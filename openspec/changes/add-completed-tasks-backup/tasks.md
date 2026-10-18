@@ -14,8 +14,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 1. API client: GET requests and pagination
 
-- [ ] 1.1 Generalize the retry loop of `Client.post` into `Client.request(method, path, params)` and add `Client.get` (design D1). In `UrllibTransport`, send GET parameters as a query string with no body and no `Content-Type`, and name the real method in error and rate-limit messages. Verify with an offline test against a local `http.server` thread that a GET request carries the query, the bearer header and no body, that POST requests are unchanged, that a 400 on a GET names `GET` in its message, that the request log shows no query string, and that `tests/test_api.py` and `tests/test_contract_probes.py` still pass
-- [ ] 1.2 Add `cursor_pages` (follows `next_cursor` until it is absent or null; a repeated cursor raises `ApiError`) and `offset_pages` (advances `offset` until a page is shorter than `limit`) to `api.py`. Verify with fake-transport unit tests for one page, three pages, a null cursor, a repeated cursor and an offset walk that ends on an exactly full page followed by an empty one
+- [x] 1.1 Generalize the retry loop of `Client.post` into `Client.request(method, path, params)` and add `Client.get` (design D1). In `UrllibTransport`, send GET parameters as a query string with no body and no `Content-Type`, and name the real method in error and rate-limit messages. Verify with an offline test against a local `http.server` thread that a GET request carries the query, the bearer header and no body, that POST requests are unchanged, that a 400 on a GET names `GET` in its message, that the request log shows no query string, and that `tests/test_api.py` and `tests/test_contract_probes.py` still pass
+- [x] 1.2 Add `cursor_pages` (follows `next_cursor` until it is absent or null; a repeated cursor raises `ApiError`) and `offset_pages` (advances `offset` until a page is shorter than `limit`) to `api.py`. Verify with fake-transport unit tests for one page, three pages, a null cursor, a repeated cursor and an offset walk that ends on an exactly full page followed by an empty one
 
 ## 2. State file
 
