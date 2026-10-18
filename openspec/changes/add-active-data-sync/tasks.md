@@ -56,11 +56,11 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 6. Command-line interface
 
-- [ ] 6.1 Implement `backup <target>` in `cli.py` with `--quiet`, `--verbose` and `--max-rate-limit-wait`, the `LEVEL message` stderr format, the warning counter, and the summary line (written, unchanged, deleted, warnings). Verify with CLI tests (fixture transport injected) that the stderr output matches the spec scenarios for the default and quiet modes
-- [ ] 6.2 Implement reading `TODOIST_API_TOKEN` and validating the target (create with parents, accept an existing backup or a directory holding only `state.json`, reject foreign non-empty directories and files). Verify with CLI tests that each case gives the specified exit status and that no request is made when the exit status is 2
-- [ ] 6.3 Implement the exception-to-exit-code mapping (D3), with tracebacks only under `--verbose`. Verify with CLI tests for exit 0 with a warning, 1 for persistent network failure, auth failure and a held lock, and 2 for usage and configuration errors, each asserting that the token appears neither on stderr nor in any file of the target
-- [ ] 6.4 Add a test that runs the CLI with stdin closed and no terminal (subprocess with `stdin=DEVNULL`) against a local `http.server` fixture, and verify that it completes with exit status 0
-- [ ] 6.5 Document installation, the token variable, the `backup` command, exit codes, scheduling examples (cron, launchd, Task Scheduler), and platform notes (macOS certificates, local disk for the target, Windows long paths) in the project `README.md`. Verify that the documented commands match `todoist-takeout --help`
+- [x] 6.1 Implement `backup <target>` in `cli.py` with `--quiet`, `--verbose` and `--max-rate-limit-wait`, the `LEVEL message` stderr format, the warning counter, and the summary line (written, unchanged, deleted, warnings). Verify with CLI tests (fixture transport injected) that the stderr output matches the spec scenarios for the default and quiet modes
+- [x] 6.2 Implement reading `TODOIST_API_TOKEN` and validating the target (create with parents, accept an existing backup or a directory holding only `state.json`, reject foreign non-empty directories and files). Verify with CLI tests that each case gives the specified exit status and that no request is made when the exit status is 2
+- [x] 6.3 Implement the exception-to-exit-code mapping (D3), with tracebacks only under `--verbose`. Verify with CLI tests for exit 0 with a warning, 1 for persistent network failure, auth failure and a held lock, and 2 for usage and configuration errors, each asserting that the token appears neither on stderr nor in any file of the target
+- [x] 6.4 Add a test that runs the CLI with stdin closed and no terminal (subprocess with `stdin=DEVNULL`) against a local `http.server` fixture, and verify that it completes with exit status 0
+- [x] 6.5 Document installation, the token variable, the `backup` command, exit codes, scheduling examples (cron, launchd, Task Scheduler), and platform notes (macOS certificates, local disk for the target, Windows long paths) in the project `README.md`. Verify that the documented commands match `todoist-takeout --help`
 
 ## 7. Fixture recording and contract tests
 
