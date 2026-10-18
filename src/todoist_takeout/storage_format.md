@@ -13,9 +13,72 @@ rewritten by every run.
 |---|---|
 | `README.md` | This description. |
 | `state.json` | The checkpoint and run metadata. See [State file](#state-file). |
-| `sync/` | The account's active data, as returned by the Todoist sync API. |
+| `sync/` | The account's active data, as returned by the Todoist sync API. See [Active data](#active-data). |
 | `pending/` | A downloaded response that has not been applied yet. Normally empty. See [Pending response](#pending-response). |
 | `.lock` | Lock file that keeps two runs from working on the same backup. See [Lock file](#lock-file). |
+
+## Active data
+
+`sync/` holds the account's active data, as returned by the Todoist sync endpoint
+(`/api/v1/sync`). Each top-level key of a sync response is a resource, for example `items`
+(tasks), `projects`, `notes` (task comments) or `project_notes` (project comments). A resource is
+stored according to its shape:
+
+| Shape | Stored at | Example |
+|---|---|---|
+| Collection: an array of objects | `sync/<resource>/<key>.json`, one file per object | `sync/items/6X7rM8997g3RQmvh.json` |
+| Mapping: a JSON object whose values are objects | `sync/<resource>/<name>.json`, one file per entry, named after the entry | `sync/workspaces/28173.json` |
+| Single value | `sync/<resource>.json` | `sync/user.json` |
+
+The key of a collection object is its `id`, except in these collections, where it is built from
+several fields in this order (see [File names](#file-names)):
+
+| Resource | Key fields |
+|---|---|
+| `view_options` | `view_type`, `object_id` |
+| `workspace_users` | `workspace_id`, `user_id` |
+| `collaborator_states`, `collaborators_states` | `project_id`, `user_id` |
+| `project_view_options_defaults` | `project_id` |
+
+For example, the view option with `view_type` `project` and `object_id` `6X7fphhgwcXVGccJ` is
+stored at `sync/view_options/project~6X7fphhgwcXVGccJ.json`. Integer key fields are written in
+decimal.
+
+Resources stored as mappings: `workspaces`.
+
+Resources stored as single values: `user`, `user_settings`, `user_plan_limits`, `stats`,
+`notification_settings`, `settings_notifications`, `live_notifications_last_read_id`,
+`live_notifications_last_read`, `day_orders`, `locations`, `role_actions`.
+
+Not stored under `sync/`: `sync_token`, `full_sync` and `full_sync_date_utc`, which go into
+`state.json`, and `temp_id_mapping` and `sync_status`, which only matter for write requests.
+
+A resource the tool does not know, or a known resource whose value has an unexpected shape, is
+stored by its shape: an array whose objects all have an `id` as a collection keyed by `id`,
+anything else as a single value. The tool prints a warning naming the resource.
+
+**Updates.** The first sync of a backup is a full sync, which returns every object. Later syncs are
+incremental and return only what changed since the previous one; the files of all other objects
+stay as they are. An empty array or object in an incremental sync means that nothing changed. A
+single value is replaced as a whole. If the server sends a full sync again, objects missing from it
+are kept unchanged, and the tool warns how many there were; they may have been deleted in Todoist.
+
+**Deleted objects.** When an object is deleted in Todoist, the sync returns it with
+`"is_deleted": true`, sometimes with all its fields and sometimes with only a few. No file is ever
+removed:
+
+- If the backup has no file for the object yet, the deletion payload is stored as `<key>.json`.
+- If the deletion payload contains every top-level field of the stored object, it replaces
+  `<key>.json`.
+- Otherwise `<key>.json` keeps the last full content of the object, and the deletion payload is
+  written next to it as a tombstone, `sync/<resource>/<key>.deleted.json`, for example
+  `sync/projects/6X7fphhgwcXVGccJ.deleted.json`.
+
+An object counts as deleted if its `<key>.json` has `"is_deleted": true` or a `<key>.deleted.json`
+exists.
+
+Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. The
+attached files themselves are not downloaded.
 
 ## JSON encoding
 

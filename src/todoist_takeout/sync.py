@@ -1,0 +1,191 @@
+"""Applying sync responses to the backup (design D8).
+
+Every object of a response is written as its own file under `sync/`, unchanged. Deleted objects
+become tombstones; no file is ever removed.
+"""
+
+import json
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+
+from todoist_takeout import resources, storage
+from todoist_takeout.errors import StorageError
+from todoist_takeout.resources import COLLECTION, MAPPING, META, SINGLE, Classifier, Kind
+
+log = logging.getLogger(__name__)
+
+SYNC_DIR = "sync"
+JSON_SUFFIX = ".json"
+DELETED_SUFFIX = ".deleted.json"
+
+
+@dataclass
+class ApplyStats:
+    written: int = 0
+    unchanged: int = 0
+    deleted: int = 0
+    missing: int = 0
+
+    def add(self, other: "ApplyStats") -> None:
+        self.written += other.written
+        self.unchanged += other.unchanged
+        self.deleted += other.deleted
+        self.missing += other.missing
+
+
+def apply_response(target: Path, response: dict, classifier: Classifier) -> ApplyStats:
+    """Store every resource of a parsed sync response under `target/sync/`."""
+    sync_dir = Path(target) / SYNC_DIR
+    full = response.get("full_sync") is True
+    stats = ApplyStats()
+    stored_live = _stored_live_keys(sync_dir) if full else {}
+
+    for key, value in response.items():
+        kind = classifier.classify(key, value)
+        if kind.name == META:
+            continue
+        name = storage.encode_key(key)
+        if not full and _is_empty(value):
+            continue  # an empty or missing resource in an incremental sync means "no change"
+        if kind.name == SINGLE:
+            _count(stats, storage.write_bytes_atomic(sync_dir / f"{name}{JSON_SUFFIX}", storage.encode_json(value)))
+            continue
+
+        directory = sync_dir / name
+        if kind.name == COLLECTION:
+            entries = [(resources.object_key(kind, obj), obj) for obj in value]
+        else:
+            entries = [((map_key,), obj) for map_key, obj in value.items()]
+        seen = set()
+        for object_key, obj in entries:
+            stem = storage.encode_key(object_key)
+            seen.add(stem)
+            _apply_object(directory, stem, object_key, kind, obj, stats)
+        if full and name in stored_live:
+            stored_live[name] -= seen
+
+    if full:
+        stats.missing = sum(len(stems) for stems in stored_live.values())
+        if stats.missing:
+            log.warning(
+                "%d stored objects were not in the full sync; they may have been deleted in Todoist "
+                "and are kept unchanged",
+                stats.missing,
+            )
+    return stats
+
+
+def _apply_object(directory: Path, stem: str, key: tuple[str, ...], kind: Kind, obj, stats: ApplyStats) -> None:
+    path = directory / f"{stem}{JSON_SUFFIX}"
+    data = storage.encode_json(obj)
+    stored = storage.read_bytes(path)
+    if stored == data:
+        stats.unchanged += 1
+        return
+    stored_value = None
+    if stored is not None:
+        stored_value = _parse_stored(path, stored)
+        _check_key(path, stored_value, key, kind)
+
+    if not (isinstance(obj, dict) and obj.get("is_deleted") is True):
+        _count(stats, storage.write_bytes_atomic(path, data))
+        return
+
+    # A deletion payload. Keep the last full content if the payload lacks any of its fields.
+    if stored_value is None or (isinstance(stored_value, dict) and stored_value.keys() <= obj.keys()):
+        written = storage.write_bytes_atomic(path, data)
+    else:
+        tombstone = directory / f"{stem}{DELETED_SUFFIX}"
+        existing = storage.read_bytes(tombstone)
+        if existing is not None and existing != data:
+            _check_key(tombstone, _parse_stored(tombstone, existing), key, kind)
+        written = storage.write_bytes_atomic(tombstone, data)
+    if written:
+        stats.deleted += 1
+    else:
+        stats.unchanged += 1
+
+
+def _check_key(path: Path, stored_value, key: tuple[str, ...], kind: Kind) -> None:
+    """Fail instead of replacing a file that holds a different object (design D7).
+
+    On a case-insensitive file system, keys that differ only in letter case share a file.
+    """
+    if kind.name == COLLECTION:
+        stored_key = resources.object_key(kind, stored_value)
+    else:
+        # A mapping entry's key is not part of its content; the directory entry carries it.
+        stored_key = storage.decode_key(_listed_stem(path))
+    if stored_key != key:
+        raise StorageError(
+            f"{path} holds the object with key {_show(stored_key)}, which is not the key "
+            f"{_show(key)} of the object to store there; on a case-insensitive file system two keys "
+            "that differ only in letter case share a file. The file was not changed"
+        )
+
+
+def _listed_stem(path: Path) -> str:
+    suffix = DELETED_SUFFIX if path.name.endswith(DELETED_SUFFIX) else JSON_SUFFIX
+    names = _listdir(path.parent)
+    if path.name not in names:
+        # Only a case-insensitive file system opens a file under a name it does not list.
+        for name in names:
+            if name.lower() == path.name.lower():
+                return name[: -len(suffix)]
+    return path.name[: -len(suffix)]
+
+
+def _show(key) -> str:
+    if key is None:
+        return "(none)"
+    return "+".join(repr(part) for part in key)
+
+
+def _parse_stored(path: Path, data: bytes):
+    try:
+        return json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise StorageError(f"{path} is not a valid JSON file: {exc}") from exc
+
+
+def _stored_live_keys(sync_dir: Path) -> dict[str, set[str]]:
+    """Return the stems of the stored objects that are not marked deleted, per resource directory."""
+    live = {}
+    if not sync_dir.is_dir():
+        return live
+    for directory in sorted(p for p in sync_dir.iterdir() if p.is_dir()):
+        names = set(_listdir(directory))
+        stems = set()
+        for name in names:
+            if not name.endswith(JSON_SUFFIX) or name.endswith(DELETED_SUFFIX):
+                continue
+            stem = name[: -len(JSON_SUFFIX)]
+            if f"{stem}{DELETED_SUFFIX}" in names:
+                continue
+            value = _parse_stored(directory / name, storage.read_bytes(directory / name) or b"null")
+            if isinstance(value, dict) and value.get("is_deleted") is True:
+                continue
+            stems.add(stem)
+        live[directory.name] = stems
+    return live
+
+
+def _listdir(directory: Path) -> list[str]:
+    try:
+        return [p.name for p in directory.iterdir()]
+    except FileNotFoundError:
+        return []
+    except OSError as exc:
+        raise StorageError(f"cannot list {directory}: {exc.strerror or exc}") from exc
+
+
+def _is_empty(value) -> bool:
+    return isinstance(value, (list, dict)) and not value
+
+
+def _count(stats: ApplyStats, written: bool) -> None:
+    if written:
+        stats.written += 1
+    else:
+        stats.unchanged += 1
