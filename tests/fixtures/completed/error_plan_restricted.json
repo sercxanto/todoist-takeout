@@ -1,0 +1,9 @@
+{
+  "error": "Premium only feature",
+  "error_code": 32,
+  "error_extra": {
+    "event_id": "5a7c9e1b3d5f7092"
+  },
+  "error_tag": "PREMIUM_ONLY",
+  "http_code": 403
+}

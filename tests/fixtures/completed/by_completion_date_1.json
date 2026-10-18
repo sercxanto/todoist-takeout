@@ -1,0 +1,73 @@
+{
+  "items": [
+    {
+      "id": "6X8Gq4CfVh9xPm2R",
+      "user_id": "2671355",
+      "project_id": "6X7fphhgwcXVGccJ",
+      "section_id": "6X7FxXvX84jHphx2",
+      "parent_id": null,
+      "added_by_uid": "2671355",
+      "assigned_by_uid": null,
+      "responsible_uid": null,
+      "labels": [
+        "errand"
+      ],
+      "deadline": null,
+      "duration": null,
+      "checked": true,
+      "is_deleted": false,
+      "added_at": "2026-09-01T08:00:00.000000Z",
+      "completed_at": "2026-09-12T18:40:12.345678Z",
+      "completed_by_uid": "2671355",
+      "updated_at": "2026-09-12T18:40:12.345678Z",
+      "due": {
+        "date": "2026-09-12",
+        "timezone": null,
+        "string": "Sep 12",
+        "lang": "en",
+        "is_recurring": false
+      },
+      "priority": 1,
+      "child_order": 3,
+      "content": "Größe der Äpfel prüfen 🍎",
+      "description": "",
+      "note_count": 2,
+      "day_order": -1,
+      "is_collapsed": false
+    },
+    {
+      "id": "6X8Gq3vJmR2cWp7H",
+      "user_id": "2671355",
+      "project_id": "6X7fphhgwcXVGccJ",
+      "section_id": "6X7FxXvX84jHphx2",
+      "parent_id": null,
+      "added_by_uid": "2671355",
+      "assigned_by_uid": null,
+      "responsible_uid": null,
+      "labels": [],
+      "deadline": null,
+      "duration": null,
+      "checked": true,
+      "is_deleted": false,
+      "added_at": "2026-09-01T08:00:00.000000Z",
+      "completed_at": "2026-09-03T07:15:00.000000Z",
+      "completed_by_uid": "2671355",
+      "updated_at": "2026-09-03T07:15:00.000000Z",
+      "due": {
+        "date": "2026-09-12",
+        "timezone": null,
+        "string": "Sep 12",
+        "lang": "en",
+        "is_recurring": false
+      },
+      "priority": 1,
+      "child_order": 3,
+      "content": "Water the plants",
+      "description": "",
+      "note_count": 0,
+      "day_order": -1,
+      "is_collapsed": false
+    }
+  ],
+  "next_cursor": "Y3Vyc29yOjI"
+}

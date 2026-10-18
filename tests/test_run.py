@@ -11,6 +11,8 @@ from todoist_takeout.api import Client
 from todoist_takeout.errors import ConfigError, RunError
 from todoist_takeout.sync import format_description, run_backup
 
+from fake_api import FakeApi
+
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
 NOW = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
 OLD = 1_000_000_000
@@ -34,26 +36,12 @@ ACCOUNT = {
 }
 
 
-class FixtureTransport:
-    """Answers each sync request with the response stored for its sync token."""
-
-    def __init__(self, responses):
-        self.responses = responses
-        self.requests = []
-
-    def send(self, method, path, form):
-        assert (method, path) == ("POST", "sync")
-        token = form["sync_token"]
-        self.requests.append(token)
-        return 200, {}, self.responses[token]
-
-
 def _no_sleep(delay):
     raise AssertionError("the run should not wait")
 
 
 def run(target, responses=ACCOUNT, now=NOW):
-    transport = FixtureTransport(responses)
+    transport = FakeApi(responses)
     stats = run_backup(target, Client(transport, sleep=_no_sleep), now=lambda: now)
     return transport.requests, stats
 

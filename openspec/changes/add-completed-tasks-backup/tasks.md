@@ -24,8 +24,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 3. Fixtures and test harness
 
-- [ ] 3.1 Add hand-written fixtures under `tests/fixtures/completed/`, in the shapes recorded by the probes but with invented IDs and content: by-completion-date pages with and without `next_cursor`, `tasks/completed` pages with `projects`, `sections` and `item_object`, activity pages with 128-bit event IDs and an event dated before a test T0, comments pages with a `file_attachment`, and error bodies for 404, 410 and a plan restriction. Verify with a fixture-loading test that every file parses, and that a 128-bit ID survives `json.loads` and `storage.encode_json` unchanged
-- [ ] 3.2 Add a fake transport for GET endpoints that answers by method, path and parameters, records the requests, and returns empty pages for endpoints a test does not configure. Make the existing `FixtureTransport` of the run and CLI tests use it, so that they keep passing once the completed part runs after the sync. Verify that the whole offline suite passes unchanged
+- [x] 3.1 Add hand-written fixtures under `tests/fixtures/completed/`, in the shapes recorded by the probes but with invented IDs and content: by-completion-date pages with and without `next_cursor`, `tasks/completed` pages with `projects`, `sections` and `item_object`, activity pages with 128-bit event IDs and an event dated before a test T0, comments pages with a `file_attachment`, and error bodies for 404, 410 and a plan restriction. Verify with a fixture-loading test that every file parses, and that a 128-bit ID survives `json.loads` and `storage.encode_json` unchanged
+- [x] 3.2 Add a fake transport for GET endpoints that answers by method, path and parameters, records the requests, and returns empty pages for endpoints a test does not configure. Make the existing `FixtureTransport` of the run and CLI tests use it, so that they keep passing once the completed part runs after the sync. Verify that the whole offline suite passes unchanged
 
 ## 4. Completed-task months and their comments
 

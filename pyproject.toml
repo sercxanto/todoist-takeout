@@ -34,6 +34,8 @@ todoist_takeout = ["storage_format.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Lets tests import their helpers, such as `fake_api`.
+pythonpath = ["tests"]
 addopts = ["--import-mode=importlib", "-m", "not contract"]
 markers = [
     "contract: runs against the real Todoist API; select with `pytest -m contract`",

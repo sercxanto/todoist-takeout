@@ -18,6 +18,8 @@ from todoist_takeout.errors import StorageError
 from todoist_takeout.lock import LOCK_FILE
 from todoist_takeout.resources import Classifier
 
+from fake_api import FakeApi
+
 FIXTURES = Path(__file__).parent / "fixtures"
 EXPECTED_TREE = FIXTURES / "expected_tree"
 UPDATE_VARIABLE = "TODOIST_TAKEOUT_UPDATE_EXPECTED"
@@ -51,14 +53,6 @@ def test_case_insensitive_file_system_refuses_to_merge_keys(tmp_path):
     assert json.loads(stored.read_bytes()) == response["projects"][0]
 
 
-class FixtureTransport:
-    def __init__(self, responses):
-        self.responses = responses
-
-    def send(self, method, path, form):
-        return 200, {}, self.responses[form["sync_token"]]
-
-
 def files(root: Path) -> dict[str, bytes]:
     return {
         path.relative_to(root).as_posix(): path.read_bytes()
@@ -77,7 +71,7 @@ def test_cli_backup_matches_the_expected_tree(tmp_path, monkeypatch):
     target = tmp_path / "backup"
 
     def factory(token, max_rate_limit_wait):
-        return Client(FixtureTransport(responses), sleep=lambda delay: None)
+        return Client(FakeApi(responses), sleep=lambda delay: None)
 
     assert main(["backup", "--quiet", str(target)], client_factory=factory) == 0
     produced = files(target)
