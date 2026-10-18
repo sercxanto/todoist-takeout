@@ -244,3 +244,82 @@ def test_incremental_sync_does_not_count_missing_objects(tmp_path, sync_fixture,
         stats = apply(tmp_path, sync_fixture("incremental_edit"))
     assert stats.missing == 0
     assert caplog.records == []
+
+
+# --- 4.7 restored objects -----------------------------------------------------
+
+PROJECT = "sync/projects/6X7fphhgwcXVGccJ.json"
+PROJECT_TOMBSTONE = "sync/projects/6X7fphhgwcXVGccJ.deleted.json"
+
+
+def restore_response(full):
+    project = {**full["projects"][1], "name": "Restored", "is_deleted": False}
+    return {"sync_token": "INC-9", "full_sync": False, "projects": [project]}
+
+
+def test_live_payload_restores_a_tombstoned_object(tmp_path, sync_fixture):
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    apply(tmp_path, sync_fixture("delete_stub"))
+    restore = restore_response(full)
+    stats = apply(tmp_path, restore)
+    assert (tmp_path / PROJECT).read_bytes() == storage.encode_json(restore["projects"][0])
+    assert not (tmp_path / PROJECT_TOMBSTONE).exists()
+    assert tree(tmp_path) == FULL_SYNC_TREE
+    assert (stats.written, stats.unchanged, stats.deleted) == (1, 0, 0)
+
+
+def test_tombstone_next_to_an_up_to_date_object_is_removed(tmp_path, sync_fixture):
+    # A run that wrote the restored payload and was killed before it removed the tombstone.
+    full = sync_fixture("full_sync")
+    restore = restore_response(full)
+    apply(tmp_path, full)
+    apply(tmp_path, sync_fixture("delete_stub"))
+    storage.write_bytes_atomic(tmp_path / PROJECT, storage.encode_json(restore["projects"][0]))
+    stats = apply(tmp_path, restore)
+    assert (tmp_path / PROJECT).read_bytes() == storage.encode_json(restore["projects"][0])
+    assert not (tmp_path / PROJECT_TOMBSTONE).exists()
+    assert (stats.written, stats.unchanged) == (1, 0)
+
+
+def test_interrupted_restore_completes_on_reapplication(tmp_path, sync_fixture):
+    full = sync_fixture("full_sync")
+    restore = restore_response(full)
+    apply(tmp_path, full)
+    apply(tmp_path, sync_fixture("delete_stub"))
+    storage.set_fault_after(1)  # the payload is written, the removal of the tombstone fails
+    try:
+        with pytest.raises(storage.InjectedFault):
+            apply(tmp_path, restore)
+    finally:
+        storage.set_fault_after(None)
+    assert (tmp_path / PROJECT_TOMBSTONE).exists()
+    apply(tmp_path, restore)
+    assert not (tmp_path / PROJECT_TOMBSTONE).exists()
+    assert (tmp_path / PROJECT).read_bytes() == storage.encode_json(restore["projects"][0])
+
+
+def test_reapplying_a_restore_changes_nothing(tmp_path, sync_fixture):
+    full = sync_fixture("full_sync")
+    restore = restore_response(full)
+    apply(tmp_path, full)
+    apply(tmp_path, sync_fixture("delete_stub"))
+    apply(tmp_path, restore)
+    age_all_files(tmp_path)
+    before = snapshot(tmp_path)
+    stats = apply(tmp_path, restore)
+    assert snapshot(tmp_path) == before
+    assert set(mtimes(tmp_path).values()) == {OLD}
+    assert (stats.written, stats.unchanged) == (0, 1)
+
+
+def test_tombstone_of_another_key_is_not_removed(tmp_path, sync_fixture):
+    # On a case-insensitive file system, the tombstone of `6x7fphhgwcxvgccj` would be found under
+    # the name of `6X7fphhgwcXVGccJ`.
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    other = storage.encode_json({"id": "6x7fphhgwcxvgccj", "is_deleted": True})
+    storage.write_bytes_atomic(tmp_path / PROJECT_TOMBSTONE, other)
+    with pytest.raises(StorageError):
+        apply(tmp_path, restore_response(full))
+    assert (tmp_path / PROJECT_TOMBSTONE).read_bytes() == other

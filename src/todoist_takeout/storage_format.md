@@ -64,8 +64,8 @@ single value is replaced as a whole. If the server sends a full sync again, obje
 are kept unchanged, and the tool warns how many there were; they may have been deleted in Todoist.
 
 **Deleted objects.** When an object is deleted in Todoist, the sync returns it with
-`"is_deleted": true`, sometimes with all its fields and sometimes with only a few. No file is ever
-removed:
+`"is_deleted": true`, sometimes with all its fields and sometimes with only a few. The object's
+file is never removed:
 
 - If the backup has no file for the object yet, the deletion payload is stored as `<key>.json`.
 - If the deletion payload contains every top-level field of the stored object, it replaces
@@ -76,6 +76,11 @@ removed:
 
 An object counts as deleted if its `<key>.json` has `"is_deleted": true` or a `<key>.deleted.json`
 exists.
+
+**Restored objects.** When the sync returns an object without `"is_deleted": true` that the
+backup stores as deleted, the returned payload is written to `<key>.json`, and then its
+`<key>.deleted.json` is removed, so that the object counts as live again. This is the only case in
+which the tool removes a file under `sync/`.
 
 Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. The
 attached files themselves are not downloaded.

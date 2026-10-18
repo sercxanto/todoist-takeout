@@ -321,3 +321,40 @@ def test_fault_hook_fires_after_configured_writes(tmp_path):
 
 def test_fault_hook_is_not_an_exception_subclass():
     assert not issubclass(storage.InjectedFault, Exception)
+
+
+def test_remove_file(tmp_path):
+    path = tmp_path / "a.json"
+    path.write_bytes(b"x\n")
+    assert storage.remove_file(path) is True
+    assert not path.exists()
+    assert storage.remove_file(path) is False
+
+
+def test_remove_file_counts_as_a_write_for_the_fault_hook(tmp_path):
+    path = tmp_path / "a.json"
+    path.write_bytes(b"x\n")
+    storage.set_fault_after(0)
+    with pytest.raises(storage.InjectedFault):
+        storage.remove_file(path)
+    assert path.exists()
+
+
+def test_remove_file_retries_sharing_violations_on_windows(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "_WINDOWS", True)
+    monkeypatch.setattr(storage, "_sleep", lambda delay: None)
+    real_unlink = os.unlink
+    calls = []
+
+    def unlink(path):
+        calls.append(path)
+        if len(calls) <= 2:
+            raise PermissionError(13, "sharing violation")
+        real_unlink(path)
+
+    monkeypatch.setattr(storage.os, "unlink", unlink)
+    path = tmp_path / "a.json"
+    path.write_bytes(b"x\n")
+    assert storage.remove_file(path) is True
+    assert len(calls) == 3
+    assert not path.exists()

@@ -113,7 +113,7 @@ _fault_after: int | None = None
 def set_fault_after(writes: int | None) -> None:
     """Let the next `writes` writes succeed and make the one after raise InjectedFault.
 
-    The hook fires once and then disarms itself. `None` disarms it.
+    A file removal counts as a write. The hook fires once and then disarms itself. `None` disarms it.
     """
     global _fault_after
     _fault_after = writes
@@ -180,6 +180,23 @@ def write_bytes_atomic(path: Path, data: bytes, *, full_sync: bool = False) -> b
     return True
 
 
+def remove_file(path: Path) -> bool:
+    """Remove `path` durably. Return False if it did not exist."""
+    path = Path(path)
+    if not path.exists():
+        return False
+    # A fault injected here leaves the file in place, like a process killed before the removal.
+    _count_write()
+    try:
+        _retry_on_sharing_violation(os.unlink, path)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise StorageError(f"cannot remove {path}: {exc.strerror or exc}") from exc
+    _sync_dir(path.parent)
+    return True
+
+
 def remove_temp_files(root: Path) -> int:
     """Remove temp files (`.*.tmp`) that an interrupted run left under `root`. Return their number."""
     removed = 0
@@ -217,12 +234,16 @@ def _sync_file(fd: int, full_sync: bool) -> None:
 
 
 def _replace(src: Path, dst: Path) -> None:
+    _retry_on_sharing_violation(os.replace, src, dst)
+
+
+def _retry_on_sharing_violation(operation, *args) -> None:
     # On Windows, virus scanners, indexers and sync clients briefly open files without
-    # FILE_SHARE_DELETE, which makes the replace fail with a sharing violation.
+    # FILE_SHARE_DELETE, which makes a replace or removal fail with a sharing violation.
     delay = 0.05
     for attempt in range(_REPLACE_RETRIES + 1):
         try:
-            os.replace(src, dst)
+            operation(*args)
             return
         except PermissionError:
             if not _WINDOWS or attempt == _REPLACE_RETRIES:

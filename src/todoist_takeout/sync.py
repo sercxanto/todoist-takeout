@@ -1,7 +1,8 @@
 """Applying sync responses to the backup (design D8).
 
 Every object of a response is written as its own file under `sync/`, unchanged. Deleted objects
-become tombstones; no file is ever removed.
+become tombstones. The only file ever removed under `sync/` is the tombstone of an object that the
+sync returns as live again.
 """
 
 import json
@@ -79,17 +80,21 @@ def apply_response(target: Path, response: dict, classifier: Classifier) -> Appl
 def _apply_object(directory: Path, stem: str, key: tuple[str, ...], kind: Kind, obj, stats: ApplyStats) -> None:
     path = directory / f"{stem}{JSON_SUFFIX}"
     data = storage.encode_json(obj)
+    live = not (isinstance(obj, dict) and obj.get("is_deleted") is True)
     stored = storage.read_bytes(path)
     if stored == data:
-        stats.unchanged += 1
+        # A run interrupted between writing a restored object and removing its tombstone
+        # left the tombstone behind; remove it now.
+        _count(stats, live and _restore(directory, stem, key, kind))
         return
     stored_value = None
     if stored is not None:
         stored_value = _parse_stored(path, stored)
         _check_key(path, stored_value, key, kind)
 
-    if not (isinstance(obj, dict) and obj.get("is_deleted") is True):
-        _count(stats, storage.write_bytes_atomic(path, data))
+    if live:
+        written = storage.write_bytes_atomic(path, data)
+        _count(stats, _restore(directory, stem, key, kind) or written)
         return
 
     # A deletion payload. Keep the last full content if the payload lacks any of its fields.
@@ -105,6 +110,20 @@ def _apply_object(directory: Path, stem: str, key: tuple[str, ...], kind: Kind, 
         stats.deleted += 1
     else:
         stats.unchanged += 1
+
+
+def _restore(directory: Path, stem: str, key: tuple[str, ...], kind: Kind) -> bool:
+    """Remove the tombstone of an object that the sync returned as live. Return whether one existed.
+
+    Call it only after `<key>.json` holds the live payload, so that a crash never leaves the
+    object without its tombstone and without its new content.
+    """
+    tombstone = directory / f"{stem}{DELETED_SUFFIX}"
+    existing = storage.read_bytes(tombstone)
+    if existing is None:
+        return False
+    _check_key(tombstone, _parse_stored(tombstone, existing), key, kind)
+    return storage.remove_file(tombstone)
 
 
 def _check_key(path: Path, stored_value, key: tuple[str, ...], kind: Kind) -> None:
