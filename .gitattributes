@@ -1,0 +1,4 @@
+# Fixtures and expected backup trees are compared byte for byte, and storage_format.md is copied
+# into every backup, so keep them byte-identical on every platform.
+tests/fixtures/** -text
+src/todoist_takeout/storage_format.md -text

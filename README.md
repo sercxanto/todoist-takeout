@@ -2,7 +2,7 @@
 
 A command-line tool that keeps a complete, long-term readable local backup of a [Todoist](https://www.todoist.com) account.
 
-> **Status:** planning. Nothing is usable yet; see the [Roadmap](#roadmap).
+> **Status:** early. Backing up active data (projects, sections, labels, tasks, comments and the other resources of the sync API) works. Completed tasks and archived projects are not backed up yet; see the [Roadmap](#roadmap).
 
 ## Why
 
@@ -169,7 +169,7 @@ These will be written up in more detail in the design documents of the correspon
 
 ## Roadmap
 
-1. **Sync active data:** a full sync, then incremental syncs, with checkpointing and tombstones. See [openspec/changes/add-active-data-sync/](openspec/changes/add-active-data-sync/).
+1. **Sync active data** *(implemented)*: a full sync, then incremental syncs, with checkpointing and tombstones. The format is described in [storage_format.md](src/todoist_takeout/storage_format.md). See [openspec/changes/add-active-data-sync/](openspec/changes/add-active-data-sync/).
 2. **Back up completed tasks and archived projects:** month files for completed tasks, written incrementally, plus archived projects with their sections and tasks, which the sync endpoint does not return. Several open questions remain. See [openspec/changes/add-completed-tasks-backup/](openspec/changes/add-completed-tasks-backup/).
 3. **Comments and attachments of completed tasks.** How expensive this is depends on the API (see the open questions in step 2).
 4. **Download attachment files.**

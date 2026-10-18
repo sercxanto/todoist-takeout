@@ -72,9 +72,9 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 8. Cross-platform integration
 
-- [ ] 8.1 Add a GitHub Actions workflow with a matrix of ubuntu, macos and windows × Python 3.11 and 3.13 that runs `pytest`. Verify that the workflow file passes `actionlint` (or a YAML lint) locally; the first real run happens once a remote exists
-- [ ] 8.2 Add the case-insensitive file-system test (D14), which uses a probe to detect case sensitivity and is skipped on case-sensitive file systems, and an end-to-end CLI test that compares the produced tree with a committed expected tree byte-for-byte. Verify that both pass locally on Linux (with the case test skipped) and are part of the CI matrix
-- [ ] 8.3 Update the README roadmap and status to reflect that active-data sync is implemented. Verify that the README links to `storage_format.md`
+- [x] 8.1 Add a GitHub Actions workflow with a matrix of ubuntu, macos and windows × Python 3.11 and 3.13 that runs `pytest`. Verify that the workflow file passes `actionlint` (or a YAML lint) locally; the first real run happens once a remote exists
+- [x] 8.2 Add the case-insensitive file-system test (D14), which uses a probe to detect case sensitivity and is skipped on case-sensitive file systems, and an end-to-end CLI test that compares the produced tree with a committed expected tree byte-for-byte. Verify that both pass locally on Linux (with the case test skipped) and are part of the CI matrix
+- [x] 8.3 Update the README roadmap and status to reflect that active-data sync is implemented. Verify that the README links to `storage_format.md`
 
 ## Workflow follow-up
 

@@ -1,0 +1,6 @@
+{
+  "share_invitation_sent": {
+    "notify_push": true,
+    "notify_email": true
+  }
+}
