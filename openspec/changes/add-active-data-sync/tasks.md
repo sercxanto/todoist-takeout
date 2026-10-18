@@ -31,10 +31,10 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 3. API client
 
-- [ ] 3.1 Implement the `Transport` protocol and the `urllib` transport in `api.py` (POST form encoding, bearer header, `Accept-Encoding: gzip`, User-Agent, 300 s timeout, default SSL context). Verify with an offline test against a local `http.server` thread that the transport sends the expected headers and form body, decodes a gzip response, and that no log record contains the token
-- [ ] 3.2 Implement the retrying `Client` with an injected clock and sleep (D4): 429 with `error_extra.retry_after`, then `Retry-After`, then the default; a per-run total wait cap; 5 attempts with backoff for network errors, timeouts and 5xx; no retry for other 4xx. Verify with unit tests using a scripted fake transport for each path, including cap exhaustion raising `RateLimitExhausted`
-- [ ] 3.3 Implement the error classification: `AuthError` for 401 and auth 403 (message names `TODOIST_API_TOKEN`), `PlanRestricted` for known plan tags, and `ApiError` carrying `error`/`error_tag`/`error_code`. Verify with unit tests that each class is raised for a matching recorded error body and that the messages contain the API's fields but not the token
-- [ ] 3.4 Add the `sync(token)` call that returns the raw response bytes. Verify with a fake-transport test that it posts `sync_token` and `resource_types=["all"]` and returns the body unchanged
+- [x] 3.1 Implement the `Transport` protocol and the `urllib` transport in `api.py` (POST form encoding, bearer header, `Accept-Encoding: gzip`, User-Agent, 300 s timeout, default SSL context). Verify with an offline test against a local `http.server` thread that the transport sends the expected headers and form body, decodes a gzip response, and that no log record contains the token
+- [x] 3.2 Implement the retrying `Client` with an injected clock and sleep (D4): 429 with `error_extra.retry_after`, then `Retry-After`, then the default; a per-run total wait cap; 5 attempts with backoff for network errors, timeouts and 5xx; no retry for other 4xx. Verify with unit tests using a scripted fake transport for each path, including cap exhaustion raising `RateLimitExhausted`
+- [x] 3.3 Implement the error classification: `AuthError` for 401 and auth 403 (message names `TODOIST_API_TOKEN`), `PlanRestricted` for known plan tags, and `ApiError` carrying `error`/`error_tag`/`error_code`. Verify with unit tests that each class is raised for a matching recorded error body and that the messages contain the API's fields but not the token
+- [x] 3.4 Add the `sync(token)` call that returns the raw response bytes. Verify with a fake-transport test that it posts `sync_token` and `resource_types=["all"]` and returns the body unchanged
 
 ## 4. Resources and applying responses
 
