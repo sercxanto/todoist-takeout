@@ -182,3 +182,48 @@ The documented storage schema is part of each step and grows with the backup for
 
 - The dev container ([.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)) provides Python 3.12.
 - Planning uses [OpenSpec](https://github.com/Fission-AI/OpenSpec). Run `openspec list` to see changes in progress.
+
+### Tests
+
+```sh
+python -m pip install -e '.[test]'
+pytest
+```
+
+The default run is fully offline: it uses the fixtures under [tests/fixtures/](tests/fixtures/) and never calls the real API. CI runs it on Linux, macOS and Windows.
+
+### Contract tests against the real API
+
+The contract tests detect when Todoist changes its API. They are deselected by default; select them with `pytest -m contract`. They use two accounts, each given by its own variable:
+
+| Variable | Account | Used by |
+|---|---|---|
+| `TODOIST_CONTRACT_TOKEN` | the read account, for example your own | read-only tests only |
+| `TODOIST_CONTRACT_WRITE_TOKEN` | the write account: a **dedicated test account, never a personal one** | read-only tests, and the write test |
+| `TODOIST_CONTRACT_ALLOW_WRITES=1` | | unlocks the write test |
+
+Each test skips when its variables are not set. The write test uses only `TODOIST_CONTRACT_WRITE_TOKEN`, never the read token. Before it writes anything, it refuses to run if both variables hold the same token or tokens of the same Todoist user.
+
+```sh
+# Read-only: the shape of a full sync of each configured account, compared with tests/fixtures/shapes.json.
+export TODOIST_CONTRACT_TOKEN=…          # set in your shell; never commit it
+export TODOIST_CONTRACT_WRITE_TOKEN=…
+pytest -m contract tests/contract/test_read.py
+
+# Write: creates, deletes, restores and archives temporary projects in the test account, then removes them.
+TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_write.py
+```
+
+Findings, such as the shape of deletion payloads, rejected commands and the plan limits of each account, are written to `tests/contract/findings/`. That directory is not committed, and the API payloads in it are scrubbed. If the write test fails during cleanup, it names the projects to delete by hand.
+
+### Recording fixtures
+
+[scripts/record_fixtures.py](scripts/record_fixtures.py) records a full and an incremental sync from a real account and writes them to `tests/fixtures/recorded/<account>/`. Recording is read-only. Every string is replaced with a placeholder except IDs, keys and enum-like values. Then the script regenerates `tests/fixtures/shapes.json`, which the contract tests compare against.
+
+```sh
+python scripts/record_fixtures.py record --account read    # uses TODOIST_CONTRACT_TOKEN
+python scripts/record_fixtures.py record --account write   # uses TODOIST_CONTRACT_WRITE_TOKEN
+python scripts/record_fixtures.py shapes                   # regenerate shapes.json only
+```
+
+Review the recorded files for personal data before you commit them.

@@ -9,3 +9,6 @@ venv/
 .coverage
 htmlcov/
 .ruff_cache/
+
+# Contract-test results (tests/contract/conftest.py)
+tests/contract/findings/
