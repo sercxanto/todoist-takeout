@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from todoist_takeout import resources, storage
+from todoist_takeout import completed, resources, storage
 from todoist_takeout.api import Client
 from todoist_takeout.errors import ConfigError, RunError, StorageError
 from todoist_takeout.lock import LOCK_FILE, TargetLock
@@ -36,6 +36,7 @@ MAX_ROUNDS = 2
 # account out of the backup (design D12), and the part each one names.
 PLAN_FEATURES = {
     "comments": "task and project comments",
+    "completed_tasks": "completed tasks, completion events and their comments",
 }
 
 
@@ -91,6 +92,7 @@ def run_backup(target: Path, client: Client, *, now: Callable[[], datetime] | No
                 break
             log.info("following the full sync with an incremental sync to catch up")
 
+        completed.run(target, client, state, now)
         _warn_about_plan_limits(target)
         state["last_successful_run_utc"] = _timestamp(now())
         storage.write_state(target, state)
@@ -169,14 +171,23 @@ def format_description() -> bytes:
     return text.replace("\r\n", "\n").encode("utf-8")
 
 
-def _warn_about_plan_limits(target: Path) -> None:
-    path = target / SYNC_DIR / f"{storage.encode_key(PLAN_LIMITS)}{JSON_SUFFIX}"
+def stored_value(target: Path, resource: str):
+    """Return the stored value of a single-value resource, such as `user`, or None if there is none."""
+    path = Path(target) / SYNC_DIR / f"{storage.encode_key(resource)}{JSON_SUFFIX}"
     data = storage.read_bytes(path)
-    if data is None:
-        return
-    limits = _parse_stored(path, data)
+    return None if data is None else _parse_stored(path, data)
+
+
+def current_plan_limits(target: Path) -> dict:
+    """The stored `user_plan_limits.current`, or an empty dict if the backup has none."""
+    limits = stored_value(target, PLAN_LIMITS)
     current = limits.get("current") if isinstance(limits, dict) else None
-    if not isinstance(current, dict):
+    return current if isinstance(current, dict) else {}
+
+
+def _warn_about_plan_limits(target: Path) -> None:
+    current = current_plan_limits(target)
+    if not current:
         return
     plan = current.get("plan_name")
     plan = f"Todoist plan {plan!r}" if isinstance(plan, str) else "Todoist plan"

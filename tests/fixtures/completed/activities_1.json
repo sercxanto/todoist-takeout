@@ -1,0 +1,45 @@
+{
+  "results": [
+    {
+      "id": 152735830295847392018475629384756102938,
+      "object_type": "item",
+      "object_id": "6X8Gr7Mn2pQwVb4T",
+      "event_type": "completed",
+      "event_date": "2026-10-19T06:30:00.000000Z",
+      "parent_project_id": "6X7fphhgwcXVGccJ",
+      "parent_item_id": null,
+      "initiator_id": null,
+      "extra_data": {
+        "client": "Todoist-Web",
+        "content": "Take out the bins",
+        "due_date": "2026-09-07T00:00:00Z",
+        "is_recurring": true,
+        "labels": [],
+        "note_count": 0,
+        "section_id": "6X7FxXvX84jHphx2"
+      },
+      "extra_data_id": null
+    },
+    {
+      "id": 152735830295847392018475629384756999001,
+      "object_type": "item",
+      "object_id": "6X8Gr7Mn2pQwVb4T",
+      "event_type": "completed",
+      "event_date": "2026-10-20T06:45:30.000000Z",
+      "parent_project_id": "6X7fphhgwcXVGccJ",
+      "parent_item_id": null,
+      "initiator_id": null,
+      "extra_data": {
+        "client": "Todoist-Web",
+        "content": "Take out the bins",
+        "due_date": "2026-09-07T00:00:00Z",
+        "is_recurring": true,
+        "labels": [],
+        "note_count": 0,
+        "section_id": "6X7FxXvX84jHphx2"
+      },
+      "extra_data_id": null
+    }
+  ],
+  "next_cursor": "YWN0aXZpdHk6Mg"
+}

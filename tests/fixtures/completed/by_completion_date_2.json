@@ -1,0 +1,37 @@
+{
+  "items": [
+    {
+      "id": "6X8Gq5Rw3jKcX8vQ",
+      "user_id": "2671355",
+      "project_id": "6X7fphhgwcXVGccJ",
+      "section_id": "6X7FxXvX84jHphx2",
+      "parent_id": null,
+      "added_by_uid": "2671355",
+      "assigned_by_uid": null,
+      "responsible_uid": null,
+      "labels": [],
+      "deadline": null,
+      "duration": null,
+      "checked": true,
+      "is_deleted": false,
+      "added_at": "2026-09-01T08:00:00.000000Z",
+      "completed_at": "2026-09-30T23:59:59.999999Z",
+      "completed_by_uid": "2671355",
+      "updated_at": "2026-09-30T23:59:59.999999Z",
+      "due": {
+        "date": "2026-09-30",
+        "timezone": null,
+        "string": "Sep 12",
+        "lang": "en",
+        "is_recurring": false
+      },
+      "priority": 1,
+      "child_order": 3,
+      "content": "Pay the September rent",
+      "description": "",
+      "note_count": 0,
+      "day_order": -1,
+      "is_collapsed": false
+    }
+  ]
+}

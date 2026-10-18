@@ -1,0 +1,9 @@
+{
+  "error": "This endpoint is no longer available",
+  "error_code": 410,
+  "error_extra": {
+    "event_id": "8d2e4b6a0c1f3e57"
+  },
+  "error_tag": "GONE",
+  "http_code": 410
+}

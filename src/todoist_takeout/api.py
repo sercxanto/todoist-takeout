@@ -15,7 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from typing import Protocol
 
 from todoist_takeout import __version__
@@ -67,10 +67,11 @@ class TransportError(Exception):
 
 
 class Transport(Protocol):
-    def send(self, method: str, path: str, form: Mapping[str, str]) -> tuple[int, Mapping[str, str], bytes]:
+    def send(self, method: str, path: str, params: Mapping[str, str]) -> tuple[int, Mapping[str, str], bytes]:
         """Send one request. Return status, headers and the body after transfer decoding.
 
-        HTTP error statuses are returned, not raised. Network failures raise TransportError.
+        `params` is the form body of a POST request and the query string of a GET request. HTTP
+        error statuses are returned, not raised. Network failures raise TransportError.
         """
 
 
@@ -94,11 +95,12 @@ class UrllibTransport:
     def __repr__(self) -> str:
         return f"UrllibTransport(base_url={self._base_url!r})"
 
-    def send(self, method, path, form):
+    def send(self, method, path, params):
         url = urllib.parse.urljoin(self._base_url, path)
+        # Only the path is logged: a query may carry content such as dates or IDs.
         log.debug("%s %s", method, urllib.parse.urlsplit(url).path)
         try:
-            status, headers, body = self._request(method, url, form)
+            status, headers, body = self._request(method, url, params)
             if headers.get("Content-Encoding", "").lower() == "gzip":
                 body = gzip.decompress(body)
         except urllib.error.HTTPError as exc:
@@ -129,18 +131,21 @@ class UrllibTransport:
             raise TransportError(f"request failed: {type(exc).__name__}: {exc}") from exc
         return status, headers, body
 
-    def _request(self, method, url, form):
-        request = urllib.request.Request(
-            url,
-            data=urllib.parse.urlencode(form).encode("ascii"),
-            method=method,
-            headers={
-                "Authorization": f"Bearer {self._token}",
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept-Encoding": "gzip",
-                "User-Agent": USER_AGENT,
-            },
-        )
+    def _request(self, method, url, params):
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT,
+        }
+        encoded = urllib.parse.urlencode(params)
+        if method == "GET":
+            data = None
+            if encoded:
+                url = f"{url}{'&' if urllib.parse.urlsplit(url).query else '?'}{encoded}"
+        else:
+            data = encoded.encode("ascii")
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+        request = urllib.request.Request(url, data=data, method=method, headers=headers)
         with self._opener.open(request, timeout=self._timeout) as response:
             return response.status, response.headers, response.read()
 
@@ -170,11 +175,18 @@ class Client:
         """Request a sync of all resource types and return the response body unchanged."""
         return self.post("sync", {"sync_token": sync_token, "resource_types": '["all"]'})
 
+    def get(self, path: str, params: Mapping[str, str]) -> bytes:
+        return self.request("GET", path, params)
+
     def post(self, path: str, form: Mapping[str, str]) -> bytes:
+        return self.request("POST", path, form)
+
+    def request(self, method: str, path: str, params: Mapping[str, str]) -> bytes:
+        """Send a request, retrying network errors, 5xx and rate limits. Return the body unchanged."""
         attempt = 1
         while True:
             try:
-                status, headers, body = self._transport.send("POST", path, form)
+                status, headers, body = self._transport.send(method, path, params)
             except TransportError as exc:
                 if not exc.retryable:
                     raise NetworkError(str(exc)) from exc
@@ -187,32 +199,83 @@ class Client:
             if 200 <= status < 300:
                 return body
             if status == 429:
-                self._wait_for_rate_limit(path, headers, _error_body(body))
+                self._wait_for_rate_limit(method, path, headers, _error_body(body))
                 continue
             if status >= 500:
                 if attempt >= MAX_ATTEMPTS:
-                    raise _classify(path, status, body, suffix=f" (gave up after {attempt} attempts)")
+                    raise _classify(method, path, status, body, suffix=f" (gave up after {attempt} attempts)")
                 self._backoff(attempt, f"HTTP {status}")
                 attempt += 1
                 continue
-            raise _classify(path, status, body)
+            raise _classify(method, path, status, body)
 
     def _backoff(self, attempt: int, reason: str) -> None:
         delay = 2 ** (attempt - 1) + self._jitter() * MAX_JITTER
         log.info("request failed (%s); retrying in %.0f s (attempt %d of %d)", reason, delay, attempt + 1, MAX_ATTEMPTS)
         self._sleep(delay)
 
-    def _wait_for_rate_limit(self, path: str, headers: Mapping[str, str], error: dict) -> None:
+    def _wait_for_rate_limit(self, method: str, path: str, headers: Mapping[str, str], error: dict) -> None:
         delay = max(_retry_after(headers, error), MIN_RATE_LIMIT_WAIT) + self._jitter() * MAX_JITTER
         if self.rate_limit_waited + delay > self._max_rate_limit_wait:
             raise RateLimitExhausted(
-                f"the Todoist API kept rate-limiting POST /{path}; waiting another {delay:.0f} s would "
+                f"the Todoist API kept rate-limiting {method} /{_path_only(path)}; waiting another {delay:.0f} s would "
                 f"exceed the limit of {self._max_rate_limit_wait:.0f} s per run "
                 f"(waited {self.rate_limit_waited:.0f} s so far)"
             )
         log.info("rate-limited by the Todoist API; waiting %.0f s before retrying", delay)
         self._sleep(delay)
         self.rate_limit_waited += delay
+
+
+def cursor_pages(client: Client, path: str, params: Mapping[str, str], limit: int) -> Iterator[dict]:
+    """Yield the parsed pages of a GET endpoint with cursor pagination.
+
+    Follows `next_cursor` until it is absent or null. A cursor seen before raises ApiError instead
+    of looping forever.
+    """
+    seen: set[str] = set()
+    cursor = None
+    while True:
+        query = {**params, "limit": str(limit)}
+        if cursor is not None:
+            query["cursor"] = cursor
+        page = _parse_page("GET", path, client.get(path, query))
+        yield page
+        cursor = page.get("next_cursor")
+        if cursor is None:
+            return
+        if not isinstance(cursor, str) or cursor in seen:
+            raise ApiError(f"GET /{_path_only(path)} returned the cursor {cursor!r} again", http_status=200)
+        seen.add(cursor)
+
+
+def offset_pages(
+    client: Client, path: str, params: Mapping[str, str], limit: int, items_key: str = "items"
+) -> Iterator[dict]:
+    """Yield the parsed pages of a GET endpoint with offset pagination.
+
+    Advances `offset` by `limit` until a page holds fewer than `limit` entries under `items_key`.
+    """
+    offset = 0
+    while True:
+        page = _parse_page("GET", path, client.get(path, {**params, "limit": str(limit), "offset": str(offset)}))
+        items = page.get(items_key)
+        if not isinstance(items, list):
+            raise ApiError(f"GET /{_path_only(path)} returned a page without a list in {items_key!r}", http_status=200)
+        yield page
+        if len(items) < limit:
+            return
+        offset += limit
+
+
+def _parse_page(method: str, path: str, body: bytes) -> dict:
+    try:
+        page = json.loads(body)
+    except ValueError as exc:
+        raise ApiError(f"{method} /{_path_only(path)} returned invalid JSON: {exc}", http_status=200) from exc
+    if not isinstance(page, dict):
+        raise ApiError(f"{method} /{_path_only(path)} returned a page that is not a JSON object", http_status=200)
+    return page
 
 
 def _retry_after(headers: Mapping[str, str], error: dict) -> float:
@@ -244,6 +307,11 @@ def _header(headers: Mapping[str, str], name: str) -> str | None:
     return None
 
 
+def _path_only(path: str) -> str:
+    # Messages, like the request log, never show a query string.
+    return urllib.parse.urlsplit(path).path
+
+
 def _error_body(body: bytes) -> dict:
     try:
         value = json.loads(body)
@@ -252,7 +320,7 @@ def _error_body(body: bytes) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def _classify(path: str, status: int, body: bytes, *, suffix: str = "") -> ApiError:
+def _classify(method: str, path: str, status: int, body: bytes, *, suffix: str = "") -> ApiError:
     """Turn an error response into the matching ApiError subclass."""
     error = _error_body(body)
     text = error.get("error")
@@ -267,7 +335,7 @@ def _classify(path: str, status: int, body: bytes, *, suffix: str = "") -> ApiEr
         details.append(f"error_tag {tag}")
     if code is not None:
         details.append(f"error_code {code}")
-    message = f"POST /{path} failed: {text or 'no error message'} ({', '.join(details)}){suffix}"
+    message = f"{method} /{_path_only(path)} failed: {text or 'no error message'} ({', '.join(details)}){suffix}"
     fields = {"http_status": status, "error": text, "error_tag": tag, "error_code": code}
 
     if status == 401 or (

@@ -1,0 +1,10 @@
+{
+  "error": "Item not found",
+  "error_code": 22,
+  "error_extra": {
+    "event_id": "3f1c9a0e2b7d4c58",
+    "retry_after": 3
+  },
+  "error_tag": "NOT_FOUND",
+  "http_code": 404
+}

@@ -14,6 +14,7 @@ kept up to date by every run.
 | `README.md` | This description. |
 | `state.json` | The checkpoint and run metadata. See [State file](#state-file). |
 | `sync/` | The account's active data, as returned by the Todoist sync API. See [Active data](#active-data). |
+| `completed/` | Completed tasks, completion events and the comments of completed tasks. See [Completed tasks](#completed-tasks). |
 | `pending/` | A downloaded response that has not been applied yet. Normally empty. See [Pending response](#pending-response). |
 | `.lock` | Lock file that keeps two runs from working on the same backup. See [Lock file](#lock-file). |
 
@@ -92,6 +93,105 @@ which the tool removes a file under `sync/`.
 Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. The
 attached files themselves are not downloaded.
 
+## Completed tasks
+
+`completed/` holds the account's completed tasks, month by month, one event per completion
+(including the completions of recurring tasks), and the comments of completed tasks. The sync in
+`sync/` does not include them. Months are UTC months in the form `YYYY-MM`.
+
+| Path | Content | Source |
+|---|---|---|
+| `completed/<YYYY-MM>.json` | The tasks completed in that month, for example `completed/2026-09.json`. | `GET /api/v1/tasks/completed/by_completion_date` |
+| `completed/comments/<task id>.json` | The comments of one completed task, for example `completed/comments/6X8Gq4CfVh9xPm2R.json`. | `GET /api/v1/comments` |
+| `completed/activity/<YYYY-MM>.json` | The completion events from T0 on whose `event_date` is in that month, for example `completed/activity/2026-10.json`. | `GET /api/v1/activities` |
+| `completed/backfill/<YYYY-MM>.json` | The completions before T0 whose `completed_at` is in that month, for example `completed/backfill/2026-09.json`. | `GET /api/v1/tasks/completed` |
+
+**Contents.** Each file holds one JSON object shaped like the API response it comes from: its list
+of entries (`items` for tasks, `results` for comments and events) and every other top-level key of
+the response, except the pagination cursor `next_cursor`. The tool adds no keys. When the entries
+arrive in several pages, they are merged into the one list, each entry exactly as the API returned
+it. The entries are ordered by time (`completed_at` for tasks, `posted_at` for comments,
+`event_date` for events) and then by `id`, with integer IDs compared as numbers; an entry without
+the time field comes first.
+
+A task entry is the task's full payload, with the same fields as in `sync/items/`, as it was when its
+month was last fetched. A task belongs to the month of its `completed_at`, so a task completed at
+`2026-09-30T23:59:59.999999Z` is in `completed/2026-09.json`.
+
+**Open and closed months.** Each run fetches every month that is not closed, from the month the
+account was created through the current month, and replaces the month's file with the result. A
+month without completed tasks has a file too, holding `{"items": []}`. A month closes once a run
+has fetched it at least 7 days after the month ended (the grace period); `tasks_closed_through` in
+`state.json` names the last closed month. Months that ended more than 7 days before the first run
+close as soon as they are stored. A closed month is never fetched again. As a consequence:
+
+- While a month is open, its file follows completions, uncompletions and changes to its tasks.
+- Changes made in Todoist to the tasks of a closed month are not in the backup. This includes
+  completions backdated into a closed month.
+- A task that was completed, uncompleted and completed again in a later month is in both months'
+  files. The entry with the newest `completed_at` is the task's current state.
+- Tasks in archived projects are not included: the API returns them only for a request filtered
+  by project.
+- Completions of recurring tasks are not included: such a task is never completed as a whole, it
+  moves to its next date. Its completions are in the [completion events](#completion-events).
+
+**Comments.** For each completed task whose `note_count` is greater than 0, the file
+`completed/comments/<task id>.json` holds its comments; the file name follows the rules of
+[File names](#file-names). While the task's month is open, its comments are fetched again whenever
+its `note_count` differs from the one stored in the month's file: new comments are added, and
+changed ones replace the stored version (matched by `id`). A comment once stored stays in the file,
+even after it is deleted in Todoist. Comments keep their attachment metadata (`file_attachment`)
+exactly as the API returned it; the attached files are not downloaded. On a plan without comments,
+no comments of completed tasks are stored.
+
+### Completion events
+
+A completion event records one completion of a task, including each completion of a recurring task
+and completions by other people in shared projects. Completions before T0, the start of the first
+run that backed up completed tasks (`t0_utc` in `state.json`), come from the one-time
+[backfill](#backfill-of-earlier-completions); completions from T0 on come from the activity log. The
+two sources cover separate time ranges, so no completion is in both.
+
+`completed/activity/<YYYY-MM>.json` holds the `item:completed` events of the activity log
+(`GET /api/v1/activities`) from T0 on, in the month of their `event_date`; an event without a valid
+`event_date` is in the month in which it was fetched. Only months with events have a file. Each run
+fetches the events since the day before the previous fetch, so fetches overlap, and merges them into
+the stored files by `id`: an event is stored once, with the content of its latest fetch, and an
+event once stored stays. An event's `extra_data` holds a snapshot of the task (content, due date,
+`is_recurring`, labels, `note_count`, section), not the full task.
+
+The activity log keeps a limited history: on the Free plan, 7 days (`activity_log_limit` in
+`sync/user_plan_limits.json`). If the backup is not run within that period, events in the gap may
+be missing; the tool warns which period is affected.
+
+**Large integers.** The `id` of an event is an integer larger than 64 bits, for example
+`152735830295847392018475629384756102938`. The files hold it exactly, but tools that parse JSON
+numbers as 64-bit integers or as doubles corrupt it, among them JavaScript (`JSON.parse`) and an
+SQLite `INTEGER` column. Read these files with a parser that keeps large integers, such as Python's
+`json`, or treat the `id` as text.
+
+### Backfill of earlier completions
+
+`completed/backfill/<YYYY-MM>.json` holds the completions before T0, fetched once from
+`GET /api/v1/tasks/completed`, month by month from the first month through the month of T0. The
+month of T0 holds only the completions before T0. A month without completions has a file too. The
+backfill can take several runs; `backfill_through` in `state.json` names the last month stored,
+and the next run continues with the month after it. Once the month of T0 is stored,
+`backfill_status` is `complete` and the endpoint is not requested again.
+
+Each entry in `items` is one completion, with its own `id` (a UUID), the `task_id` of the completed
+task and its `completed_at`; a recurring task has one entry per completion. `item_object` holds the
+full task object, with the same fields as in `sync/items/`; for a task deleted since, it may be the
+only full copy left. The maps `projects` and `sections` hold the projects and sections the entries
+refer to, keyed by their `id`, which may be the only names left of projects and sections deleted
+since. Unlike the activity log, this endpoint does not return completions by other people in
+shared projects, so those are missing before T0.
+
+The endpoint is deprecated. If the API no longer offers it (HTTP 404 or 410), `backfill_status`
+becomes `unavailable`, the months already stored are kept, the tool warns once, and it does not
+request the endpoint again. The completions of recurring tasks before T0 are then missing from the
+backup; other completed tasks are still in the month files.
+
 ## JSON encoding
 
 Every `.json` file the tool writes is encoded the same way on every operating system:
@@ -104,12 +204,13 @@ Every `.json` file the tool writes is encoded the same way on every operating sy
 - object keys in the order the API returned them.
 
 Each object file holds exactly the JSON value the API returned for that object, with every field
-and nothing added. Only whitespace and the spelling of numbers can differ from the API's text.
+and nothing added, and so does each entry in a file under `completed/`. Only whitespace and the
+spelling of numbers can differ from the API's text.
 
 ## File names
 
 An object's file name is built from its key: usually its `id`, sometimes several fields (the
-`sync/` section names them). Each key component is encoded on its own:
+`sync/` section names them). The comments of a completed task are named after the task's `id`. Each key component is encoded on its own:
 
 - the characters `A`-`Z`, `a`-`z`, `0`-`9`, `_` and `-` are kept;
 - every other character is written as its UTF-8 bytes, each as `%XX` with uppercase hex digits.
@@ -140,6 +241,14 @@ points past data that is not on disk.
   "sync_token": "…",
   "last_full_sync_utc": "2026-10-18T10:00:00Z",
   "last_successful_run_utc": "2026-10-18T10:00:05Z",
+  "completed": {
+    "t0_utc": "2026-10-18T10:00:05.123456Z",
+    "first_month": "2016-03",
+    "tasks_closed_through": "2026-09",
+    "backfill_through": "2026-10",
+    "backfill_status": "complete",
+    "activity_fetched_utc": "2026-10-18T10:00:05.123456Z"
+  },
   "tool_version": "0.1.0"
 }
 ```
@@ -150,7 +259,23 @@ points past data that is not on disk.
 | `sync_token` | The sync token of the last applied response, or `null` before the first one is applied. |
 | `last_full_sync_utc` | The `full_sync_date_utc` of the last full sync, or `null`. |
 | `last_successful_run_utc` | When the last run completed, or `null`. |
+| `completed` | The checkpoint of the completed tasks, see below. Missing until a run backs up completed tasks. |
 | `tool_version` | The version of todoist-takeout that last wrote the file. |
+
+The `completed` object records how far the backup of completed tasks, completion events and the
+comments of completed tasks has come. Months are UTC months in the form `YYYY-MM`.
+
+| Field | Meaning |
+|---|---|
+| `t0_utc` | The start of the first run that backed up completed tasks (T0). It never changes. Completion events from T0 on come from the activity log; completions before T0 come from the one-time backfill. |
+| `first_month` | The first month that is backed up: the month the account was created (`joined_at` of the user), or `2007-01` if that is unknown. It never changes. |
+| `tasks_closed_through` | The last closed month of completed tasks, or `null`. A month closes once it was fetched at least 7 days after it ended; closed months are never fetched again. |
+| `backfill_through` | The last month the one-time backfill has stored, or `null`. |
+| `backfill_status` | `in_progress` while the backfill has months left, `complete` once it has stored the month of T0, or `unavailable` if the API no longer offers its endpoint. |
+| `activity_fetched_utc` | When the last complete fetch of the activity log started, or `null`. The next fetch continues from there. |
+
+Each field advances only after the files it covers are written. A backup without the `completed`
+object starts this part as on a first run.
 
 Times are UTC in ISO 8601 format. The first run creates `state.json` without a sync token before
 it writes anything else, which marks the directory as a todoist-takeout backup. Fields that a later

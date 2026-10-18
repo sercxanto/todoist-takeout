@@ -1055,5 +1055,403 @@
       "full_sync": true,
       "fields": {}
     }
+  },
+  "endpoints": {
+    "by_completion_date": {
+      "sources": [
+        "recorded/read/by_completion_date.json",
+        "recorded/write/by_completion_date.json"
+      ],
+      "keys": {
+        "items": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {
+            "added_at": [
+              "string"
+            ],
+            "added_by_uid": [
+              "string"
+            ],
+            "assigned_by_uid": [
+              "null",
+              "string"
+            ],
+            "checked": [
+              "boolean"
+            ],
+            "child_order": [
+              "integer"
+            ],
+            "completed_at": [
+              "string"
+            ],
+            "completed_by_uid": [
+              "string"
+            ],
+            "completed_count": [
+              "integer"
+            ],
+            "content": [
+              "string"
+            ],
+            "day_order": [
+              "integer"
+            ],
+            "deadline": [
+              "null"
+            ],
+            "description": [
+              "string"
+            ],
+            "due": [
+              "null",
+              "object"
+            ],
+            "duration": [
+              "null"
+            ],
+            "id": [
+              "string"
+            ],
+            "is_collapsed": [
+              "boolean"
+            ],
+            "is_deleted": [
+              "boolean"
+            ],
+            "labels": [
+              "array"
+            ],
+            "note_count": [
+              "integer"
+            ],
+            "order_key": [
+              "null",
+              "string"
+            ],
+            "parent_id": [
+              "null"
+            ],
+            "postponed_count": [
+              "integer"
+            ],
+            "priority": [
+              "integer"
+            ],
+            "project_id": [
+              "string"
+            ],
+            "responsible_uid": [
+              "null"
+            ],
+            "section_id": [
+              "null"
+            ],
+            "updated_at": [
+              "string"
+            ],
+            "user_id": [
+              "string"
+            ]
+          }
+        },
+        "next_cursor": {
+          "kind": "value",
+          "types": [
+            "string"
+          ]
+        }
+      }
+    },
+    "tasks_completed": {
+      "sources": [
+        "recorded/read/tasks_completed.json",
+        "recorded/write/tasks_completed.json"
+      ],
+      "keys": {
+        "items": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {
+            "completed_at": [
+              "string"
+            ],
+            "content": [
+              "string"
+            ],
+            "id": [
+              "string"
+            ],
+            "item_object": [
+              "object"
+            ],
+            "meta_data": [
+              "null"
+            ],
+            "note_count": [
+              "integer"
+            ],
+            "notes": [
+              "array"
+            ],
+            "project_id": [
+              "string"
+            ],
+            "section_id": [
+              "null",
+              "string"
+            ],
+            "task_id": [
+              "string"
+            ],
+            "user_id": [
+              "string"
+            ]
+          }
+        },
+        "projects": {
+          "kind": "map",
+          "types": [
+            "object"
+          ],
+          "fields": {
+            "access": [
+              "object"
+            ],
+            "can_assign_tasks": [
+              "boolean"
+            ],
+            "can_comment": [
+              "boolean"
+            ],
+            "child_order": [
+              "integer"
+            ],
+            "color": [
+              "string"
+            ],
+            "created_at": [
+              "string"
+            ],
+            "creator_uid": [
+              "string"
+            ],
+            "default_order": [
+              "integer"
+            ],
+            "default_order_key": [
+              "null"
+            ],
+            "description": [
+              "string"
+            ],
+            "icon": [
+              "null"
+            ],
+            "id": [
+              "string"
+            ],
+            "inbox_project": [
+              "boolean"
+            ],
+            "is_archived": [
+              "boolean"
+            ],
+            "is_collapsed": [
+              "boolean"
+            ],
+            "is_deleted": [
+              "boolean"
+            ],
+            "is_favorite": [
+              "boolean"
+            ],
+            "is_frozen": [
+              "boolean"
+            ],
+            "is_shared": [
+              "boolean"
+            ],
+            "name": [
+              "string"
+            ],
+            "order_key": [
+              "string"
+            ],
+            "parent_id": [
+              "null"
+            ],
+            "public_access": [
+              "boolean"
+            ],
+            "public_key": [
+              "string"
+            ],
+            "role": [
+              "string"
+            ],
+            "updated_at": [
+              "string"
+            ],
+            "view_style": [
+              "string"
+            ]
+          }
+        },
+        "sections": {
+          "kind": "map",
+          "types": [
+            "object"
+          ],
+          "fields": {
+            "added_at": [
+              "string"
+            ],
+            "archived_at": [
+              "null"
+            ],
+            "description": [
+              "null"
+            ],
+            "id": [
+              "string"
+            ],
+            "is_archived": [
+              "boolean"
+            ],
+            "is_collapsed": [
+              "boolean"
+            ],
+            "is_deleted": [
+              "boolean"
+            ],
+            "name": [
+              "string"
+            ],
+            "order_key": [
+              "string"
+            ],
+            "project_id": [
+              "string"
+            ],
+            "section_order": [
+              "integer"
+            ],
+            "updated_at": [
+              "string"
+            ],
+            "user_id": [
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "activities": {
+      "sources": [
+        "recorded/read/activities.json",
+        "recorded/write/activities.json"
+      ],
+      "keys": {
+        "next_cursor": {
+          "kind": "value",
+          "types": [
+            "null",
+            "string"
+          ]
+        },
+        "results": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {
+            "event_date": [
+              "string"
+            ],
+            "event_type": [
+              "string"
+            ],
+            "extra_data": [
+              "object"
+            ],
+            "extra_data_id": [
+              "null"
+            ],
+            "id": [
+              "integer"
+            ],
+            "initiator_id": [
+              "string"
+            ],
+            "object_id": [
+              "string"
+            ],
+            "object_type": [
+              "string"
+            ],
+            "parent_item_id": [
+              "null"
+            ],
+            "parent_project_id": [
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "comments": {
+      "sources": [
+        "recorded/read/comments.json"
+      ],
+      "keys": {
+        "next_cursor": {
+          "kind": "value",
+          "types": [
+            "null"
+          ]
+        },
+        "results": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {
+            "content": [
+              "string"
+            ],
+            "file_attachment": [
+              "null"
+            ],
+            "id": [
+              "string"
+            ],
+            "is_deleted": [
+              "boolean"
+            ],
+            "item_id": [
+              "string"
+            ],
+            "posted_at": [
+              "string"
+            ],
+            "posted_uid": [
+              "string"
+            ],
+            "reactions": [
+              "null"
+            ],
+            "uids_to_notify": [
+              "null"
+            ]
+          }
+        }
+      }
+    }
   }
 }

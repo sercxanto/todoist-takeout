@@ -27,9 +27,12 @@ class _Handler(BaseHTTPRequestHandler):
     response = (200, {}, b"{}")
     received = []
 
+    def do_GET(self):
+        self.do_POST()
+
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
-        type(self).received.append((self.path, dict(self.headers), self.rfile.read(length)))
+        type(self).received.append((self.command, self.path, dict(self.headers), self.rfile.read(length)))
         status, headers, body = type(self).response
         headers = dict(headers)
         # Announce more bytes than are sent, so that the client sees the body cut off.
@@ -69,8 +72,8 @@ def test_transport_sends_headers_and_form(server, caplog):
         status, _headers, body = transport.send("POST", "sync", {"sync_token": "*", "resource_types": '["all"]'})
 
     assert (status, body) == (200, b'{"ok": true}')
-    [(path, headers, raw)] = _Handler.received
-    assert path == "/api/v1/sync"
+    [(method, path, headers, raw)] = _Handler.received
+    assert (method, path) == ("POST", "/api/v1/sync")
     assert headers["Authorization"] == f"Bearer {TOKEN}"
     assert headers["Accept-Encoding"] == "gzip"
     assert headers["User-Agent"] == f"todoist-takeout/{__version__}"
@@ -79,6 +82,45 @@ def test_transport_sends_headers_and_form(server, caplog):
     assert any("POST /api/v1/sync" in r.getMessage() for r in caplog.records)
     assert all(TOKEN not in r.getMessage() for r in caplog.records)
     assert TOKEN not in repr(transport)
+
+
+def test_transport_sends_get_parameters_as_query(server, caplog):
+    _httpd, base_url = server
+    _Handler.response = (200, {"Content-Type": "application/json"}, b'{"items": []}')
+    transport = api.UrllibTransport(TOKEN, base_url=base_url)
+    params = {"since": "2026-09-01T00:00:00.000000Z", "object_event_types": '["item:completed"]'}
+
+    with caplog.at_level(logging.DEBUG):
+        status, _headers, body = transport.send("GET", "tasks/completed/by_completion_date", params)
+
+    assert (status, body) == (200, b'{"items": []}')
+    [(method, path, headers, raw)] = _Handler.received
+    parts = urllib.parse.urlsplit(path)
+    assert (method, parts.path) == ("GET", "/api/v1/tasks/completed/by_completion_date")
+    assert urllib.parse.parse_qs(parts.query) == {key: [value] for key, value in params.items()}
+    assert headers["Authorization"] == f"Bearer {TOKEN}"
+    assert raw == b""
+    assert "Content-Length" not in headers and "Content-Type" not in headers
+    messages = [r.getMessage() for r in caplog.records]
+    assert "GET /api/v1/tasks/completed/by_completion_date" in messages
+    assert all("?" not in m and "2026-09" not in m for m in messages)
+
+
+def test_transport_keeps_a_query_already_in_the_path(server):
+    _httpd, base_url = server
+    api.UrllibTransport(TOKEN, base_url=base_url).send("GET", "comments?task_id=t1", {"limit": "100"})
+    [(_method, path, _headers, _raw)] = _Handler.received
+    assert urllib.parse.parse_qs(urllib.parse.urlsplit(path).query) == {"task_id": ["t1"], "limit": ["100"]}
+
+
+def test_get_errors_name_the_method_without_the_query(server):
+    _httpd, base_url = server
+    _Handler.response = _error(400, tag="INVALID_ARGUMENT_VALUE", text="Invalid argument value")
+    client = api.Client(api.UrllibTransport(TOKEN, base_url=base_url), sleep=lambda s: None)
+    with pytest.raises(ApiError) as info:
+        client.get("tasks/completed/by_completion_date", {"since": "2026-09-01T00:00:00.000000Z"})
+    assert str(info.value).startswith("GET /tasks/completed/by_completion_date failed: Invalid argument value")
+    assert "2026-09" not in str(info.value)
 
 
 def test_transport_decodes_gzip(server):
@@ -349,6 +391,25 @@ def test_error_messages_do_not_contain_the_token(server):
         assert TOKEN not in str(info.value)
 
 
+def test_get_is_sent_as_get_and_retried_like_post():
+    transport = FakeTransport((503, {}, b""), _error(429, extra={"retry_after": 3}), OK)
+    client, sleeps = _client(transport)
+    assert client.get("activities", {"limit": "100"}) == OK[2]
+    assert sleeps == [1, 3]
+    assert transport.requests == [("GET", "activities", {"limit": "100"})] * 3
+
+
+def test_rate_limit_message_names_the_method():
+    transport = FakeTransport(_error(429, extra={"retry_after": 400}))
+    client, _sleeps = _client(transport, max_rate_limit_wait=100)
+    with pytest.raises(RateLimitExhausted, match=r"rate-limiting GET /activities;"):
+        client.get("activities", {})
+
+
+def test_post_errors_still_name_post():
+    assert str(_raised(_error(400))).startswith("POST /sync failed:")
+
+
 # --- 3.4 sync call -------------------------------------------------------------
 
 
@@ -358,3 +419,87 @@ def test_sync_posts_token_and_all_resource_types_and_returns_body_unchanged():
     client, _sleeps = _client(transport)
     assert client.sync("prev-token") is body
     assert transport.requests == [("POST", "sync", {"sync_token": "prev-token", "resource_types": '["all"]'})]
+
+
+# --- pagination -----------------------------------------------------------------
+
+
+def _page(**body):
+    return 200, {}, json.dumps(body).encode()
+
+
+def _cursor_walk(*pages, params=None):
+    transport = FakeTransport(*pages)
+    client, _sleeps = _client(transport)
+    return list(api.cursor_pages(client, "activities", params or {"x": "1"}, 100)), transport.requests
+
+
+def test_cursor_pages_single_page_without_cursor():
+    pages, requests = _cursor_walk(_page(results=[{"id": 1}]))
+    assert pages == [{"results": [{"id": 1}]}]
+    assert requests == [("GET", "activities", {"x": "1", "limit": "100"})]
+
+
+def test_cursor_pages_follows_next_cursor():
+    pages, requests = _cursor_walk(
+        _page(results=[{"id": 1}], next_cursor="c1"),
+        _page(results=[{"id": 2}], next_cursor="c2"),
+        _page(results=[{"id": 3}]),
+    )
+    assert [p["results"][0]["id"] for p in pages] == [1, 2, 3]
+    assert [r[2].get("cursor") for r in requests] == [None, "c1", "c2"]
+    assert all(r[2]["x"] == "1" and r[2]["limit"] == "100" for r in requests)
+
+
+def test_cursor_pages_stops_at_null_cursor():
+    pages, requests = _cursor_walk(_page(results=[], next_cursor="c1"), _page(results=[], next_cursor=None))
+    assert len(pages) == len(requests) == 2
+
+
+def test_cursor_pages_rejects_a_repeated_cursor():
+    transport = FakeTransport(
+        _page(results=[], next_cursor="c1"), _page(results=[], next_cursor="c2"), _page(results=[], next_cursor="c1")
+    )
+    client, _sleeps = _client(transport)
+    with pytest.raises(ApiError, match="cursor 'c1' again"):
+        list(api.cursor_pages(client, "activities", {}, 100))
+    assert len(transport.requests) == 3
+
+
+def test_pages_must_be_json_objects():
+    client, _sleeps = _client(FakeTransport((200, {}, b"[]")))
+    with pytest.raises(ApiError, match="not a JSON object"):
+        list(api.cursor_pages(client, "activities", {}, 100))
+
+
+def test_offset_pages_ends_on_a_short_page():
+    transport = FakeTransport(_page(items=[{"id": "a"}, {"id": "b"}]), _page(items=[{"id": "c"}], projects={}))
+    client, _sleeps = _client(transport)
+    pages = list(api.offset_pages(client, "tasks/completed", {"annotate_items": "true"}, 2))
+    assert [len(p["items"]) for p in pages] == [2, 1]
+    assert [r[2] for r in transport.requests] == [
+        {"annotate_items": "true", "limit": "2", "offset": "0"},
+        {"annotate_items": "true", "limit": "2", "offset": "2"},
+    ]
+
+
+def test_offset_pages_ends_after_a_full_page_followed_by_an_empty_one():
+    transport = FakeTransport(
+        _page(items=[{"id": "a"}, {"id": "b"}]), _page(items=[{"id": "c"}, {"id": "d"}]), _page(items=[])
+    )
+    client, _sleeps = _client(transport)
+    pages = list(api.offset_pages(client, "tasks/completed", {}, 2))
+    assert [len(p["items"]) for p in pages] == [2, 2, 0]
+    assert [r[2]["offset"] for r in transport.requests] == ["0", "2", "4"]
+
+
+def test_offset_pages_requires_the_list_key():
+    client, _sleeps = _client(FakeTransport(_page(results=[])))
+    with pytest.raises(ApiError, match="'items'"):
+        list(api.offset_pages(client, "tasks/completed", {}, 2))
+
+
+def test_pages_keep_large_integers_exact():
+    event_id = 2**127 + 12345
+    pages, _requests = _cursor_walk((200, {}, f'{{"results": [{{"id": {event_id}}}]}}'.encode()))
+    assert pages[0]["results"][0]["id"] == event_id

@@ -1,0 +1,160 @@
+{
+  "items": [
+    {
+      "id": "a3e4b5c6-7d8e-4f90-a1b2-c3d4e5f60718",
+      "task_id": "6X8Gq4CfVh9xPm2R",
+      "user_id": "2671355",
+      "project_id": "6X7fphhgwcXVGccJ",
+      "section_id": "6X7FxXvX84jHphx2",
+      "content": "Größe der Äpfel prüfen 🍎",
+      "completed_at": "2026-09-12T18:40:12.345678Z",
+      "note_count": 2,
+      "meta_data": null,
+      "item_object": {
+        "id": "6X8Gq4CfVh9xPm2R",
+        "user_id": "2671355",
+        "project_id": "6X7fphhgwcXVGccJ",
+        "section_id": "6X7FxXvX84jHphx2",
+        "parent_id": null,
+        "added_by_uid": "2671355",
+        "assigned_by_uid": null,
+        "responsible_uid": null,
+        "labels": [
+          "errand"
+        ],
+        "deadline": null,
+        "duration": null,
+        "checked": true,
+        "is_deleted": false,
+        "added_at": "2026-09-01T08:00:00.000000Z",
+        "completed_at": "2026-09-12T18:40:12.345678Z",
+        "completed_by_uid": "2671355",
+        "updated_at": "2026-09-12T18:40:12.345678Z",
+        "due": {
+          "date": "2026-09-12",
+          "timezone": null,
+          "string": "Sep 12",
+          "lang": "en",
+          "is_recurring": false
+        },
+        "priority": 1,
+        "child_order": 3,
+        "content": "Größe der Äpfel prüfen 🍎",
+        "description": "",
+        "note_count": 2,
+        "day_order": -1,
+        "is_collapsed": false
+      }
+    },
+    {
+      "id": "5c2d8a7e-91f0-4b6d-8e3a-7f4c1a9b2d55",
+      "task_id": "6X8Gr7Mn2pQwVb4T",
+      "user_id": "2671355",
+      "project_id": "6X7fphhgwcXVGccJ",
+      "section_id": "6X7FxXvX84jHphx2",
+      "content": "Take out the bins",
+      "completed_at": "2026-09-06T06:31:10.000000Z",
+      "note_count": 0,
+      "meta_data": null,
+      "item_object": {
+        "id": "6X8Gr7Mn2pQwVb4T",
+        "user_id": "2671355",
+        "project_id": "6X7fphhgwcXVGccJ",
+        "section_id": "6X7FxXvX84jHphx2",
+        "parent_id": null,
+        "added_by_uid": "2671355",
+        "assigned_by_uid": null,
+        "responsible_uid": null,
+        "labels": [],
+        "deadline": null,
+        "duration": null,
+        "checked": false,
+        "is_deleted": false,
+        "added_at": "2026-09-01T08:00:00.000000Z",
+        "completed_at": null,
+        "completed_by_uid": null,
+        "updated_at": "2026-09-01T08:00:00.000000Z",
+        "due": {
+          "date": "2026-09-07",
+          "timezone": null,
+          "string": "every day",
+          "lang": "en",
+          "is_recurring": true
+        },
+        "priority": 1,
+        "child_order": 3,
+        "content": "Take out the bins",
+        "description": "",
+        "note_count": 0,
+        "day_order": -1,
+        "is_collapsed": false
+      }
+    },
+    {
+      "id": "0b9f0e6c-4a51-4c3e-9a57-3f1d2b8e7a10",
+      "task_id": "6X8Gr7Mn2pQwVb4T",
+      "user_id": "2671355",
+      "project_id": "6X7fphhgwcXVGccJ",
+      "section_id": "6X7FxXvX84jHphx2",
+      "content": "Take out the bins",
+      "completed_at": "2026-09-05T06:30:00.000000Z",
+      "note_count": 0,
+      "meta_data": null,
+      "item_object": {
+        "id": "6X8Gr7Mn2pQwVb4T",
+        "user_id": "2671355",
+        "project_id": "6X7fphhgwcXVGccJ",
+        "section_id": "6X7FxXvX84jHphx2",
+        "parent_id": null,
+        "added_by_uid": "2671355",
+        "assigned_by_uid": null,
+        "responsible_uid": null,
+        "labels": [],
+        "deadline": null,
+        "duration": null,
+        "checked": false,
+        "is_deleted": false,
+        "added_at": "2026-09-01T08:00:00.000000Z",
+        "completed_at": null,
+        "completed_by_uid": null,
+        "updated_at": "2026-09-01T08:00:00.000000Z",
+        "due": {
+          "date": "2026-09-07",
+          "timezone": null,
+          "string": "every day",
+          "lang": "en",
+          "is_recurring": true
+        },
+        "priority": 1,
+        "child_order": 3,
+        "content": "Take out the bins",
+        "description": "",
+        "note_count": 0,
+        "day_order": -1,
+        "is_collapsed": false
+      }
+    }
+  ],
+  "projects": {
+    "6X7fphhgwcXVGccJ": {
+      "id": "6X7fphhgwcXVGccJ",
+      "name": "Household",
+      "color": "lime_green",
+      "parent_id": null,
+      "child_order": 1,
+      "is_archived": false,
+      "is_deleted": false,
+      "view_style": "list"
+    }
+  },
+  "sections": {
+    "6X7FxXvX84jHphx2": {
+      "id": "6X7FxXvX84jHphx2",
+      "name": "Fruit",
+      "project_id": "6X7fphhgwcXVGccJ",
+      "section_order": 1,
+      "is_archived": false,
+      "is_deleted": false
+    }
+  }
+}

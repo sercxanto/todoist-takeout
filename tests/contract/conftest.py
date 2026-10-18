@@ -33,6 +33,22 @@ def client_for():
 
 
 @pytest.fixture
+def write_client(contract_support, client_for):
+    """The write token and a client for it, after the guard checked that it is not the read account."""
+    write_token = contract_support.env_token(contract_support.WRITE_TOKEN)
+    if not write_token:
+        pytest.skip(f"{contract_support.WRITE_TOKEN} is not set")
+    if not contract_support.writes_allowed():
+        pytest.skip(f"{contract_support.ALLOW_WRITES} is not 1")
+    read_token = contract_support.env_token(contract_support.READ_TOKEN)
+    try:
+        contract_support.check_write_account(write_token, read_token, client_for)
+    except contract_support.AccountGuardError as exc:
+        pytest.fail(f"refusing to write: {exc}")
+    return write_token, client_for(write_token)
+
+
+@pytest.fixture
 def write_findings():
     """Write a findings document to tests/contract/findings/<name>.json.
 

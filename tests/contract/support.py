@@ -1,4 +1,4 @@
-"""Helpers for the contract tests: account variables, the write-account guard, sync commands.
+"""Helpers for the contract tests: account variables, the write-account guard, sync commands, observer.
 
 The offline test `tests/test_contract_support.py` checks the guard, so that a misconfigured shell
 can never send write commands to the read account.
@@ -57,6 +57,20 @@ def check_write_account(write_token: str, read_token: str, client_for) -> None:
             f"{WRITE_TOKEN} and {READ_TOKEN} belong to the same Todoist user; "
             "writes must go to a dedicated test account"
         )
+
+
+class Observer:
+    """Follows the account with its own sync token, to see the raw response of each step."""
+
+    def __init__(self, client):
+        self.client = client
+        self.full = json.loads(client.sync("*"))
+        self.token = self.full["sync_token"]
+
+    def changes(self) -> dict:
+        response = json.loads(self.client.sync(self.token))
+        self.token = response["sync_token"]
+        return response
 
 
 @dataclass

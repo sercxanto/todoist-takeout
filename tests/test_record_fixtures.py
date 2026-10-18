@@ -1,8 +1,12 @@
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
-from todoist_takeout import storage
+from todoist_takeout import completed, storage
+
+from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, TASKS_COMPLETED, FakeApi, completed_fixture
 
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
 
@@ -220,3 +224,127 @@ def test_compare_shapes_does_not_report_what_an_account_or_a_full_sync_cannot_sh
         "key 'user'",
         "field items.content",
     ]
+
+
+# --- Completed-tasks endpoints ------------------------------------------------------------------
+
+
+def test_large_event_ids_become_numeric_pseudonyms_of_the_same_length(recorder):
+    first, second = completed_fixture("activities_1"), completed_fixture("activities_2")
+    second["results"].append(dict(first["results"][0]))  # the same event in a later response
+    originals = [event["id"] for page in (first, second) for event in page["results"]]
+    assert all(original > 2**64 for original in originals)
+
+    pages = [json.loads(data) for data in recorder.scrubbed_bytes([json.dumps(p).encode() for p in (first, second)])]
+    pseudonyms = [event["id"] for page in pages for event in page["results"]]
+    for original, pseudonym in zip(originals, pseudonyms):
+        assert isinstance(pseudonym, int) and pseudonym != 0 and pseudonym != original
+        assert len(str(pseudonym)) == len(str(original))
+    # Consistent within the recording: the repeated event keeps its pseudonym, the others differ.
+    assert pseudonyms[-1] == pseudonyms[0]
+    assert len(set(pseudonyms)) == len(set(originals))
+    text = "".join(json.dumps(page) for page in pages)
+    assert not any(str(original) in text for original in originals)
+
+
+def fake_account(by_month: dict[str, dict], *, comments: bool = True) -> FakeApi:
+    full = {"sync_token": "token-1", "full_sync": True, "items": []}
+    fake = FakeApi({"*": json.dumps(full).encode(), "token-1": b'{"sync_token": "token-2", "full_sync": false}'})
+    for month, page in by_month.items():
+        since, until = completed.month_window(month)
+        fake.answer(BY_COMPLETION_DATE, {"since": since, "until": until}, page)
+    fake.answer(TASKS_COMPLETED, {}, completed_fixture("tasks_completed"))
+    fake.answer(ACTIVITIES, {}, completed_fixture("activities_1"))
+    if comments:
+        fake.answer(COMMENTS, {}, completed_fixture("comments"))
+    return fake
+
+
+@pytest.fixture
+def recording(recorder, tmp_path, monkeypatch):
+    """Run `record --account read` against a fake API into a temporary recordings directory."""
+    monkeypatch.setenv("TODOIST_CONTRACT_TOKEN", TOKEN)
+    monkeypatch.setattr(recorder, "RECORDED", tmp_path / "recorded")
+
+    def run(fake: FakeApi) -> Path:
+        monkeypatch.setattr(recorder, "UrllibTransport", lambda token: fake)
+        recorder.record("read", now=datetime(2026, 10, 18, 10, tzinfo=timezone.utc))
+        return tmp_path / "recorded" / "read"
+
+    return run
+
+
+def test_record_takes_one_page_of_each_completed_tasks_endpoint(recording):
+    # September is empty; August has a task with comments (note_count 2).
+    fake = fake_account({"2026-08": completed_fixture("by_completion_date_1")})
+    directory = recording(fake)
+
+    assert sorted(path.stem for path in directory.iterdir()) == sorted(
+        ["full", "incremental", "by_completion_date", "tasks_completed", "activities", "comments"]
+    )
+    limit = {"limit": "50"}
+    assert fake.requested(BY_COMPLETION_DATE) == [
+        {"since": "2026-09-01T00:00:00.000000Z", "until": "2026-09-30T23:59:59.999999Z", **limit},
+        {"since": "2026-08-01T00:00:00.000000Z", "until": "2026-08-31T23:59:59.999999Z", **limit},
+    ]
+    assert fake.requested(TASKS_COMPLETED) == [
+        {"since": "2026-08-01T00:00:00.000000Z", "until": "2026-08-31T23:59:59.999999Z",
+         "annotate_items": "true", "offset": "0", **limit},
+    ]
+    assert fake.requested(ACTIVITIES) == [{"object_event_types": '["item:completed"]', **limit}]
+    assert fake.requested(COMMENTS) == [{"task_id": "6X8Gq4CfVh9xPm2R", **limit}]
+    assert fake.requests == ["*", "token-1"]  # two syncs and no commands
+
+    # Scrubbed with one scrubber: the comments' task matches the recorded task, and no ID is left.
+    tasks = json.loads((directory / "by_completion_date.json").read_bytes())["items"]
+    comments = json.loads((directory / "comments.json").read_bytes())["results"]
+    assert {comment["item_id"] for comment in comments} == {tasks[0]["id"]} != {"6X8Gq4CfVh9xPm2R"}
+    text = "".join(path.read_text(encoding="utf-8") for path in directory.iterdir())
+    for original in ["6X8Gq4CfVh9xPm2R", "6X7fphhgwcXVGccJ", "152735830295847392018475629384756102938", "preise"]:
+        assert original not in text, original
+
+
+def test_record_without_a_task_with_comments_drops_an_old_comments_file(recording, recorder):
+    directory = recording(fake_account({"2026-08": completed_fixture("by_completion_date_1")}))
+    assert (directory / "comments.json").exists()
+
+    without = completed_fixture("by_completion_date_2")  # no task with comments
+    fake = fake_account({"2026-09": without}, comments=False)
+    recording(fake)
+    assert not (directory / "comments.json").exists()
+    assert len(fake.requested(BY_COMPLETION_DATE)) == recorder.SEARCH_MONTHS
+    assert fake.requested(COMMENTS) == []
+    # The month recorded is the latest with completed tasks, not the last one searched.
+    assert fake.requested(TASKS_COMPLETED)[0]["since"] == "2026-09-01T00:00:00.000000Z"
+
+
+def test_rescrub_keeps_the_completed_tasks_recordings_consistent(recording, recorder):
+    directory = recording(fake_account({"2026-08": completed_fixture("by_completion_date_1")}))
+    recorder.rescrub()
+    tasks = json.loads((directory / "by_completion_date.json").read_bytes())["items"]
+    comments = json.loads((directory / "comments.json").read_bytes())["results"]
+    assert {comment["item_id"] for comment in comments} == {tasks[0]["id"]}
+
+
+def test_endpoint_shapes_follow_the_page_merge(recorder):
+    shape = recorder.endpoint_shape_of(completed_fixture("tasks_completed"))["keys"]
+    assert shape["items"]["kind"] == "list" and shape["items"]["fields"]["item_object"] == ["object"]
+    # The project map is described by the fields of its projects, not by their IDs.
+    assert shape["projects"]["kind"] == "map" and shape["projects"]["fields"]["name"] == ["string"]
+    assert recorder.endpoint_shape_of({"projects": {}})["keys"]["projects"] == {
+        "kind": "map", "types": ["object"], "fields": {},
+    }
+    events = recorder.endpoint_shape_of(completed_fixture("activities_1"))["keys"]
+    assert events["results"]["fields"]["id"] == ["integer"] and events["next_cursor"]["kind"] == "value"
+
+    changed = completed_fixture("tasks_completed")
+    changed["items"][0]["brand_new"] = 1
+    expected = recorder.endpoint_shape_of(completed_fixture("tasks_completed"))
+    added, _removed = recorder.compare_shapes(expected, recorder.endpoint_shape_of(changed))
+    assert added == ["field items.brand_new (integer)"]
+
+
+def test_committed_shapes_describe_the_completed_tasks_endpoints(recorder):
+    shapes = json.loads(recorder.SHAPES.read_bytes())
+    assert sorted(shapes["endpoints"]) == sorted(recorder.ENDPOINTS)
+    assert all("full_sync" not in entry for e in shapes["endpoints"].values() for entry in e["keys"].values())

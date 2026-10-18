@@ -1,0 +1,106 @@
+# Spec Delta
+
+## ADDED Requirements
+
+### Requirement: Completed-tasks layout
+Completed tasks SHALL be stored at `completed/<YYYY-MM>.json`, completion events from the activity log at `completed/activity/<YYYY-MM>.json`, completions from the one-time backfill at `completed/backfill/<YYYY-MM>.json`, and the comments of a completed task at `completed/comments/<task id>.json`. Months are UTC. An event belongs to the month of its `event_date`, a backfill entry to the month of its `completed_at`.
+
+#### Scenario: Month of completed tasks
+- **WHEN** the completed tasks of September 2026 are stored
+- **THEN** they are in `completed/2026-09.json`
+
+#### Scenario: Month without completions
+- **WHEN** a fetched month has no completed tasks
+- **THEN** `completed/<YYYY-MM>.json` exists for it and holds an empty list of tasks
+
+#### Scenario: Completion event
+- **WHEN** the activity log returns a completion event with `event_date` `2026-10-01T00:00:01.000000Z`
+- **THEN** it is stored in `completed/activity/2026-10.json`
+
+#### Scenario: Comments of a completed task
+- **WHEN** the comments of the completed task with id `6X7rM8997g3RQmvh` are stored
+- **THEN** they are in `completed/comments/6X7rM8997g3RQmvh.json`, with the file name built by the same rules as object file names
+
+### Requirement: Contents of completed-tasks files
+Each file under `completed/` SHALL hold one JSON object shaped like the API response it comes from: its list of entries, and every other top-level key of the response except the pagination cursor. When the entries come from several pages or fetches, they SHALL be merged into that one list, each entry unchanged, ordered by time and then by `id`. The tool SHALL NOT add keys.
+
+#### Scenario: Several pages
+- **WHEN** the completed tasks of a month arrive in three pages
+- **THEN** `completed/<YYYY-MM>.json` holds one object whose `items` list contains the entries of all three pages, ordered by `completed_at` and then `id`, and no `next_cursor`
+
+#### Scenario: Additional top-level keys
+- **WHEN** a response of `tasks/completed` carries `projects` and `sections` next to `items`
+- **THEN** the backfill file of that month holds `projects` and `sections` too
+
+### Requirement: Completed-tasks checkpoint
+`state.json` SHALL also hold T0, the last closed month of completed tasks, the progress of the one-time backfill, and the time of the last fetch of the activity log. The tool SHALL record T0 before its first request for completed tasks, and SHALL advance each of the other values only after the files it covers are written.
+
+#### Scenario: Month closed
+- **WHEN** a run closes 2026-09
+- **THEN** `state.json` names 2026-09 as the last closed month only after `completed/2026-09.json` and the comments of its tasks are written
+
+#### Scenario: Killed before the checkpoint
+- **WHEN** a run is killed after writing `completed/activity/2026-10.json` but before recording the time of that fetch
+- **THEN** the next run fetches those events again and the file ends up with each event once
+
+## MODIFIED Requirements
+
+### Requirement: Directory layout
+A backup directory SHALL contain `state.json`, a format description `README.md`, and a `sync/` directory, and a `completed/` directory once completed tasks are backed up. A resource that is a collection of objects SHALL be stored as one file per object at `sync/<resource>/<key>.json`. A resource that is a single value SHALL be stored at `sync/<resource>.json`. `<resource>` is the top-level key of the sync response, for example `items`, `projects` or `notes`.
+
+#### Scenario: Task file
+- **WHEN** the sync returns a task with id `6X7rM8997g3RQmvh`
+- **THEN** it is stored at `sync/items/6X7rM8997g3RQmvh.json`
+
+#### Scenario: Single-value resource
+- **WHEN** the sync returns the `user` object
+- **THEN** it is stored at `sync/user.json`
+
+#### Scenario: Object without an id field
+- **WHEN** the sync returns an object of a collection whose objects are identified by several fields, such as a view option identified by `view_type` and `object_id`
+- **THEN** it is stored at `sync/<resource>/<key>.json`, where `<key>` is built from those fields in the order and with the separator the format description documents
+
+#### Scenario: Object identified by one of several fields
+- **WHEN** the sync returns a `completed_info` entry that has `project_id` `P1` and no `section_id`
+- **THEN** it is stored at `sync/completed_info/project_id~P1.json`
+
+#### Scenario: Completed tasks
+- **WHEN** a run backs up completed tasks
+- **THEN** they are stored under `completed/` as the Completed-tasks layout requirement describes
+
+### Requirement: Raw payloads unchanged
+Each object file SHALL contain exactly the JSON value the API returned for that object: every field, with the same names, values and order. The tool SHALL NOT add fields, remove fields or wrap the value. Each entry in a file under `completed/` SHALL likewise be exactly the JSON value the API returned for that entry.
+
+#### Scenario: Round trip
+- **WHEN** an object file is parsed as JSON
+- **THEN** the result equals the object as it appeared in the API response
+
+#### Scenario: Entry of a completed-tasks file
+- **WHEN** an entry of `completed/2026-09.json` is compared with the same entry in the API response
+- **THEN** they are equal, field by field and in the same order
+
+### Requirement: Stable JSON encoding
+Every JSON file the tool writes, including object files, the files under `completed/` and `state.json`, SHALL be UTF-8 without a byte order mark, indented with two spaces, with non-ASCII characters written as they are rather than escaped, with LF line endings and a final newline, on every operating system.
+
+#### Scenario: Same bytes on every platform
+- **WHEN** the same sync response is applied on Windows, macOS and Linux
+- **THEN** the resulting object files are byte-for-byte identical
+
+#### Scenario: Non-ASCII content
+- **WHEN** a task's content contains `Größe 🍎`
+- **THEN** the stored file contains those characters literally in UTF-8
+
+#### Scenario: Month file on every platform
+- **WHEN** the same completed tasks of a month are stored on Windows, macOS and Linux
+- **THEN** the resulting `completed/<YYYY-MM>.json` files are byte-for-byte identical
+
+### Requirement: Documented format
+The tool SHALL write a `README.md` into the backup directory that describes the layout, file encoding, key and file-name rules, tombstones, the files under `completed/` and `state.json`, together with the format version. The same description SHALL be kept in the project repository.
+
+#### Scenario: Format description in the backup
+- **WHEN** a run completes
+- **THEN** the backup's `README.md` describes the format version recorded in `state.json`
+
+#### Scenario: Large integers
+- **WHEN** a reader consults the description of the activity log's events
+- **THEN** it warns that their `id` values exceed 64 bits and that tools which parse numbers as 64-bit integers or doubles, such as JavaScript or an SQLite `INTEGER` column, corrupt them

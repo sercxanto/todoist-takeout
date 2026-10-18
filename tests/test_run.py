@@ -11,6 +11,8 @@ from todoist_takeout.api import Client
 from todoist_takeout.errors import ConfigError, RunError
 from todoist_takeout.sync import format_description, run_backup
 
+from fake_api import FakeApi
+
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
 NOW = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
 OLD = 1_000_000_000
@@ -34,26 +36,12 @@ ACCOUNT = {
 }
 
 
-class FixtureTransport:
-    """Answers each sync request with the response stored for its sync token."""
-
-    def __init__(self, responses):
-        self.responses = responses
-        self.requests = []
-
-    def send(self, method, path, form):
-        assert (method, path) == ("POST", "sync")
-        token = form["sync_token"]
-        self.requests.append(token)
-        return 200, {}, self.responses[token]
-
-
 def _no_sleep(delay):
     raise AssertionError("the run should not wait")
 
 
 def run(target, responses=ACCOUNT, now=NOW):
-    transport = FixtureTransport(responses)
+    transport = FakeApi(responses)
     stats = run_backup(target, Client(transport, sleep=_no_sleep), now=lambda: now)
     return transport.requests, stats
 
@@ -279,9 +267,10 @@ def test_missing_plan_information_does_not_warn(tmp_path, caplog):
 
 # Writes and removals of an uninterrupted first run: state.json, then for the full sync the
 # pending response, 30 objects, README.md, state.json and the pending removal, then for the
-# follow-up the pending response, the edited task, state.json and the pending removal, and finally
-# state.json.
-FIRST_RUN_WRITES = 40
+# follow-up the pending response, the edited task, state.json and the pending removal, then for the
+# completed tasks state.json with T0, the months 2026-08 and 2026-09 each with state.json closing
+# it, and the open month 2026-10, and finally state.json.
+FIRST_RUN_WRITES = 54
 # For each request of the first run, the number of writes after which its response is saved in
 # `pending/`. From then on, it must never be requested again.
 RESPONSE_SAVED_AFTER = {"*": 2, "FULL-1": 36}
@@ -355,4 +344,9 @@ def test_repeat_run_changes_only_the_state_file(tmp_path):
     assert changed == {"state.json"}
     touched = {path for path in tree(tmp_path) if (tmp_path / path).stat().st_mtime_ns != OLD}
     assert touched == {"state.json"}
-    assert state(tmp_path) == {**before_state, "last_successful_run_utc": "2026-10-18T13:00:00Z"}
+    # Only the run time and the time of the activity log's fetch advance.
+    assert state(tmp_path) == {
+        **before_state,
+        "last_successful_run_utc": "2026-10-18T13:00:00Z",
+        "completed": {**before_state["completed"], "activity_fetched_utc": "2026-10-18T13:00:00.000000Z"},
+    }

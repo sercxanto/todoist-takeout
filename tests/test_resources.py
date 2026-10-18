@@ -148,7 +148,10 @@ def test_one_of_entry_with_neither_or_both_fields_falls_back_with_one_warning(en
     assert "'completed_info'" in record.getMessage() and "one of project_id | section_id | item_id" in record.getMessage()
 
 
-RECORDED = sorted((Path(__file__).parent / "fixtures" / "recorded").glob("*/*.json"))
+# Sync recordings only; the other recorded files are responses of the completed-tasks endpoints.
+RECORDED = sorted(
+    path for name in ("full", "incremental") for path in (Path(__file__).parent / "fixtures" / "recorded").glob(f"*/{name}.json")
+)
 
 
 @pytest.mark.parametrize("path", RECORDED, ids=[p.relative_to(p.parents[1]).as_posix() for p in RECORDED])
