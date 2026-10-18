@@ -1,14 +1,15 @@
-"""Records sync fixtures from a real Todoist account and generates `tests/fixtures/shapes.json`.
+"""Records API fixtures from a real Todoist account and generates `tests/fixtures/shapes.json`.
 
     python scripts/record_fixtures.py record --account read    # uses TODOIST_CONTRACT_TOKEN
     python scripts/record_fixtures.py record --account write   # uses TODOIST_CONTRACT_WRITE_TOKEN
     python scripts/record_fixtures.py rescrub                  # applies the current rules to the recordings
     python scripts/record_fixtures.py shapes                   # regenerates shapes.json only
 
-Recording is read-only: it makes a full sync and one incremental sync and sends no commands. Both
-responses are scrubbed before they are written to `tests/fixtures/recorded/<account>/`, so that
-nothing of the account is committed: strings become placeholders, IDs random pseudonyms and numbers
-zero (see Scrubber). Field names, booleans and enum-like values stay.
+Recording is read-only: it makes a full sync and one incremental sync, sends no commands, and
+records one page of each completed-tasks endpoint (see record_completed). All responses are
+scrubbed together before they are written to `tests/fixtures/recorded/<account>/`, so that nothing
+of the account is committed: strings become placeholders, IDs random pseudonyms and numbers zero
+(see Scrubber). Field names, booleans and enum-like values stay.
 
 The contract tests import this module for `Scrubber`, `shape_of` and `compare_shapes`.
 """
@@ -20,12 +21,13 @@ import random
 import re
 import string
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from todoist_takeout import resources, storage  # noqa: E402
+from todoist_takeout import completed, resources, storage  # noqa: E402
 from todoist_takeout.api import Client, UrllibTransport  # noqa: E402
 
 FIXTURES = ROOT / "tests" / "fixtures"
@@ -33,6 +35,21 @@ RECORDED = FIXTURES / "recorded"
 SHAPES = FIXTURES / "shapes.json"
 # Used for shapes.json as long as nothing is recorded.
 HAND_WRITTEN = [FIXTURES / "sync" / "full_sync.json", FIXTURES / "sync" / "incremental_edit.json"]
+
+SYNC_FILES = ("full", "incremental")
+# The GET endpoints of the completed-tasks backup: recording name → path, and the hand-written
+# fixtures under tests/fixtures/completed/ that stand in for its shapes as long as nothing is recorded.
+ENDPOINTS = {
+    "by_completion_date": (completed.BY_COMPLETION_DATE, ["by_completion_date_1", "by_completion_date_2"]),
+    "tasks_completed": (completed.TASKS_COMPLETED, ["tasks_completed"]),
+    "activities": (completed.ACTIVITIES, ["activities_1", "activities_2"]),
+    "comments": (completed.COMMENTS, ["comments"]),
+}
+RECORDING_FILES = SYNC_FILES + tuple(ENDPOINTS)
+# Smaller than the tool's page sizes, to keep the recordings small; the shape is the same.
+RECORD_PAGE_LIMIT = 50
+# How many months before the current one record_completed searches for completed tasks.
+SEARCH_MONTHS = 12
 
 TOKEN_VARIABLES = {"read": "TODOIST_CONTRACT_TOKEN", "write": "TODOIST_CONTRACT_WRITE_TOKEN"}
 
@@ -252,24 +269,54 @@ def shape_of(response: dict) -> dict:
         else:
             objects = None
         if objects is not None:
-            fields: dict[str, set[str]] = {}
-            for obj in objects:
-                for field, item in obj.items():
-                    # Object keys that are IDs, as in `day_orders`, differ per account and day.
-                    name = ID_FIELD if _ID_KEY.match(field) else field
-                    fields.setdefault(name, set()).add(json_type(item))
-            entry["fields"] = {field: sorted(types) for field, types in sorted(fields.items())}
+            entry["fields"] = _fields(objects)
         keys[key] = entry
     return {"keys": dict(sorted(keys.items()))}
+
+
+def endpoint_shape_of(response: dict) -> dict:
+    """Top-level keys of a GET response with their kind, JSON types and the fields of their entries.
+
+    The kinds follow the page merge of design D6: `list` for the list of entries, `map` for an
+    object, `value` for anything else. A map keyed by IDs, such as `projects` of `tasks/completed`,
+    is described by the fields of its values.
+    """
+    keys = {}
+    for key, value in response.items():
+        objects = None
+        if isinstance(value, list):
+            kind, objects = "list", [obj for obj in value if isinstance(obj, dict)]
+        elif isinstance(value, dict):
+            kind, objects = "map", [value]
+            if value and all(_ID_KEY.match(k) and isinstance(v, dict) for k, v in value.items()):
+                objects = list(value.values())
+        else:
+            kind = "value"
+        entry = {"kind": kind, "types": [json_type(value)]}
+        if objects is not None:
+            entry["fields"] = _fields(objects)
+        keys[key] = entry
+    return {"keys": dict(sorted(keys.items()))}
+
+
+def _fields(objects: list[dict]) -> dict:
+    fields: dict[str, set[str]] = {}
+    for obj in objects:
+        for field, item in obj.items():
+            # Object keys that are IDs, as in `day_orders`, differ per account and day.
+            name = ID_FIELD if _ID_KEY.match(field) else field
+            fields.setdefault(name, set()).add(json_type(item))
+    return {field: sorted(types) for field, types in sorted(fields.items())}
 
 
 def merge_shapes(shapes: list[dict]) -> dict:
     keys: dict[str, dict] = {}
     for shape in shapes:
         for key, entry in shape["keys"].items():
-            merged = keys.setdefault(key, {"kinds": set(), "types": set(), "full_sync": False})
+            merged = keys.setdefault(key, {"kinds": set(), "types": set()})
             merged["kinds"].add(entry["kind"])
-            merged["full_sync"] = merged["full_sync"] or entry.get("full_sync", False)
+            if "full_sync" in entry:  # sync shapes only
+                merged["full_sync"] = merged.get("full_sync", False) or entry["full_sync"]
             merged["types"].update(entry["types"])
             if "fields" in entry:
                 fields = merged.setdefault("fields", {})
@@ -278,7 +325,9 @@ def merge_shapes(shapes: list[dict]) -> dict:
     result = {}
     for key, merged in sorted(keys.items()):
         kinds = merged["kinds"] - {"unclassified"} or merged["kinds"]
-        entry = {"kind": "|".join(sorted(kinds)), "types": sorted(merged["types"]), "full_sync": merged["full_sync"]}
+        entry = {"kind": "|".join(sorted(kinds)), "types": sorted(merged["types"])}
+        if "full_sync" in merged:
+            entry["full_sync"] = merged["full_sync"]
         if "fields" in merged:
             entry["fields"] = {field: sorted(types) for field, types in sorted(merged["fields"].items())}
         result[key] = entry
@@ -286,14 +335,31 @@ def merge_shapes(shapes: list[dict]) -> dict:
 
 
 def shape_sources() -> list[Path]:
-    recorded = sorted(RECORDED.glob("*/*.json"))
+    recorded = sorted(path for name in SYNC_FILES for path in RECORDED.glob(f"*/{name}.json"))
     return recorded or HAND_WRITTEN
 
 
-def generate_shapes(sources: list[Path] | None = None) -> dict:
+def endpoint_shape_sources() -> dict[str, list[Path]]:
+    """The recordings of each completed-tasks endpoint, or its hand-written fixtures."""
+    sources = {}
+    for name, (_path, hand_written) in ENDPOINTS.items():
+        recorded = sorted(RECORDED.glob(f"*/{name}.json"))
+        sources[name] = recorded or [FIXTURES / "completed" / f"{stem}.json" for stem in hand_written]
+    return sources
+
+
+def generate_shapes(sources: list[Path] | None = None, endpoint_sources: dict[str, list[Path]] | None = None) -> dict:
     sources = shape_sources() if sources is None else sources
+    endpoint_sources = endpoint_shape_sources() if endpoint_sources is None else endpoint_sources
     shapes = merge_shapes([shape_of(json.loads(path.read_bytes())) for path in sources])
-    return {"sources": [path.relative_to(FIXTURES).as_posix() for path in sources], **shapes}
+    endpoints = {
+        name: {
+            "sources": [path.relative_to(FIXTURES).as_posix() for path in paths],
+            **merge_shapes([endpoint_shape_of(json.loads(path.read_bytes())) for path in paths]),
+        }
+        for name, paths in endpoint_sources.items()
+    }
+    return {"sources": [path.relative_to(FIXTURES).as_posix() for path in sources], **shapes, "endpoints": endpoints}
 
 
 def compare_shapes(expected: dict, actual: dict) -> tuple[list[str], list[str]]:
@@ -362,25 +428,80 @@ def scrubbed_bytes(bodies: list[bytes], token: str | None = None) -> list[bytes]
     return results
 
 
-def record(account: str) -> list[Path]:
+def record(account: str, now: datetime | None = None) -> list[Path]:
     token = token_for(account)
     client = Client(UrllibTransport(token))
     full = client.sync("*")
     incremental = client.sync(json.loads(full)["sync_token"])
+    bodies = {"full": full, "incremental": incremental}
+    bodies.update(record_completed(client, now or datetime.now(timezone.utc)))
     directory = RECORDED / account
     directory.mkdir(parents=True, exist_ok=True)
-    return _write(directory, scrubbed_bytes([full, incremental], token))
+    return _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values()), token))))
 
 
-RECORDING_FILES = ("full", "incremental")
+def record_completed(client: Client, now: datetime) -> dict[str, bytes]:
+    """One page of each completed-tasks endpoint, with the parameters the tool sends. Read-only.
+
+    `by_completion_date` and `tasks/completed` are recorded for the latest month before the current
+    one that has completed tasks, searching back SEARCH_MONTHS months (the month before the current
+    one if none has). `comments` are those of the first task with `note_count` > 0 seen in these
+    months; without such a task, they are not recorded. `activities` is the latest page of
+    completion events.
+    """
+    bodies: dict[str, bytes] = {}
+    chosen = task_id = None
+    month = completed.month_of(now)
+    for _ in range(SEARCH_MONTHS):
+        month = _previous_month(month)
+        since, until = completed.month_window(month)
+        params = {"since": since, "until": until, "limit": str(RECORD_PAGE_LIMIT)}
+        body = client.get(completed.BY_COMPLETION_DATE, params)
+        items = json.loads(body).get("items") or []
+        if chosen is None and (items or "by_completion_date" not in bodies):
+            bodies["by_completion_date"] = body
+            if items:
+                chosen = month
+        if task_id is None:
+            task_id = next((task["id"] for task in items if _has_comments(task)), None)
+        if chosen is not None and task_id is not None:
+            break
+    since, until = completed.month_window(chosen or _previous_month(completed.month_of(now)))
+    bodies["tasks_completed"] = client.get(
+        completed.TASKS_COMPLETED,
+        {"since": since, "until": until, "annotate_items": "true", "limit": str(RECORD_PAGE_LIMIT), "offset": "0"},
+    )
+    bodies["activities"] = client.get(
+        completed.ACTIVITIES, {"object_event_types": completed.COMPLETION_EVENTS, "limit": str(RECORD_PAGE_LIMIT)}
+    )
+    if task_id is not None:
+        bodies["comments"] = client.get(completed.COMMENTS, {"task_id": str(task_id), "limit": str(RECORD_PAGE_LIMIT)})
+    else:
+        print(f"no completed task with comments in the last {SEARCH_MONTHS} months; comments not recorded", file=sys.stderr)
+    return bodies
 
 
-def _write(directory: Path, results: list[bytes]) -> list[Path]:
+def _previous_month(month: str) -> str:
+    return completed.month_of(completed.month_start(month) - timedelta(days=1))
+
+
+def _has_comments(task) -> bool:
+    if not isinstance(task, dict) or "id" not in task:
+        return False
+    count = task.get("note_count")
+    return isinstance(count, int) and not isinstance(count, bool) and count > 0
+
+
+def _write(directory: Path, results: dict[str, bytes]) -> list[Path]:
+    """Write the files of one recording, and remove those of an earlier one that this one lacks."""
     written = []
-    for name, data in zip(RECORDING_FILES, results):
+    for name in RECORDING_FILES:
         path = directory / f"{name}.json"
-        path.write_bytes(data)
-        written.append(path)
+        if name in results:
+            path.write_bytes(results[name])
+            written.append(path)
+        else:
+            path.unlink(missing_ok=True)  # its pseudonyms would not match the new recording's
     return written
 
 
@@ -388,15 +509,18 @@ def rescrub() -> list[Path]:
     """Apply the current scrubbing rules to every existing recording, keeping it consistent."""
     written = []
     for directory in sorted(path for path in RECORDED.iterdir() if path.is_dir()):
-        paths = [directory / f"{name}.json" for name in RECORDING_FILES]
-        written += _write(directory, scrubbed_bytes([path.read_bytes() for path in paths]))
+        paths = {name: directory / f"{name}.json" for name in RECORDING_FILES}
+        bodies = {name: path.read_bytes() for name, path in paths.items() if path.exists()}
+        written += _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values())))))
     return written
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    record_parser = commands.add_parser("record", help="record a full and an incremental sync, then regenerate shapes")
+    record_parser = commands.add_parser(
+        "record", help="record a full and an incremental sync and the completed-tasks endpoints, then regenerate shapes"
+    )
     record_parser.add_argument("--account", choices=sorted(TOKEN_VARIABLES), required=True)
     commands.add_parser("rescrub", help="apply the current scrubbing rules to the recordings, then regenerate shapes")
     commands.add_parser("shapes", help="regenerate shapes.json from the recorded fixtures")

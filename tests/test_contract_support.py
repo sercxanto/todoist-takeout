@@ -89,7 +89,7 @@ def test_contract_tests_skip_without_the_variables(tmp_path):
         timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "6 skipped" in result.stdout, result.stdout
+    assert "9 skipped" in result.stdout, result.stdout
     assert "passed" not in result.stdout and "failed" not in result.stdout
     assert "TODOIST_CONTRACT_TOKEN is not set" in result.stdout
     assert "TODOIST_CONTRACT_WRITE_TOKEN is not set" in result.stdout
@@ -111,4 +111,4 @@ def test_write_tests_skip_without_the_allow_flag(tmp_path):
         timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "2 skipped" in result.stdout and "TODOIST_CONTRACT_ALLOW_WRITES is not 1" in result.stdout
+    assert "3 skipped" in result.stdout and "TODOIST_CONTRACT_ALLOW_WRITES is not 1" in result.stdout

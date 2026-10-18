@@ -4,16 +4,23 @@ It creates temporary objects, deletes, restores and archives them, and checks ho
 what the sync reports. Each step's raw incremental response is recorded as a finding, because
 these API behaviours are undocumented. The test fails at the end if storage did not match the
 spec, after the findings are written.
+
+A second test completes tasks and checks that the completed-tasks backup stores their completion
+events and comments (add-completed-tasks-backup, design D14).
 """
 
 import json
+import time
 
-from todoist_takeout import storage
+from todoist_takeout import completed, storage
 from todoist_takeout.sync import DELETED_SUFFIX, JSON_SUFFIX, SYNC_DIR, run_backup
 
 PREFIX = "todoist-takeout contract test"
 # Candidate commands for undeleting a task. None is documented; the test records what happens.
 RESTORE_COMMANDS = ["item_undelete", "item_restore"]
+# New activity-log events appeared within 14 s in the probes; the test reruns the backup until then.
+EVENT_TIMEOUT = 120.0
+EVENT_INTERVAL = 5.0
 
 
 def find(response: dict, resource: str, object_id):
@@ -178,6 +185,74 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
         findings["rejected_commands"] = [rejected.as_finding() for rejected in commands.rejected]
         findings["cleanup_failed"] = cleanup
         write_findings("write", findings, token)
+
+    assert not cleanup, f"delete these projects of the test account by hand: {cleanup}"
+    assert not problems, "\n".join(problems)
+
+
+def completion_events(target, task_id) -> list:
+    """The completion events of a task stored under completed/activity/."""
+    events = []
+    for path in sorted((target / completed.COMPLETED_DIR / completed.ACTIVITY_DIR).glob(f"*{completed.JSON_SUFFIX}")):
+        events += [e for e in json.loads(path.read_bytes())["results"] if str(e.get("object_id")) == str(task_id)]
+    return events
+
+
+def stored_comments(target, task_id) -> list | None:
+    """The comments stored in completed/comments/<task id>.json, or None without that file."""
+    name = f"{storage.encode_key(str(task_id))}{completed.JSON_SUFFIX}"
+    data = storage.read_bytes(target / completed.COMPLETED_DIR / completed.COMMENTS_DIR / name)
+    return None if data is None else json.loads(data)["results"]
+
+
+def test_completed_tasks_backup(write_client, contract_support, tmp_path, write_findings):
+    token, client = write_client
+    commands = contract_support.Commands(client)
+    target = tmp_path / "backup"
+    findings: dict = {}
+    problems: list[str] = []
+    projects: list = []
+
+    try:
+        run_backup(target, client)  # records T0; the completions below come after it
+
+        project = commands.add("project_add", {"name": f"{PREFIX}: completed"})
+        assert project, f"cannot create a project: {[r.as_finding() for r in commands.rejected]}"
+        projects.append(project)
+        recurring = commands.add(
+            "item_add", {"content": f"{PREFIX}: recurring", "project_id": project, "due": {"string": "every day"}}
+        )
+        commented = commands.add("item_add", {"content": f"{PREFIX}: with comment", "project_id": project})
+        assert recurring and commented, f"cannot create tasks: {[r.as_finding() for r in commands.rejected]}"
+        note = commands.add("note_add", {"content": f"{PREFIX}: comment", "item_id": commented})
+        findings["accepted"] = {
+            "note_add": note is not None,
+            "item_close": [bool(commands.run("item_close", {"id": recurring})) for _ in range(2)],
+            "item_complete": bool(commands.run("item_complete", {"id": commented})),
+        }
+
+        deadline = time.monotonic() + EVENT_TIMEOUT
+        runs = 0
+        while True:
+            run_backup(target, client)
+            runs += 1
+            events, comments = completion_events(target, recurring), stored_comments(target, commented)
+            if (len(events) >= 2 and comments) or time.monotonic() >= deadline:
+                break
+            time.sleep(EVENT_INTERVAL)
+        findings["backup_runs"] = runs
+        findings["recurring_events"] = len(events)
+        findings["comment_file"] = None if comments is None else len(comments)
+
+        if len(events) != 2:
+            problems.append(f"expected two completion events of the recurring task, found {len(events)}")
+        if not comments or note not in {str(comment.get("id")) for comment in comments}:
+            problems.append(f"the comment of the completed task is not in completed/comments/ ({comments=})")
+    finally:
+        cleanup = [project_id for project_id in projects if not commands.run("project_delete", {"id": project_id})]
+        findings["rejected_commands"] = [rejected.as_finding() for rejected in commands.rejected]
+        findings["cleanup_failed"] = cleanup
+        write_findings("write-completed", findings, token)
 
     assert not cleanup, f"delete these projects of the test account by hand: {cleanup}"
     assert not problems, "\n".join(problems)

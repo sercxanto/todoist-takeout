@@ -4,12 +4,19 @@
   "collaborator_states": [],
   "collaborators": [],
   "completed_info": [],
-  "day_orders": {},
+  "day_orders": {
+    "4xg79F91vP5BzZ6d": 0,
+    "5uo66I9ZVe3R3dXf": 0,
+    "1qv54R3wCSt9etm3": 0,
+    "1gy92d1n87CiN52r": 0,
+    "5ll58e4prQVOBVfv": 0,
+    "6gr63a1kdhbMXNxa": 0
+  },
   "filters": [
     {
       "color": "charcoal",
       "description": "",
-      "id": "8419358847",
+      "id": "9062657962",
       "is_deleted": false,
       "is_favorite": false,
       "is_frozen": false,
@@ -21,7 +28,7 @@
     {
       "color": "charcoal",
       "description": "",
-      "id": "7461721090",
+      "id": "7074214642",
       "is_deleted": false,
       "is_favorite": false,
       "is_frozen": false,
@@ -46,14 +53,14 @@
   "project_view_options_defaults": [
     {
       "calendar_settings": null,
-      "creator_uid": 90935042,
+      "creator_uid": 59685852,
       "filtered_by": null,
       "grouped_by": null,
-      "project_id": "6et4cSPHngaIN1Sj",
+      "project_id": "6gj6eIJYtgpMG4Rc",
       "show_completed_tasks": false,
       "sort_order": "<scrubbed>",
       "sorted_by": null,
-      "updater_uid": 90935042,
+      "updater_uid": 59685852,
       "view_mode": "<scrubbed>"
     }
   ],
@@ -68,12 +75,12 @@
       "child_order": 0,
       "color": "charcoal",
       "created_at": "2000-01-01T00:00:00.000000Z",
-      "creator_uid": "<scrubbed>",
+      "creator_uid": "59685852",
       "default_order": 0,
       "default_order_key": null,
       "description": "",
       "icon": null,
-      "id": "6et4cSPHngaIN1Sj",
+      "id": "6gj6eIJYtgpMG4Rc",
       "inbox_project": true,
       "is_archived": false,
       "is_collapsed": false,
@@ -825,30 +832,30 @@
         "locale": "<scrubbed>",
         "templates": [
           {
-            "id": "tafvexc",
+            "id": "axmxgji",
             "name": "<scrubbed>",
-            "template_type": "<scrubbed>"
+            "template_type": "project"
           },
           {
-            "id": "zzm-icwgyu-dbjqrg",
+            "id": "izj-zrlcrw-vasfet",
             "name": "<scrubbed>",
-            "template_type": "<scrubbed>"
+            "template_type": "project"
           },
           {
-            "id": "pzewaskv-oojovafi",
+            "id": "lktoeagv-icydsxxk",
             "name": "<scrubbed>",
-            "template_type": "<scrubbed>"
+            "template_type": "project"
           },
           {
-            "id": "glfn-ppopktu",
+            "id": "xzbe-mtvfyxh",
             "name": "<scrubbed>",
-            "template_type": "<scrubbed>"
+            "template_type": "setup"
           }
         ]
       },
       "is_deleted": false,
       "type": "templates",
-      "user_id": "90935042"
+      "user_id": "59685852"
     }
   ],
   "sync_status": {},
@@ -856,6 +863,7 @@
   "temp_id_mapping": {},
   "tooltips": {
     "scheduled": [
+      "<scrubbed>",
       "<scrubbed>",
       "<scrubbed>",
       "<scrubbed>",
@@ -918,9 +926,9 @@
     "has_magic_number": false,
     "has_password": true,
     "has_started_a_trial": false,
-    "id": "90935042",
+    "id": "59685852",
     "image_id": null,
-    "inbox_project_id": "6et4cSPHngaIN1Sj",
+    "inbox_project_id": "6gj6eIJYtgpMG4Rc",
     "is_celebrations_enabled": true,
     "is_deleted": false,
     "is_onboarded": false,
@@ -935,7 +943,7 @@
     "onboarded_dated_tasks_created": false,
     "onboarded_desktop_accessed": true,
     "onboarded_mobile_accessed": false,
-    "onboarded_tasks_completed": false,
+    "onboarded_tasks_completed": true,
     "onboarding_completed": true,
     "onboarding_initiated": true,
     "onboarding_level": "<scrubbed>",
@@ -978,7 +986,50 @@
     "weekend_start_day": 0,
     "weekly_goal": 0
   },
-  "user_item_orders": [],
+  "user_item_orders": [
+    {
+      "is_deleted": false,
+      "item_id": "4xg79F91vP5BzZ6d",
+      "order_key": "<scrubbed>",
+      "scope": "day",
+      "scope_id": 5
+    },
+    {
+      "is_deleted": false,
+      "item_id": "1gy92d1n87CiN52r",
+      "order_key": "<scrubbed>",
+      "scope": "day",
+      "scope_id": 5
+    },
+    {
+      "is_deleted": false,
+      "item_id": "5ll58e4prQVOBVfv",
+      "order_key": "<scrubbed>",
+      "scope": "day",
+      "scope_id": 5
+    },
+    {
+      "is_deleted": false,
+      "item_id": "1qv54R3wCSt9etm3",
+      "order_key": "<scrubbed>",
+      "scope": "day",
+      "scope_id": 5
+    },
+    {
+      "is_deleted": false,
+      "item_id": "5uo66I9ZVe3R3dXf",
+      "order_key": "<scrubbed>",
+      "scope": "day",
+      "scope_id": 5
+    },
+    {
+      "is_deleted": false,
+      "item_id": "6gr63a1kdhbMXNxa",
+      "order_key": "<scrubbed>",
+      "scope": "day",
+      "scope_id": 5
+    }
+  ],
   "user_plan_limits": {
     "current": {
       "activity_log": true,

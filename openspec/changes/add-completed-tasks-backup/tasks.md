@@ -57,12 +57,12 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 8. Fixture recording and contract tests
 
-- [ ] 8.1 Extend `scripts/record_fixtures.py` to record one month of `by_completion_date`, one page each of `tasks/completed` (annotated), the activity log and the comments of one completed task, read-only, scrubbed by the existing rules, under `tests/fixtures/recorded/<account>/`, and to add these endpoints to `shapes.json`. Verify with an offline scrubber test that 128-bit event IDs become pseudonyms of the same length that are not 0 and stay consistent within a recording
-- [ ] 8.2 Ask the user to record both accounts with the new command, then review the recordings for personal data with them and regenerate `shapes.json`. Verify that the shapes test passes against the committed recordings
-- [ ] 8.3 Add the read-only contract test `tests/contract/test_completed_read.py`, parametrized over both accounts: compare the four endpoints with `shapes.json` (added fields fail), and fail if `tasks/completed` is gone or the activity filter is rejected. Verify offline that it is skipped without its variables
-- [ ] 8.4 Ask the user to run 8.3 against both accounts. Verify that it passes, or record any difference as a finding and resolve it before continuing
-- [ ] 8.5 Extend the write contract test, on the write account only and behind the existing guard: complete a recurring task twice and a task with a comment, run the tool into a temporary backup, and assert two completion events in `completed/activity/` and the comment file. Verify offline that it is skipped without its variables and that the guard still refuses equal tokens and equal users; then ask the user to run it against the write account
-- [ ] 8.6 Document the new contract test and recording command in the README's Development section. Verify that the documented commands run as written (the skipped path at minimum)
+- [x] 8.1 Extend `scripts/record_fixtures.py` to record one month of `by_completion_date`, one page each of `tasks/completed` (annotated), the activity log and the comments of one completed task, read-only, scrubbed by the existing rules, under `tests/fixtures/recorded/<account>/`, and to add these endpoints to `shapes.json`. Verify with an offline scrubber test that 128-bit event IDs become pseudonyms of the same length that are not 0 and stay consistent within a recording
+- [x] 8.2 Ask the user to record both accounts with the new command, then review the recordings for personal data with them and regenerate `shapes.json`. Verify that the shapes test passes against the committed recordings
+- [x] 8.3 Add the read-only contract test `tests/contract/test_completed_read.py`, parametrized over both accounts: compare the four endpoints with `shapes.json` (added fields fail), and fail if `tasks/completed` is gone or the activity filter is rejected. Verify offline that it is skipped without its variables
+- [x] 8.4 Ask the user to run 8.3 against both accounts. Verify that it passes, or record any difference as a finding and resolve it before continuing
+- [x] 8.5 Extend the write contract test, on the write account only and behind the existing guard: complete a recurring task twice and a task with a comment, run the tool into a temporary backup, and assert two completion events in `completed/activity/` and the comment file. Verify offline that it is skipped without its variables and that the guard still refuses equal tokens and equal users; then ask the user to run it against the write account
+- [x] 8.6 Document the new contract test and recording command in the README's Development section. Verify that the documented commands run as written (the skipped path at minimum)
 
 ## 9. Integration
 
