@@ -27,7 +27,6 @@ stored according to its shape:
 | Shape | Stored at | Example |
 |---|---|---|
 | Collection: an array of objects | `sync/<resource>/<key>.json`, one file per object | `sync/items/6X7rM8997g3RQmvh.json` |
-| Mapping: a JSON object whose values are objects | `sync/<resource>/<name>.json`, one file per entry, named after the entry | `sync/workspaces/28173.json` |
 | Single value | `sync/<resource>.json` | `sync/user.json` |
 
 The key of a collection object is its `id`, except in these collections, where it is built from
@@ -39,16 +38,24 @@ several fields in this order (see [File names](#file-names)):
 | `workspace_users` | `workspace_id`, `user_id` |
 | `collaborator_states`, `collaborators_states` | `project_id`, `user_id` |
 | `project_view_options_defaults` | `project_id` |
+| `user_item_orders` | `scope`, `scope_id`, `item_id` |
+| `suggestions` | `type` |
 
 For example, the view option with `view_type` `project` and `object_id` `6X7fphhgwcXVGccJ` is
 stored at `sync/view_options/project~6X7fphhgwcXVGccJ.json`. Integer key fields are written in
 decimal.
 
-Resources stored as mappings: `workspaces`.
+The objects of `completed_info` each have exactly one of `project_id` and `section_id`. Their key
+is the name of that field followed by its value, so the entry with `project_id` `6Jf8VQXxpwv5XvQ2`
+is stored at `sync/completed_info/project_id~6Jf8VQXxpwv5XvQ2.json`. A project and a section with
+the same id therefore never share a file.
+
+Resources keyed by one of several fields: `completed_info`.
 
 Resources stored as single values: `user`, `user_settings`, `user_plan_limits`, `stats`,
 `notification_settings`, `settings_notifications`, `live_notifications_last_read_id`,
-`live_notifications_last_read`, `day_orders`, `locations`, `role_actions`.
+`live_notifications_last_read`, `day_orders`, `locations`, `role_actions`, `tooltips`,
+`incomplete_item_ids`, `incomplete_project_ids`, `id_mapping`.
 
 Not stored under `sync/`: `sync_token`, `full_sync` and `full_sync_date_utc`, which go into
 `state.json`, and `temp_id_mapping` and `sync_status`, which only matter for write requests.
@@ -64,15 +71,15 @@ single value is replaced as a whole. If the server sends a full sync again, obje
 are kept unchanged, and the tool warns how many there were; they may have been deleted in Todoist.
 
 **Deleted objects.** When an object is deleted in Todoist, the sync returns it with
-`"is_deleted": true`, sometimes with all its fields and sometimes with only a few. The object's
-file is never removed:
+`"is_deleted": true`. The deletion payload usually has all its fields, but with their values
+emptied (for example `"content": ""` and `"updated_at": null`), so it does not preserve the
+object's content. The object's file is never removed:
 
-- If the backup has no file for the object yet, the deletion payload is stored as `<key>.json`.
-- If the deletion payload contains every top-level field of the stored object, it replaces
-  `<key>.json`.
-- Otherwise `<key>.json` keeps the last full content of the object, and the deletion payload is
-  written next to it as a tombstone, `sync/<resource>/<key>.deleted.json`, for example
-  `sync/projects/6X7fphhgwcXVGccJ.deleted.json`.
+- If the backup holds the object as live, `<key>.json` keeps its last live content, and the
+  deletion payload is written next to it as a tombstone, `sync/<resource>/<key>.deleted.json`, for
+  example `sync/projects/6X7fphhgwcXVGccJ.deleted.json`.
+- If the backup has no file for the object yet, or its `<key>.json` already holds a deletion
+  payload, the deletion payload is stored as `<key>.json`.
 
 An object counts as deleted if its `<key>.json` has `"is_deleted": true` or a `<key>.deleted.json`
 exists.

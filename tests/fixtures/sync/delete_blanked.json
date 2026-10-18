@@ -1,0 +1,24 @@
+{
+  "sync_token": "INC-2",
+  "full_sync": false,
+  "projects": [
+    {
+      "id": "6Jf8VQXxpwv5XvQ2",
+      "name": "",
+      "color": "berry_red",
+      "parent_id": null,
+      "child_order": 1,
+      "is_collapsed": false,
+      "shared": false,
+      "can_assign_tasks": false,
+      "is_deleted": true,
+      "is_archived": false,
+      "is_favorite": false,
+      "view_style": "list",
+      "created_at": null,
+      "updated_at": null
+    }
+  ],
+  "items": [],
+  "notes": []
+}

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from todoist_takeout import resources
-from todoist_takeout.resources import COLLECTION, MAPPING, META, SINGLE, Classifier
+from todoist_takeout.resources import COLLECTION, META, ONE_OF, SINGLE, Classifier
 
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
 
@@ -28,7 +28,8 @@ EXPECTED = {
     "view_options": (COLLECTION, ("view_type", "object_id")),
     "project_view_options_defaults": (COLLECTION, ("project_id",)),
     "workspace_users": (COLLECTION, ("workspace_id", "user_id")),
-    "workspaces": (MAPPING, ()),
+    "workspaces": (COLLECTION, ("id",)),
+    "completed_info": (ONE_OF, ("project_id", "section_id")),
     "user": (SINGLE, ()),
     "user_settings": (SINGLE, ()),
     "user_plan_limits": (SINGLE, ()),
@@ -55,6 +56,7 @@ def test_fixtures_exist():
         "incremental_edit",
         "delete_full",
         "delete_stub",
+        "delete_blanked",
         "unknown_key",
         "plan_limits_no_comments",
         "server_full_sync",
@@ -116,8 +118,44 @@ def test_known_key_with_unexpected_shape_falls_back_with_warning(caplog):
     assert "'collaborators'" in record.getMessage()
 
 
-def test_mapping_given_as_array_with_ids_falls_back_to_collection():
-    assert Classifier().classify("workspaces", [{"id": "1"}]) == resources.ID
+def test_workspaces_given_as_mapping_falls_back_with_warning(caplog):
+    with caplog.at_level(logging.WARNING):
+        kind = Classifier().classify("workspaces", {"28173": {"id": "28173"}})
+    assert kind.name == SINGLE
+    [record] = caplog.records
+    assert "unexpected shape" in record.getMessage()
+
+
+def test_one_of_key_is_the_present_field_and_its_value():
+    kind = resources.KNOWN["completed_info"]
+    assert resources.object_key(kind, {"project_id": "P1", "completed_items": 3}) == ("project_id", "P1")
+    assert resources.object_key(kind, {"section_id": 7, "project_id": None}) == ("section_id", "7")
+    assert resources.object_key(kind, {"completed_items": 3}) is None
+    assert resources.object_key(kind, {"project_id": "P1", "section_id": "S1"}) is None
+
+
+@pytest.mark.parametrize("entry", [{"completed_items": 3}, {"project_id": "P1", "section_id": "S1"}])
+def test_one_of_entry_with_neither_or_both_fields_falls_back_with_one_warning(entry, caplog):
+    classifier = Classifier()
+    with caplog.at_level(logging.WARNING):
+        kind = classifier.classify("completed_info", [{"project_id": "P1"}, entry])
+        classifier.classify("completed_info", [entry])
+    assert kind.name == SINGLE
+    [record] = caplog.records
+    assert "'completed_info'" in record.getMessage() and "one of project_id | section_id" in record.getMessage()
+
+
+RECORDED = sorted((Path(__file__).parent / "fixtures" / "recorded").glob("*/*.json"))
+
+
+@pytest.mark.parametrize("path", RECORDED, ids=[p.relative_to(p.parents[1]).as_posix() for p in RECORDED])
+def test_recorded_keys_are_classified_without_fallback(path, caplog):
+    classifier = Classifier()
+    with caplog.at_level(logging.WARNING):
+        for key, value in json.loads(path.read_bytes()).items():
+            kind = classifier.classify(key, value)
+            assert resources.KNOWN.get(key) == kind, key
+    assert not caplog.records
 
 
 def test_integer_key_fields_become_strings():

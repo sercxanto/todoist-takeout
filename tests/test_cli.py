@@ -144,7 +144,7 @@ def test_default_run_prints_info_lines_one_warning_and_the_summary(tmp_path, cap
         "backed up on this plan"
     ]
     assert "INFO requesting a full sync of the account" in lines
-    assert lines[-1] == "INFO backup complete: 29 objects written, 0 unchanged, 0 marked deleted, 1 warning"
+    assert lines[-1] == "INFO backup complete: 31 objects written, 0 unchanged, 0 marked deleted, 1 warning"
     assert cli.transport.requests == ["*", "FULL-1"]
 
 
@@ -382,6 +382,6 @@ def test_runs_without_stdin_and_terminal(tmp_path):
         httpd.server_close()
     assert result.returncode == 0, result.stderr
     assert result.stdout == ""
-    assert result.stderr.splitlines()[-1].startswith("INFO backup complete: 29 objects written")
+    assert result.stderr.splitlines()[-1].startswith("INFO backup complete: 31 objects written")
     assert json.loads((tmp_path / "state.json").read_bytes())["sync_token"] == "INC-1"
     assert_token_absent(result.stderr, tmp_path)

@@ -2,20 +2,23 @@
 
     python scripts/record_fixtures.py record --account read    # uses TODOIST_CONTRACT_TOKEN
     python scripts/record_fixtures.py record --account write   # uses TODOIST_CONTRACT_WRITE_TOKEN
+    python scripts/record_fixtures.py rescrub                  # applies the current rules to the recordings
     python scripts/record_fixtures.py shapes                   # regenerates shapes.json only
 
 Recording is read-only: it makes a full sync and one incremental sync and sends no commands. Both
-responses are scrubbed before they are written to `tests/fixtures/recorded/<account>/`: every string
-is replaced with a placeholder except IDs, keys and enum-like values, so that no personal data is
-committed. Field names (object keys) are kept. Numbers and booleans are kept.
+responses are scrubbed before they are written to `tests/fixtures/recorded/<account>/`, so that
+nothing of the account is committed: strings become placeholders, IDs random pseudonyms and numbers
+zero (see Scrubber). Field names, booleans and enum-like values stay.
 
-The contract tests import this module for `scrub`, `shape_of` and `compare_shapes`.
+The contract tests import this module for `Scrubber`, `shape_of` and `compare_shapes`.
 """
 
 import argparse
 import json
 import os
+import random
 import re
+import string
 import sys
 from pathlib import Path
 
@@ -35,16 +38,17 @@ TOKEN_VARIABLES = {"read": "TODOIST_CONTRACT_TOKEN", "write": "TODOIST_CONTRACT_
 
 # --- Scrubbing ---------------------------------------------------------------
 
-# Fields whose string values are kept when they look like an enum value (see _ENUM_LIKE).
+# Fields whose string values are kept when they look like an enum value (see _ENUM_LIKE). Fields
+# that could tell something about the person, such as `lang` or `premium_status`, are not listed.
 ENUM_FIELDS = frozenset(
     {
         "color",
         "view_style",
         "view_type",
         "type",
+        "scope",
         "role",
         "status",
-        "lang",
         "unit",
         "layout",
         "grouped_by",
@@ -58,33 +62,36 @@ ENUM_FIELDS = frozenset(
         "workspace_role",
         "access_level",
         "plan",
-        "premium_status",
+        "template_type",
     }
 )
-# Fields that hold keys of collection objects (resources.KNOWN), kept like IDs.
-KEY_FIELDS = frozenset(field for kind in resources.KNOWN.values() for field in kind.fields)
+# Numbers in this resource are plan values, not account data; design D12 reads them.
+PLAN_LIMITS = "user_plan_limits"
+# IDs of six or more characters must not occur anywhere in the output.
+MIN_CHECKED_ID_LENGTH = 6
 
 _ENUM_LIKE = re.compile(r"[a-z][a-z0-9_]{0,39}\Z")
 _ID_LIKE = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
+# Object keys that are IDs, such as the task IDs in `day_orders`, rather than field names.
+_ID_KEY = re.compile(r"(?=[A-Za-z]*[0-9])[A-Za-z0-9]{6,64}\Z")
 _DATE_LIKE = re.compile(r"\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?)?(Z|[+-]\d{2}:?\d{2})?\Z")
 _EMAIL_LIKE = re.compile(r"[^@\s]+@[^@\s]+\Z")
 _DATE_TEMPLATE = "2000-01-01T00:00:00.000000"
 
 PLACEHOLDER = "<scrubbed>"
+# Stands for all object keys that are IDs in shapes.json.
+ID_FIELD = "<id>"
 EMAIL_PLACEHOLDER = "user@example.invalid"
 URL_PLACEHOLDER = "https://example.invalid/"
 
 
-def _is_id_field(field: str | None) -> bool:
-    if field is None:
-        return False
-    return field == "id" or field.endswith(("_id", "_ids")) or field in KEY_FIELDS
+def is_id_field(field: str | None) -> bool:
+    return field is not None and (field == "id" or field.endswith(("_id", "_ids", "_uid", "_uids")))
 
 
-def scrub_string(value: str, field: str | None) -> str:
+def scrub_text(value: str, field: str | None) -> str:
+    """The placeholder for a string that is not an ID."""
     if value == "":
-        return value
-    if _is_id_field(field) and _ID_LIKE.match(value):
         return value
     if field in ENUM_FIELDS and _ENUM_LIKE.match(value):
         return value
@@ -102,19 +109,81 @@ def scrub_string(value: str, field: str | None) -> str:
     return PLACEHOLDER
 
 
-def scrub(value, field: str | None = None):
-    """Return a copy of a parsed JSON value with personal strings replaced.
+class Scrubber:
+    """Removes everything that belongs to the account from parsed JSON values.
 
-    `field` is the name of the object field that holds `value`; array elements inherit it, so the
-    elements of `child_ids` count as IDs and the elements of `labels` are scrubbed.
+    Strings become placeholders, except enum-like values of ENUM_FIELDS. IDs (values of `id`,
+    `*_id`, `*_ids`, `*_uid` and `*_uids` fields, and object keys that look like IDs) become random
+    pseudonyms with the same length and character classes. The same ID gets the same pseudonym for
+    the lifetime of the scrubber, so use one scrubber for all responses of a recording. Numbers
+    become 0 of the same type, except in `user_plan_limits`. Booleans, null and field names stay.
     """
-    if isinstance(value, dict):
-        return {key: scrub(item, key) for key, item in value.items()}
-    if isinstance(value, list):
-        return [scrub(item, field) for item in value]
-    if isinstance(value, str):
-        return scrub_string(value, field)
-    return value
+
+    def __init__(self, rng: random.Random | None = None):
+        self._rng = rng or random.SystemRandom()
+        self._pseudonyms: dict[str, str] = {}
+        self._used: set[str] = set()
+
+    @property
+    def originals(self) -> set[str]:
+        return set(self._pseudonyms)
+
+    def scrub(self, value, field: str | None = None, *, plan: bool = False):
+        """Return a scrubbed copy of `value`, the value of the object field `field`.
+
+        Array elements inherit the field, so the elements of `child_ids` count as IDs.
+        """
+        plan = plan or field == PLAN_LIMITS
+        if isinstance(value, dict):
+            return {self._key(key): self.scrub(item, key, plan=plan) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self.scrub(item, field, plan=plan) for item in value]
+        if isinstance(value, bool) or value is None:
+            return value
+        if isinstance(value, str):
+            if is_id_field(field) and _ID_LIKE.match(value):
+                return self.pseudonym(value)
+            return scrub_text(value, field)
+        if isinstance(value, int):
+            if is_id_field(field):
+                return int(self.pseudonym(str(value)))
+            return value if plan else 0
+        if isinstance(value, float):
+            return value if plan else 0.0
+        return value
+
+    def _key(self, key: str) -> str:
+        if key in self._pseudonyms or _ID_KEY.match(key):
+            return self.pseudonym(key)
+        return key
+
+    def pseudonym(self, original: str) -> str:
+        if original not in self._pseudonyms:
+            for _ in range(1000):
+                candidate = "".join(self._replace(i, char) for i, char in enumerate(original))
+                if candidate not in self._used and (candidate != original or len(original) < 2):
+                    break
+            else:
+                raise ValueError(f"no free pseudonym for an ID of length {len(original)}")
+            self._pseudonyms[original] = candidate
+            self._used.add(candidate)
+        return self._pseudonyms[original]
+
+    def _replace(self, index: int, char: str) -> str:
+        if char.isdigit():
+            if index == 0 and char != "0":
+                return self._rng.choice("123456789")  # no leading zero, so numeric IDs stay numbers
+            return self._rng.choice(string.digits)
+        if char in string.ascii_uppercase:
+            return self._rng.choice(string.ascii_uppercase)
+        if char in string.ascii_lowercase:
+            return self._rng.choice(string.ascii_lowercase)
+        return char
+
+
+def scrub(value, field: str | None = None):
+    """Scrub one value with a scrubber of its own (see Scrubber)."""
+    return Scrubber().scrub(value, field)
 
 
 # --- Shapes ------------------------------------------------------------------
@@ -143,27 +212,34 @@ def describe_kind(key: str, value) -> str:
         return "unclassified"
     if kind.name == resources.COLLECTION:
         return f"collection({','.join(kind.fields)})"
+    if kind.name == resources.ONE_OF:
+        return f"one_of({','.join(kind.fields)})"
     return kind.name
 
 
 def shape_of(response: dict) -> dict:
-    """Top-level keys with their kind, JSON types and, for objects, field names and field types."""
+    """Top-level keys with their kind, JSON types and, for objects, field names and field types.
+
+    `full_sync` says whether the key occurred in a full sync, because some keys only occur in
+    incremental ones.
+    """
     keys = {}
+    full = response.get("full_sync") is True
     for key, value in response.items():
-        entry = {"kind": describe_kind(key, value), "types": [json_type(value)]}
+        entry = {"kind": describe_kind(key, value), "types": [json_type(value)], "full_sync": full}
         if isinstance(value, list):
             objects = [obj for obj in value if isinstance(obj, dict)]
         elif isinstance(value, dict):
-            entries = list(value.values())
-            mapping = entry["kind"] == resources.MAPPING
-            objects = [obj for obj in entries if isinstance(obj, dict)] if mapping else [value]
+            objects = [value]
         else:
             objects = None
         if objects is not None:
             fields: dict[str, set[str]] = {}
             for obj in objects:
                 for field, item in obj.items():
-                    fields.setdefault(field, set()).add(json_type(item))
+                    # Object keys that are IDs, as in `day_orders`, differ per account and day.
+                    name = ID_FIELD if _ID_KEY.match(field) else field
+                    fields.setdefault(name, set()).add(json_type(item))
             entry["fields"] = {field: sorted(types) for field, types in sorted(fields.items())}
         keys[key] = entry
     return {"keys": dict(sorted(keys.items()))}
@@ -173,8 +249,9 @@ def merge_shapes(shapes: list[dict]) -> dict:
     keys: dict[str, dict] = {}
     for shape in shapes:
         for key, entry in shape["keys"].items():
-            merged = keys.setdefault(key, {"kinds": set(), "types": set()})
+            merged = keys.setdefault(key, {"kinds": set(), "types": set(), "full_sync": False})
             merged["kinds"].add(entry["kind"])
+            merged["full_sync"] = merged["full_sync"] or entry.get("full_sync", False)
             merged["types"].update(entry["types"])
             if "fields" in entry:
                 fields = merged.setdefault("fields", {})
@@ -183,7 +260,7 @@ def merge_shapes(shapes: list[dict]) -> dict:
     result = {}
     for key, merged in sorted(keys.items()):
         kinds = merged["kinds"] - {"unclassified"} or merged["kinds"]
-        entry = {"kind": "|".join(sorted(kinds)), "types": sorted(merged["types"])}
+        entry = {"kind": "|".join(sorted(kinds)), "types": sorted(merged["types"]), "full_sync": merged["full_sync"]}
         if "fields" in merged:
             entry["fields"] = {field: sorted(types) for field, types in sorted(merged["fields"].items())}
         result[key] = entry
@@ -202,13 +279,20 @@ def generate_shapes(sources: list[Path] | None = None) -> dict:
 
 
 def compare_shapes(expected: dict, actual: dict) -> tuple[list[str], list[str]]:
-    """Return (added, removed): differences of `actual` from `expected`, one line each."""
+    """Return (added, removed): differences of `actual` from `expected`, one line each.
+
+    Removals are only listed where they can mean something: a key that the recordings saw in a full
+    sync missing from a full sync, and a field missing from a resource whose objects are present.
+    An account without tasks cannot show the fields of tasks.
+    """
     added, removed = [], []
     want, have = expected["keys"], actual["keys"]
+    actual_full = any(entry.get("full_sync") for entry in have.values())
     for key in sorted(have.keys() - want.keys()):
         added.append(f"key {key!r} ({have[key]['kind']})")
     for key in sorted(want.keys() - have.keys()):
-        removed.append(f"key {key!r}")
+        if want[key].get("full_sync") or not actual_full:
+            removed.append(f"key {key!r}")
     for key in sorted(have.keys() & want.keys()):
         old, new = want[key], have[key]
         if new["kind"] not in old["kind"].split("|"):
@@ -218,8 +302,9 @@ def compare_shapes(expected: dict, actual: dict) -> tuple[list[str], list[str]]:
         old_fields, new_fields = old.get("fields", {}), new.get("fields", {})
         for field in sorted(new_fields.keys() - old_fields.keys()):
             added.append(f"field {key}.{field} ({', '.join(new_fields[field])})")
-        for field in sorted(old_fields.keys() - new_fields.keys()):
-            removed.append(f"field {key}.{field}")
+        if new_fields:
+            for field in sorted(old_fields.keys() - new_fields.keys()):
+                removed.append(f"field {key}.{field}")
         for field in sorted(new_fields.keys() & old_fields.keys()):
             for type_ in sorted(set(new_fields[field]) - set(old_fields[field])):
                 added.append(f"type {type_} of {key}.{field}")
@@ -242,11 +327,18 @@ def token_for(account: str) -> str:
     return token
 
 
-def scrubbed_bytes(body: bytes, token: str) -> bytes:
-    data = storage.encode_json(scrub(json.loads(body)))
-    if token.encode() in data:
-        raise SystemExit("error: the scrubbed response still contains the API token; nothing was written")
-    return data
+def scrubbed_bytes(bodies: list[bytes], token: str | None = None) -> list[bytes]:
+    """Scrub the responses of one recording with one scrubber, and check the result."""
+    scrubber = Scrubber()
+    results = [storage.encode_json(scrubber.scrub(json.loads(body))) for body in bodies]
+    for data in results:
+        if token and token.encode() in data:
+            raise SystemExit("error: the scrubbed response still contains the API token; nothing was written")
+        text = data.decode("utf-8")
+        leaked = sorted(o for o in scrubber.originals if len(o) >= MIN_CHECKED_ID_LENGTH and o in text)
+        if leaked:
+            raise SystemExit(f"error: the scrubbed response still contains {len(leaked)} original IDs; nothing was written")
+    return results
 
 
 def record(account: str) -> list[Path]:
@@ -256,11 +348,27 @@ def record(account: str) -> list[Path]:
     incremental = client.sync(json.loads(full)["sync_token"])
     directory = RECORDED / account
     directory.mkdir(parents=True, exist_ok=True)
+    return _write(directory, scrubbed_bytes([full, incremental], token))
+
+
+RECORDING_FILES = ("full", "incremental")
+
+
+def _write(directory: Path, results: list[bytes]) -> list[Path]:
     written = []
-    for name, body in [("full", full), ("incremental", incremental)]:
+    for name, data in zip(RECORDING_FILES, results):
         path = directory / f"{name}.json"
-        path.write_bytes(scrubbed_bytes(body, token))
+        path.write_bytes(data)
         written.append(path)
+    return written
+
+
+def rescrub() -> list[Path]:
+    """Apply the current scrubbing rules to every existing recording, keeping it consistent."""
+    written = []
+    for directory in sorted(path for path in RECORDED.iterdir() if path.is_dir()):
+        paths = [directory / f"{name}.json" for name in RECORDING_FILES]
+        written += _write(directory, scrubbed_bytes([path.read_bytes() for path in paths]))
     return written
 
 
@@ -269,11 +377,12 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     record_parser = commands.add_parser("record", help="record a full and an incremental sync, then regenerate shapes")
     record_parser.add_argument("--account", choices=sorted(TOKEN_VARIABLES), required=True)
+    commands.add_parser("rescrub", help="apply the current scrubbing rules to the recordings, then regenerate shapes")
     commands.add_parser("shapes", help="regenerate shapes.json from the recorded fixtures")
     args = parser.parse_args(argv)
 
-    if args.command == "record":
-        for path in record(args.account):
+    if args.command in ("record", "rescrub"):
+        for path in record(args.account) if args.command == "record" else rescrub():
             print(f"wrote {path.relative_to(ROOT)}", file=sys.stderr)
         print("review the files for personal data before committing them", file=sys.stderr)
     print(f"wrote {write_shapes().relative_to(ROOT)}", file=sys.stderr)

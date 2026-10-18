@@ -9,7 +9,7 @@ from dataclasses import dataclass
 log = logging.getLogger(__name__)
 
 COLLECTION = "collection"  # array of objects, one file per object, keyed by `fields`
-MAPPING = "mapping"  # JSON object of objects, one file per entry, keyed by the entry's name
+ONE_OF = "one_of"  # array of objects, each with exactly one of `fields`, keyed by that field and its value
 SINGLE = "single"  # one value, one file
 META = "meta"  # response metadata, not stored as an object
 
@@ -37,6 +37,11 @@ KNOWN: dict[str, Kind] = {
             "collaborators",
             "live_notifications",
             "workspace_filters",
+            "workspaces",
+            # Empty in every recorded account so far; the shape check warns if they do not fit.
+            "calendar_accounts",
+            "calendars",
+            "folders",
         ],
         ID,
     ),
@@ -46,7 +51,9 @@ KNOWN: dict[str, Kind] = {
     # The API documentation spells this key both ways.
     "collaborator_states": Kind(COLLECTION, ("project_id", "user_id")),
     "collaborators_states": Kind(COLLECTION, ("project_id", "user_id")),
-    "workspaces": Kind(MAPPING),
+    "user_item_orders": Kind(COLLECTION, ("scope", "scope_id", "item_id")),
+    "suggestions": Kind(COLLECTION, ("type",)),
+    "completed_info": Kind(ONE_OF, ("project_id", "section_id")),
     **dict.fromkeys(
         [
             "user",
@@ -61,6 +68,12 @@ KNOWN: dict[str, Kind] = {
             "day_orders",
             "locations",
             "role_actions",
+            "tooltips",
+            "incomplete_item_ids",
+            "incomplete_project_ids",
+            # Undocumented; an empty object in every recorded incremental sync. Stored, not dropped,
+            # in case it ever carries data.
+            "id_mapping",
         ],
         Kind(SINGLE),
     ),
@@ -78,19 +91,26 @@ def key_component(value) -> str | None:
 
 
 def object_key(kind: Kind, obj) -> tuple[str, ...] | None:
-    """Return the key of a collection object, or None if it lacks a key field."""
+    """Return the key of a collection object, or None if it lacks a key field.
+
+    For ONE_OF, the key is the name of the one key field the object has, then its value; an object
+    with none or several of them has no key.
+    """
     if not isinstance(obj, dict):
         return None
+    if kind.name == ONE_OF:
+        present = [(field, key_component(obj.get(field))) for field in kind.fields if obj.get(field) is not None]
+        if len(present) != 1 or present[0][1] is None:
+            return None
+        return present[0]
     key = tuple(key_component(obj.get(field)) for field in kind.fields)
     return None if None in key else key
 
 
 def fits(kind: Kind, value) -> bool:
     """Whether `value` has the shape that `kind` expects."""
-    if kind.name == COLLECTION:
+    if kind.name in (COLLECTION, ONE_OF):
         return isinstance(value, list) and all(object_key(kind, obj) is not None for obj in value)
-    if kind.name == MAPPING:
-        return isinstance(value, dict) and all(isinstance(entry, dict) for entry in value.values())
     return True
 
 
@@ -128,6 +148,6 @@ class Classifier:
 def _describe(kind: Kind) -> str:
     if kind.name == COLLECTION:
         return f"a collection keyed by {' + '.join(kind.fields)}"
-    if kind.name == MAPPING:
-        return "a mapping of objects"
+    if kind.name == ONE_OF:
+        return f"a collection keyed by one of {' | '.join(kind.fields)}"
     return "a single value"

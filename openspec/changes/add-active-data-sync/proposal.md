@@ -39,6 +39,6 @@ None. The project has no specs yet.
 
 ## Open Questions
 
-- **Format of deleted objects:** Does the sync return the full object or only its ID when `is_deleted` is set? The contract test will show. The answer decides whether the last content of a deleted object is preserved.
+- **Format of deleted objects:** Does the sync return the full object or only its ID when `is_deleted` is set? *Answered by the contract test (2026-10-18):* neither. The payload has every field, but with emptied values (`content: ""`, `updated_at: null`). The tool therefore always keeps the last live content and stores the deletion payload next to it as a tombstone.
 - **Exit codes:** What should the exit status be for "succeeded with limitations", for example a feature that is not on the plan, as opposed to an error? This gets decided in the design.
 - **Minimum Python version:** 3.10 or newer is proposed. This gets confirmed in the design.

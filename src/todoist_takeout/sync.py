@@ -17,7 +17,7 @@ from todoist_takeout import resources, storage
 from todoist_takeout.api import Client
 from todoist_takeout.errors import ConfigError, RunError, StorageError
 from todoist_takeout.lock import LOCK_FILE, TargetLock
-from todoist_takeout.resources import COLLECTION, MAPPING, META, SINGLE, Classifier, Kind
+from todoist_takeout.resources import META, SINGLE, Classifier, Kind
 
 log = logging.getLogger(__name__)
 
@@ -215,12 +215,9 @@ def apply_response(target: Path, response: dict, classifier: Classifier) -> Appl
             continue
 
         directory = sync_dir / name
-        if kind.name == COLLECTION:
-            entries = [(resources.object_key(kind, obj), obj) for obj in value]
-        else:
-            entries = [((map_key,), obj) for map_key, obj in value.items()]
         seen = set()
-        for object_key, obj in entries:
+        for obj in value:
+            object_key = resources.object_key(kind, obj)
             stem = storage.encode_key(object_key)
             seen.add(stem)
             _apply_object(directory, stem, object_key, kind, obj, stats)
@@ -241,7 +238,7 @@ def apply_response(target: Path, response: dict, classifier: Classifier) -> Appl
 def _apply_object(directory: Path, stem: str, key: tuple[str, ...], kind: Kind, obj, stats: ApplyStats) -> None:
     path = directory / f"{stem}{JSON_SUFFIX}"
     data = storage.encode_json(obj)
-    live = not (isinstance(obj, dict) and obj.get("is_deleted") is True)
+    live = not _is_deleted(obj)
     stored = storage.read_bytes(path)
     if stored == data:
         # A run interrupted between writing a restored object and removing its tombstone
@@ -258,8 +255,9 @@ def _apply_object(directory: Path, stem: str, key: tuple[str, ...], kind: Kind, 
         _count(stats, _restore(directory, stem, key, kind) or written)
         return
 
-    # A deletion payload. Keep the last full content if the payload lacks any of its fields.
-    if stored_value is None or (isinstance(stored_value, dict) and stored_value.keys() <= obj.keys()):
+    # A deletion payload. Keep the last live content: Todoist's deletion payloads have every field
+    # but emptied values, so they never replace a live object (design D8).
+    if stored_value is None or _is_deleted(stored_value):
         written = storage.write_bytes_atomic(path, data)
     else:
         tombstone = directory / f"{stem}{DELETED_SUFFIX}"
@@ -292,28 +290,13 @@ def _check_key(path: Path, stored_value, key: tuple[str, ...], kind: Kind) -> No
 
     On a case-insensitive file system, keys that differ only in letter case share a file.
     """
-    if kind.name == COLLECTION:
-        stored_key = resources.object_key(kind, stored_value)
-    else:
-        # A mapping entry's key is not part of its content; the directory entry carries it.
-        stored_key = storage.decode_key(_listed_stem(path))
+    stored_key = resources.object_key(kind, stored_value)
     if stored_key != key:
         raise StorageError(
             f"{path} holds the object with key {_show(stored_key)}, which is not the key "
             f"{_show(key)} of the object to store there; on a case-insensitive file system two keys "
             "that differ only in letter case share a file. The file was not changed"
         )
-
-
-def _listed_stem(path: Path) -> str:
-    suffix = DELETED_SUFFIX if path.name.endswith(DELETED_SUFFIX) else JSON_SUFFIX
-    names = _listdir(path.parent)
-    if path.name not in names:
-        # Only a case-insensitive file system opens a file under a name it does not list.
-        for name in names:
-            if name.lower() == path.name.lower():
-                return name[: -len(suffix)]
-    return path.name[: -len(suffix)]
 
 
 def _show(key) -> str:
@@ -344,7 +327,7 @@ def _stored_live_keys(sync_dir: Path) -> dict[str, set[str]]:
             if f"{stem}{DELETED_SUFFIX}" in names:
                 continue
             value = _parse_stored(directory / name, storage.read_bytes(directory / name) or b"null")
-            if isinstance(value, dict) and value.get("is_deleted") is True:
+            if _is_deleted(value):
                 continue
             stems.add(stem)
         live[directory.name] = stems
@@ -358,6 +341,10 @@ def _listdir(directory: Path) -> list[str]:
         return []
     except OSError as exc:
         raise StorageError(f"cannot list {directory}: {exc.strerror or exc}") from exc
+
+
+def _is_deleted(value) -> bool:
+    return isinstance(value, dict) and value.get("is_deleted") is True
 
 
 def _is_empty(value) -> bool:

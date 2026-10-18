@@ -6,7 +6,7 @@ import pytest
 
 from todoist_takeout import storage
 from todoist_takeout.errors import StorageError
-from todoist_takeout.resources import KNOWN, Classifier
+from todoist_takeout.resources import KNOWN, Classifier, object_key
 from todoist_takeout.sync import apply_response
 
 FULL_SYNC_TREE = {
@@ -29,6 +29,8 @@ FULL_SYNC_TREE = {
     "sync/project_view_options_defaults/6Jf8VQXxpwv5XvQ2.json",
     "sync/workspaces/28173.json",
     "sync/workspace_users/28173~2671355.json",
+    "sync/completed_info/project_id~6Jf8VQXxpwv5XvQ2.json",
+    "sync/completed_info/section_id~6X7FxXvX84jHphx2.json",
     "sync/user.json",
     "sync/user_settings.json",
     "sync/user_plan_limits.json",
@@ -83,17 +85,10 @@ def test_stored_objects_parse_to_their_source_objects(tmp_path, sync_fixture):
             continue
         resource, stem = parts[1], parts[2]
         value = response[resource]
-        if isinstance(value, dict):
-            source = value[stem]
-        else:
-            [source] = [obj for obj in value if storage.encode_key(_key(resource, obj)) == stem]
+        [source] = [obj for obj in value if storage.encode_key(object_key(KNOWN[resource], obj)) == stem]
         assert stored == source
         assert list(stored) == list(source)  # field order kept
         assert (tmp_path / path).read_bytes() == storage.encode_json(source)
-
-
-def _key(resource, obj):
-    return [str(obj[field]) for field in KNOWN[resource].fields]
 
 
 def test_non_ascii_content_is_stored_literally(tmp_path, sync_fixture):
@@ -164,13 +159,23 @@ def test_colliding_composite_key_raises(tmp_path, sync_fixture):
 # --- 4.4 tombstones -----------------------------------------------------------
 
 
-def test_full_deletion_payload_replaces_the_object(tmp_path, sync_fixture):
-    apply(tmp_path, sync_fixture("full_sync"))
-    deletion = sync_fixture("delete_full")
+@pytest.mark.parametrize(
+    "name, resource, index",
+    [("delete_full", "items", 1), ("delete_blanked", "projects", 2)],
+)
+def test_deletion_payload_with_every_field_becomes_a_tombstone(tmp_path, sync_fixture, name, resource, index):
+    # Todoist's deletion payloads have every field but emptied values; the live content stays.
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    deletion = sync_fixture(name)
+    [payload] = deletion[resource]
+    assert full[resource][index]["id"] == payload["id"]
     stats = apply(tmp_path, deletion)
-    path = tmp_path / "sync/items/6X7rfFVPjhvv84XG.json"
-    assert path.read_bytes() == storage.encode_json(deletion["items"][0])
-    assert tree(tmp_path) == FULL_SYNC_TREE  # no other file
+    path = tmp_path / f"sync/{resource}/{payload['id']}.json"
+    tombstone = tmp_path / f"sync/{resource}/{payload['id']}.deleted.json"
+    assert path.read_bytes() == storage.encode_json(full[resource][index])
+    assert tombstone.read_bytes() == storage.encode_json(payload)
+    assert tree(tmp_path) == FULL_SYNC_TREE | {tombstone.relative_to(tmp_path).as_posix()}
     assert stats.deleted == 1
 
 
@@ -195,7 +200,20 @@ def test_deleted_before_ever_stored(tmp_path, sync_fixture):
     )
 
 
-@pytest.mark.parametrize("name", ["delete_full", "delete_stub"])
+def test_second_deletion_of_a_never_stored_object_replaces_it(tmp_path, sync_fixture):
+    first = sync_fixture("delete_stub")
+    apply(tmp_path, first)
+    second = sync_fixture("delete_stub")
+    second["projects"][0]["name"] = ""
+    stats = apply(tmp_path, second)
+    assert tree(tmp_path) == {"sync/projects/6X7fphhgwcXVGccJ.json"}
+    assert (tmp_path / "sync/projects/6X7fphhgwcXVGccJ.json").read_bytes() == storage.encode_json(
+        second["projects"][0]
+    )
+    assert stats.deleted == 1
+
+
+@pytest.mark.parametrize("name", ["delete_full", "delete_stub", "delete_blanked"])
 def test_reapplying_a_deletion_changes_nothing(tmp_path, sync_fixture, name):
     apply(tmp_path, sync_fixture("full_sync"))
     apply(tmp_path, sync_fixture(name))
@@ -231,7 +249,7 @@ def test_server_full_sync_keeps_missing_objects_and_warns(tmp_path, sync_fixture
 def test_missing_count_ignores_objects_already_deleted(tmp_path, sync_fixture):
     apply(tmp_path, sync_fixture("full_sync"))
     apply(tmp_path, sync_fixture("delete_stub"))  # tombstone for project 6X7fphhgwcXVGccJ
-    apply(tmp_path, sync_fixture("delete_full"))  # item 6X7rfFVPjhvv84XG stored with is_deleted
+    apply(tmp_path, sync_fixture("delete_full"))  # tombstone for item 6X7rfFVPjhvv84XG
     response = sync_fixture("server_full_sync")
     response["projects"] = [p for p in response["projects"] if p["id"] != "6X7fphhgwcXVGccJ"]
     response["items"] = [i for i in response["items"] if i["id"] != "6X7rfFVPjhvv84XG"]

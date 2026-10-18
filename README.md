@@ -54,7 +54,7 @@ Options of `backup`:
 All messages go to stderr, one line each, starting with `INFO`, `WARNING` or `ERROR`. A successful run ends with a summary line such as:
 
 ```
-INFO backup complete: 29 objects written, 0 unchanged, 0 marked deleted, 1 warning
+INFO backup complete: 31 objects written, 0 unchanged, 0 marked deleted, 1 warning
 ```
 
 Features your Todoist plan does not include, such as comments on some plans, produce a warning and never make the run fail.
@@ -218,11 +218,12 @@ Findings, such as the shape of deletion payloads, rejected commands and the plan
 
 ### Recording fixtures
 
-[scripts/record_fixtures.py](scripts/record_fixtures.py) records a full and an incremental sync from a real account and writes them to `tests/fixtures/recorded/<account>/`. Recording is read-only. Every string is replaced with a placeholder except IDs, keys and enum-like values. Then the script regenerates `tests/fixtures/shapes.json`, which the contract tests compare against.
+[scripts/record_fixtures.py](scripts/record_fixtures.py) records a full and an incremental sync from a real account and writes them to `tests/fixtures/recorded/<account>/`. Recording is read-only. Nothing of the account is kept: strings become placeholders (except enum-like values such as colours), IDs become random pseudonyms that still match each other within a recording, and numbers become `0` (except plan limits). Then the script regenerates `tests/fixtures/shapes.json`, which the contract tests compare against.
 
 ```sh
 python scripts/record_fixtures.py record --account read    # uses TODOIST_CONTRACT_TOKEN
 python scripts/record_fixtures.py record --account write   # uses TODOIST_CONTRACT_WRITE_TOKEN
+python scripts/record_fixtures.py rescrub                  # apply the current scrubbing rules to the recordings
 python scripts/record_fixtures.py shapes                   # regenerate shapes.json only
 ```
 

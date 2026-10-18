@@ -11,7 +11,15 @@ Facts about the Todoist API v1 that shape the design (from the public API refere
 - The docs recommend an incremental sync right after a full sync, because large accounts may get a full sync whose `full_sync_date_utc` lags behind.
 - Errors have the shape `{error, error_code, error_tag, http_code, error_extra}`. `error_extra.retry_after` may be present on 429 responses and on other errors.
 - `user_plan_limits` describes what the plan includes, for example `comments: false`.
-- The docs do not say whether deleted objects arrive as full objects or as stubs.
+- The docs do not say whether deleted objects arrive as full objects or as stubs. The contract tests answered this; see below.
+
+Findings of the contract tests against a Pro and a Free account (2026-10-18), recorded in `tests/fixtures/recorded/`:
+
+- **Deletion payloads** of tasks, comments and projects have every field of the live object, but with emptied values: `content: ""` or `name: ""`, `updated_at: null`, and for projects `created_at: null` and `access: null`. Comparing field names cannot tell them from full objects (D8).
+- **No restore path:** `item_undelete` and `item_restore` are rejected with `INVALID_COMMAND` (error code 39), and no other command restores a deleted object with the same id. D8 step 1 stays as a safeguard.
+- **Archiving** a project returns the project with `is_archived: true` in the next incremental sync. Its tasks are not in the response and stay live in the backup. This feeds the archived-projects questions of `add-completed-tasks-backup`.
+- **Plans:** the Free account has `comments: true`, so D12's only warning does not fire there.
+- **Undocumented resources:** both accounts return `calendar_accounts`, `calendars`, `completed_info`, `folders`, `incomplete_item_ids`, `incomplete_project_ids`, `suggestions`, `tooltips` and `user_item_orders`, and incremental syncs an empty `id_mapping` object, stored as `single` so that nothing is dropped if it ever carries data. `workspaces` is an array, not an object of objects. D6 lists them.
 
 ## Goals / Non-Goals
 
@@ -101,13 +109,17 @@ The sync response body is saved byte-for-byte to `pending/sync-response.json` be
 
 | Kind | Examples | Stored as |
 |---|---|---|
-| `collection(id)` | `items`, `projects`, `sections`, `labels`, `notes`, `project_notes`, `filters`, `reminders`, `reminders_location`, `collaborators`, `live_notifications`, `workspace_filters` | `sync/<key>/<id>.json` |
-| `collection(fields…)` | `view_options` (`view_type`, `object_id`), `workspace_users` (`workspace_id`, `user_id`), `project_view_options_defaults` (`project_id`) | `sync/<key>/<f1>~<f2>.json` |
-| `mapping` | resources returned as a JSON object of objects (e.g. `workspaces` if the recorded shape confirms it) | `sync/<key>/<map-key>.json` |
-| `single` | `user`, `user_settings`, `user_plan_limits`, `stats`, `notification_settings`/`settings_notifications`, `day_orders`, `live_notifications_last_read_id` | `sync/<key>.json` |
+| `collection(id)` | `items`, `projects`, `sections`, `labels`, `notes`, `project_notes`, `filters`, `reminders`, `reminders_location`, `collaborators`, `live_notifications`, `workspace_filters`, `workspaces`, `calendar_accounts`, `calendars`, `folders` | `sync/<key>/<id>.json` |
+| `collection(fields…)` | `view_options` (`view_type`, `object_id`), `workspace_users` (`workspace_id`, `user_id`), `project_view_options_defaults` (`project_id`), `user_item_orders` (`scope`, `scope_id`, `item_id`), `suggestions` (`type`) | `sync/<key>/<f1>~<f2>.json` |
+| `collection(one of…)` | `completed_info` (`project_id` \| `section_id`) | `sync/<key>/<field>~<value>.json` |
+| `single` | `user`, `user_settings`, `user_plan_limits`, `stats`, `notification_settings`/`settings_notifications`, `day_orders`, `live_notifications_last_read_id`, `tooltips`, `incomplete_item_ids`, `incomplete_project_ids`, `id_mapping` | `sync/<key>.json` |
 | `meta` | `sync_token`, `full_sync`, `full_sync_date_utc`, `temp_id_mapping`, `sync_status` | not stored as objects; the first three feed `state.json` |
 
-The real kind of each resource is pinned by recorded fixtures and checked by the contract test. Both spellings of the inconsistently documented keys are listed.
+The real kind of each resource is pinned by recorded fixtures and checked by the contract test. Both spellings of the inconsistently documented keys are listed. `calendar_accounts`, `calendars` and `folders` were empty in both recorded accounts; `collection(id)` is the documented guess, and the shape check warns if a non-empty response does not fit it.
+
+`collection(one of…)` is for objects that carry exactly one of several key fields: each `completed_info` entry has either `project_id` or `section_id`. The file name holds the field name and its value, so that a project and a section with the same id cannot share a file. An object with none or more than one of the fields does not fit the kind, which triggers the shape fallback and its warning.
+
+An earlier draft had a `mapping` kind for resources returned as an object of objects, expecting `workspaces` to be one. The recordings show no such resource, so the kind is dropped rather than documented for a case that does not occur.
 
 Unknown keys are handled by shape:
 
@@ -132,10 +144,11 @@ For each object, `apply` computes the target path and the encoded bytes, then:
 
 1. **Live object** (`is_deleted` is not true): write `<key>.json` if its bytes differ from the stored ones. Then, if `<key>.deleted.json` exists, remove it and fsync the directory on POSIX: the object was restored. This check runs even when `<key>.json` is unchanged, so that a run interrupted between the write and the removal completes the removal when it applies the response again. This is the only file the tool ever removes under `sync/`.
 2. **Deletion payload:**
-   - no stored `<key>.json` → write the payload as `<key>.json`;
-   - the stored live object's top-level keys ⊆ the payload's keys → overwrite `<key>.json`;
-   - otherwise → keep `<key>.json` and write the payload to `<key>.deleted.json`.
+   - the stored `<key>.json` is live (`is_deleted` is not true) → keep it and write the payload to `<key>.deleted.json`;
+   - otherwise, when there is no stored `<key>.json` or it already holds a deletion payload → write the payload as `<key>.json`.
    Re-applying the same payload gives the same result, so the step is idempotent.
+
+   *Rejected:* overwrite `<key>.json` when the payload has every top-level key of the stored object. The contract test showed that Todoist's deletion payloads have every key but emptied values, so this rule would replace the last content with blanks. Whether a payload is a full object cannot be told from its keys, so the live content is always kept.
 3. **Full sync:** first collect the set of stored live keys per collection, then count those missing from the response and log one warning with the total. Nothing is changed for missing objects.
 
 `single` resources are overwritten when their bytes change.
@@ -209,15 +222,15 @@ Unknown fields that a newer minor tool version adds are kept when the file is re
 - **Contract tests** (`pytest -m contract`): each part skips unless its variables are set. Two accounts are supported, because a personal account must never receive writes:
   - `TODOIST_CONTRACT_TOKEN`: the read account, for example the user's real account. Only read-only tests use it.
   - `TODOIST_CONTRACT_WRITE_TOKEN`: the write account, a dedicated test account. The write part uses only this token and never falls back to the read token. The read-only part also runs against it, which records a second plan (for example a free plan's `user_plan_limits` and restrictions).
-  - Read-only part, once per configured account: a full sync, with the shape of every top-level key compared to `tests/fixtures/shapes.json`. Added keys, fields or JSON types fail the test. Removed ones are only reported, because an account may lack data that the recorded account had. Every top-level key must be classified by `resources.py` without the fallback.
-  - Write part, which additionally requires `TODOIST_CONTRACT_ALLOW_WRITES=1`. Before it writes anything, it refuses to run if the write token equals the read token, or if both tokens belong to the same `user.id`. A command that the write account's plan rejects (for example a comment on a free plan) is recorded as a finding, together with its error, and the part continues without that object. Findings are written to `tests/contract/findings/` (not committed), scrubbed like fixtures.
+  - Read-only part, once per configured account: a full sync, with the shape of every top-level key compared to `tests/fixtures/shapes.json`. Added keys, fields or JSON types fail the test. Removed ones are only reported, because an account may lack data that the recorded account had, and only where a removal can mean something: a field missing from a resource whose objects are present, or a key that the recordings saw in a full sync. `shapes.json` therefore notes for each key whether it occurred in a full sync. Every top-level key must be classified by `resources.py` without the fallback.
+  - Write part, which additionally requires `TODOIST_CONTRACT_ALLOW_WRITES=1`. Before it writes anything, it refuses to run if the write token equals the read token, or if both tokens belong to the same `user.id`. A command that the write account's plan rejects (for example a comment on a free plan) is recorded as a finding, together with its error, and the part continues without that object. Findings are written to `tests/contract/findings/` (not committed), with the API payloads in them scrubbed like fixtures. After a deletion, the part also checks that `<key>.json` still holds the content it had before.
   - The write part: creates a temporary project, task and comment, deletes them, syncs incrementally, and records the shape of the deletion payloads. It then archives a second temporary project that contains a task, syncs incrementally, and records what the sync reports for the project and its task. This answers the "archiving between runs" question of `add-completed-tasks-backup`. Finally it cleans up.
-- **Fixtures:** first hand-written from the documented examples, then complemented by recordings made with `scripts/record_fixtures.py` under `tests/fixtures/recorded/<account>/` (`read` or `write`). Recording is read-only and works with either account. The hand-written fixtures stay, because the offline tests depend on their exact content; `shapes.json` is generated from the recordings, or from the hand-written full and incremental fixtures as long as no recording exists. That script replaces all strings except IDs, keys and enum-like values with placeholders, so that no personal data is committed.
+- **Fixtures:** first hand-written from the documented examples, then complemented by recordings made with `scripts/record_fixtures.py` under `tests/fixtures/recorded/<account>/` (`read` or `write`). Recording is read-only and works with either account. The hand-written fixtures stay, because the offline tests depend on their exact content; `shapes.json` is generated from the recordings, or from the hand-written full and incremental fixtures as long as no recording exists. That script scrubs the responses so that nothing of the account is committed, not even IDs: strings become placeholders, except enum-like values of a short list of enum fields (`lang` and `premium_status` are scrubbed too); every ID, whether a string, a number or an object key such as in `day_orders`, is replaced by a random pseudonym with the same length and character classes; numbers become `0` (or `0.0`), except in `user_plan_limits`, which holds plan values that D12 reads. Pseudonyms are consistent within one recording, so references such as `items[].project_id` → `projects[].id` still match and keys stay unique, but they are random rather than hashed, because a hash of a numeric ID could be reversed by trying all values, and the mapping is never stored. Before writing, the script checks that neither the token nor any original ID of six or more characters occurs in the output.
 - **CI:** a GitHub Actions matrix over ubuntu, macos and windows × Python 3.11 and 3.13. It runs once a remote exists, and the repository has none yet.
 
 ## Risks / Trade-offs
 
-- [Deletion payloads may be stubs] → D8 keeps the last full content either way. The contract write test documents the real behaviour.
+- [Deletion payloads carry emptied values (observed) or may be stubs] → D8 always keeps the last live content and stores the payload as a tombstone. The contract write test checks this against the real API.
 - [A resource's real shape differs from the table, e.g. `workspaces`] → Classification falls back by shape with a warning. The contract test compares shapes, and fixtures pin them.
 - [A server-initiated full sync hides deletions] → The tool warns with a count. No data is lost; objects may stay live in the backup after they were deleted.
 - [Thousands of fsyncs on the first full sync are slow, especially on Windows] → This affects only the first run. Unchanged files are skipped on later full syncs. Measure during implementation; if it proves too slow, fsyncing in batches is an option that keeps the guarantee.
@@ -234,4 +247,4 @@ None. This is the first release and format version 1. To roll back, delete the t
 
 - The exact error tags Todoist uses for plan restrictions. They only extend the D4 table.
 - Whether `full_sync_date_utc` can lag so far that one follow-up incremental sync is not enough. If so, the round limit in D10 can be raised without other changes.
-- Whether Todoist can restore a deleted object with the same id, and what the sync returns for it. The write contract test (7.4) checks this; until then, D8 step 1 handles the case defensively.
+- Whether Todoist can restore a deleted object with the same id. The write contract test found no command that does (see Context); D8 step 1 still handles the case defensively, in case another client or Todoist support restores one.

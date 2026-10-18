@@ -2,7 +2,7 @@ import re
 from importlib import resources
 
 from todoist_takeout import storage
-from todoist_takeout.resources import COLLECTION, KNOWN, MAPPING, SINGLE, Classifier
+from todoist_takeout.resources import COLLECTION, KNOWN, ONE_OF, SINGLE, Classifier
 from todoist_takeout.sync import apply_response
 
 
@@ -40,7 +40,7 @@ def _pattern(documented: str) -> re.Pattern:
 
 
 def _produced_tree(tmp_path, sync_fixture):
-    for name in ["full_sync", "delete_stub", "delete_full"]:
+    for name in ["full_sync", "delete_stub", "delete_full", "delete_blanked"]:
         apply_response(tmp_path, sync_fixture(name), Classifier())
     return sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*") if p.is_file())
 
@@ -73,5 +73,5 @@ def test_documented_kinds_match_the_resource_table():
         [block] = re.findall(rf"^{heading}: (.*?)\.$", text, re.M | re.S)
         return set(re.findall(r"`([a-z_]+)`", block))
 
-    assert listed("Resources stored as mappings") == {k for k, v in KNOWN.items() if v.name == MAPPING}
+    assert listed("Resources keyed by one of several fields") == {k for k, v in KNOWN.items() if v.name == ONE_OF}
     assert listed("Resources stored as single values") == {k for k, v in KNOWN.items() if v.name == SINGLE}

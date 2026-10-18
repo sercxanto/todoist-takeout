@@ -43,11 +43,11 @@ When the API answers an incremental request with a full sync (`full_sync` is tru
 - **THEN** the tool stores all returned objects, keeps the 3 missing objects unchanged, warns that 3 stored objects were not in the full sync, and exits with status 0
 
 ### Requirement: Tombstones for deleted objects
-When a sync response marks an object as deleted (`is_deleted` is true), the tool SHALL keep it in the backup as deleted and SHALL NOT remove any file, except as the Restored objects requirement allows. Afterwards, the stored data SHALL include the deletion payload as the API returned it, and SHALL still include the last full content of the object if the deletion payload omits any of its top-level fields.
+When a sync response marks an object as deleted (`is_deleted` is true), the tool SHALL keep it in the backup as deleted and SHALL NOT remove any file, except as the Restored objects requirement allows. Afterwards, the stored data SHALL include the deletion payload as the API returned it and, if the backup held the object as live, the object's last live content unchanged.
 
-#### Scenario: Deletion payload is the full object
-- **WHEN** a stored task is deleted in Todoist and the sync returns the full task with `is_deleted: true`
-- **THEN** the stored task becomes that payload, and no other file is created for it
+#### Scenario: Deletion payload with blanked values
+- **WHEN** a stored task is deleted in Todoist and the sync returns it with all of its fields, `is_deleted: true` and emptied values such as `content: ""`
+- **THEN** the stored task keeps its previous content, and the deletion payload is stored next to it as a tombstone
 
 #### Scenario: Deletion payload is a stub
 - **WHEN** a stored task is deleted in Todoist and the sync returns a payload with `is_deleted: true` that lacks top-level fields of the stored task

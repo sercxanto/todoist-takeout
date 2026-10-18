@@ -21,6 +21,10 @@ A backup directory SHALL contain `state.json`, a format description `README.md`,
 - **WHEN** the sync returns an object of a collection whose objects are identified by several fields, such as a view option identified by `view_type` and `object_id`
 - **THEN** it is stored at `sync/<resource>/<key>.json`, where `<key>` is built from those fields in the order and with the separator the format description documents
 
+#### Scenario: Object identified by one of several fields
+- **WHEN** the sync returns a `completed_info` entry that has `project_id` `P1` and no `section_id`
+- **THEN** it is stored at `sync/completed_info/project_id~P1.json`
+
 ### Requirement: Raw payloads unchanged
 Each object file SHALL contain exactly the JSON value the API returned for that object: every field, with the same names, values and order. The tool SHALL NOT add fields, remove fields or wrap the value.
 
@@ -47,11 +51,15 @@ The tool SHALL NOT rewrite a file whose new content would be identical to its cu
 - **THEN** the file is not rewritten and its modification time stays the same
 
 ### Requirement: Tombstone files
-When a deletion payload lacks top-level fields that the stored object has, the tool SHALL keep `<key>.json` unchanged and write the deletion payload to `<key>.deleted.json` in the same directory. An object SHALL count as deleted if its `<key>.json` has `is_deleted: true` or a `<key>.deleted.json` exists.
+When a deletion payload arrives for an object whose stored `<key>.json` is live (does not have `is_deleted: true`), the tool SHALL keep `<key>.json` unchanged and write the deletion payload to `<key>.deleted.json` in the same directory. When no `<key>.json` exists, or it already holds a deletion payload, the tool SHALL write the deletion payload to `<key>.json`. An object SHALL count as deleted if its `<key>.json` has `is_deleted: true` or a `<key>.deleted.json` exists.
 
 #### Scenario: Stub deletion
 - **WHEN** a stored project at `sync/projects/P1.json` is deleted and the API returns only `{"id": "P1", "is_deleted": true}`
 - **THEN** `sync/projects/P1.json` keeps its previous content and `sync/projects/P1.deleted.json` contains `{"id": "P1", "is_deleted": true}`
+
+#### Scenario: Blanked deletion
+- **WHEN** a stored project at `sync/projects/P1.json` is deleted and the API returns project `P1` with all of its fields, `is_deleted: true` and `name: ""`
+- **THEN** `sync/projects/P1.json` keeps its previous content and `sync/projects/P1.deleted.json` contains the returned payload
 
 ### Requirement: Restored objects
 When a live payload (`is_deleted` is not true) arrives for an object that has a `<key>.deleted.json`, the tool SHALL write the payload to `<key>.json` and then remove `<key>.deleted.json`, so that the object counts as live again. This is the only case in which the tool removes a file under `sync/`.

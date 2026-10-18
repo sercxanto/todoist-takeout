@@ -90,7 +90,7 @@ def test_first_run_makes_a_full_and_a_follow_up_request(tmp_path):
     assert {"state.json", "README.md", ".lock", "sync/items/6X7rM8997g3RQmvh.json"} <= tree(tmp_path)
     edited = json.loads(fixture_bytes("incremental_edit"))["items"][0]
     assert json.loads((tmp_path / "sync/items/6X7rM8997g3RQmvh.json").read_bytes()) == edited
-    assert stats.written == 29  # 28 objects of the full sync, then the edited task
+    assert stats.written == 31  # 30 objects of the full sync, then the edited task
 
 
 def test_second_run_makes_one_incremental_request(tmp_path):
@@ -278,13 +278,13 @@ def test_missing_plan_information_does_not_warn(tmp_path, caplog):
 # --- 5.4 crash and resume ---------------------------------------------------------
 
 # Writes and removals of an uninterrupted first run: state.json, then for the full sync the
-# pending response, 28 objects, README.md, state.json and the pending removal, then for the
+# pending response, 30 objects, README.md, state.json and the pending removal, then for the
 # follow-up the pending response, the edited task, state.json and the pending removal, and finally
 # state.json.
-FIRST_RUN_WRITES = 38
+FIRST_RUN_WRITES = 40
 # For each request of the first run, the number of writes after which its response is saved in
 # `pending/`. From then on, it must never be requested again.
-RESPONSE_SAVED_AFTER = {"*": 2, "FULL-1": 34}
+RESPONSE_SAVED_AFTER = {"*": 2, "FULL-1": 36}
 
 
 @pytest.fixture(scope="module")

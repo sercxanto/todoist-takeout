@@ -25,7 +25,7 @@ def test_full_sync_matches_recorded_shapes(account, contract_support, recorder, 
             "added": added,
             "removed": removed,
             "unclassified": unclassified,
-            "user_plan_limits": recorder.scrub(response.get("user_plan_limits")),
+            "user_plan_limits": recorder.scrub(response.get("user_plan_limits"), "user_plan_limits"),
         },
         token,
     )

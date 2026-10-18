@@ -286,14 +286,14 @@
       "updater_uid": "2671355"
     }
   ],
-  "workspaces": {
-    "28173": {
+  "workspaces": [
+    {
       "id": "28173",
       "name": "Acme",
       "plan": "STARTER",
       "is_deleted": false
     }
-  },
+  ],
   "workspace_users": [
     {
       "workspace_id": "28173",
@@ -304,6 +304,17 @@
   ],
   "live_notifications": [],
   "live_notifications_last_read_id": "0",
+  "completed_info": [
+    {
+      "project_id": "6Jf8VQXxpwv5XvQ2",
+      "completed_items": 3,
+      "archived_sections": 0
+    },
+    {
+      "section_id": "6X7FxXvX84jHphx2",
+      "completed_items": 1
+    }
+  ],
   "user": {
     "id": "2671355",
     "email": "me@example.com",

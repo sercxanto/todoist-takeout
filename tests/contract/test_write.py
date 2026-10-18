@@ -64,13 +64,13 @@ def stored(target, resource: str, object_id) -> tuple[dict | None, dict | None]:
     return files[0], files[1]
 
 
-def check_deleted(target, resource, object_id, problems):
+def check_deleted(target, resource, object_id, before, problems):
+    """D8: the live content stored before the deletion stays, and the payload is the tombstone."""
     live, tombstone = stored(target, resource, object_id)
-    if tombstone is None:
-        if not (live and live.get("is_deleted") is True):
-            problems.append(f"{resource}/{object_id}: neither a deletion payload nor a tombstone is stored")
-    elif tombstone.get("is_deleted") is not True or live is None or live.get("is_deleted") is True:
-        problems.append(f"{resource}/{object_id}: the tombstone does not follow D8 ({live=}, {tombstone=})")
+    if live != before:
+        problems.append(f"{resource}/{object_id}: <key>.json lost its last live content ({before=}, after={live})")
+    if tombstone is None or tombstone.get("is_deleted") is not True:
+        problems.append(f"{resource}/{object_id}: no tombstone with is_deleted: true ({tombstone=})")
 
 
 def presence(obj) -> dict:
@@ -90,8 +90,10 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
     def backup():
         run_backup(target, client)
 
+    scrubber = recorder.Scrubber()  # one for all findings, so that their IDs match each other
+
     def payload(response, resource, object_id):
-        return recorder.scrub(find(response, resource, object_id))
+        return scrubber.scrub(find(response, resource, object_id))
 
     try:
         observer = Observer(client)
@@ -109,6 +111,9 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
         backup()
 
         # Delete the comment and the task.
+        before = {"task": stored(target, "items", task)[0], "note": note and stored(target, "notes", note)[0]}
+        if not before["task"] or (note and not before["note"]):
+            problems.append(f"the new task or comment was not stored before the deletion ({before=})")
         if note:
             commands.run("note_delete", {"id": note})
         commands.run("item_delete", {"id": task})
@@ -119,9 +124,9 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
         backup()
         if findings["deletion"]["task"] is None:
             problems.append("the incremental sync did not report the deleted task")
-        check_deleted(target, "items", task, problems)
+        check_deleted(target, "items", task, before["task"], problems)
         if note:
-            check_deleted(target, "notes", note, problems)
+            check_deleted(target, "notes", note, before["note"], problems)
 
         # Try to restore the task.
         findings["restore"] = {"commands": {}}
@@ -143,12 +148,13 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
             findings["restore"]["result"] = "no restore path found"
 
         # Delete the project.
+        before["project"] = stored(target, "projects", project)[0]
         if commands.run("project_delete", {"id": project}):
             projects.remove(project)
         changes = observer.changes()
         findings["deletion"]["project"] = payload(changes, "projects", project)
         backup()
-        check_deleted(target, "projects", project, problems)
+        check_deleted(target, "projects", project, before["project"], problems)
 
         # Archive a second project that contains a task.
         archived = commands.add("project_add", {"name": f"{PREFIX}: archive"})
