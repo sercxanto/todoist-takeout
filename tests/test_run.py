@@ -251,8 +251,8 @@ def test_plan_without_comments_warns_and_the_run_succeeds(tmp_path, caplog):
     with caplog.at_level(logging.WARNING):
         requests, _ = run(tmp_path, {"INC-1": fixture_bytes("plan_limits_no_comments"), "INC-5": unchanged("INC-5")})
     assert requests == ["INC-1"]
-    comments = [m for m in _plan_warnings(caplog) if "comments" in m]
-    assert comments == [
+    # The fixture's plan also has `reminders: false`, which does not warn (design D12).
+    assert _plan_warnings(caplog) == [
         "the Todoist plan 'free' does not include comments; task and project comments cannot be backed up "
         "on this plan"
     ]
@@ -260,23 +260,18 @@ def test_plan_without_comments_warns_and_the_run_succeeds(tmp_path, caplog):
     assert state(tmp_path)["last_successful_run_utc"] is not None
 
 
-def test_each_disabled_feature_warns_once(tmp_path, caplog):
+def test_plan_with_comments_does_not_warn(tmp_path, caplog):
+    # The full-sync fixture's free plan includes comments but not reminders.
     with caplog.at_level(logging.WARNING):
         run(tmp_path)
-    # The full-sync fixture's free plan includes comments but not reminders.
-    assert _plan_warnings(caplog) == [
-        "the Todoist plan 'free' does not include reminders; reminders cannot be backed up on this plan"
-    ]
+    assert _plan_warnings(caplog) == []
 
 
-def test_full_plan_or_missing_plan_information_does_not_warn(tmp_path, caplog):
-    full = json.loads(fixture_bytes("full_sync"))
-    full["user_plan_limits"]["current"].update(comments=True, reminders=True)
-    without = json.loads(fixture_bytes("full_sync"))
-    del without["user_plan_limits"]
-    for i, response in enumerate([full, without]):
-        with caplog.at_level(logging.WARNING):
-            run(tmp_path / str(i), {"*": json.dumps(response).encode(), "FULL-1": unchanged("FULL-1")})
+def test_missing_plan_information_does_not_warn(tmp_path, caplog):
+    response = json.loads(fixture_bytes("full_sync"))
+    del response["user_plan_limits"]
+    with caplog.at_level(logging.WARNING):
+        run(tmp_path, {"*": json.dumps(response).encode(), "FULL-1": unchanged("FULL-1")})
     assert _plan_warnings(caplog) == []
 
 

@@ -182,7 +182,7 @@ The follow-up incremental sync runs only after a full sync, whether the tool req
 
 ### D12: Plan limitations
 
-After the sync, the tool reads the stored `user_plan_limits.current` and compares it with a small table that maps plan flags to parts of this backup: `comments` → task and project comments, and `reminders` → reminders. Each disabled feature produces one warning. If plan information is missing, no warning is produced. Later changes add rows (completed tasks) and use `PlanRestricted` for their optional endpoints.
+After the sync, the tool reads the stored `user_plan_limits.current` and compares it with a small table that maps plan flags to parts of this backup, for example `comments` → task and project comments. Each disabled feature produces one warning. Other flags, such as `reminders`, are deliberately left out for now: it is unknown whether a plan without the feature hides existing data from the sync or only keeps the user from creating it, and a warning on every scheduled run that points to no missing data would teach users to ignore warnings. A flag is added once the contract test shows that the sync omits data for it. If plan information is missing, no warning is produced. Later changes add rows (completed tasks) and use `PlanRestricted` for their optional endpoints.
 
 ### D13: State file
 

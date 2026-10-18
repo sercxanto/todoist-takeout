@@ -36,7 +36,6 @@ MAX_ROUNDS = 2
 # account out of the backup (design D12), and the part each one names.
 PLAN_FEATURES = {
     "comments": "task and project comments",
-    "reminders": "reminders",
 }
 
 
