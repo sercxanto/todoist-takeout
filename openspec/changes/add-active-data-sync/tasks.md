@@ -85,7 +85,7 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 - [x] 9.2 Make the scrubber pseudonymize every object key that is an ID, including IDs without digits: collect the IDs of all responses of a recording first, then replace keys that are known IDs, keys of ID-keyed resources such as `day_orders`, and keys that look like IDs. Verify with a scrubber test using an all-letter task ID that occurs only as a `day_orders` key, and that the leak check covers it
 - [x] 9.3 Add `item_id` to the key fields of `completed_info` (D6) and to `storage_format.md`. Verify with tests that an entry with `item_id` gets `item_id~<id>.json` and that an entry with two of the fields still falls back
 - [x] 9.4 Make the write contract test require `TODOIST_CONTRACT_TOKEN` and fail before any write without it (D14). Verify with the offline guard tests
-- [ ] 9.5 Extend the write contract test with the day-order step from D14 and record the result as a finding. Verify that it is skipped without the variables, and with a manual run by the user against the write account; if incremental `day_orders` turn out to be deltas, revise D6 before archiving
+- [x] 9.5 Extend the write contract test with the day-order step from D14 and record the result as a finding. Verify that it is skipped without the variables, and with a manual run by the user against the write account; if incremental `day_orders` turn out to be deltas, revise D6 before archiving
 
 ## Workflow follow-up
 

@@ -124,7 +124,7 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
             commands.run("item_update_day_orders", {"ids_to_orders": {today[0]: 1, today[1]: 2}})
             reordered = observer.changes()
             orders = reordered.get("day_orders")
-            stored = json.loads(storage.read_bytes(target / SYNC_DIR / "day_orders.json") or b"null")
+            stored_orders = json.loads(storage.read_bytes(target / SYNC_DIR / "day_orders.json") or b"null")
             backup()
             findings["day_orders"] = {
                 "full_sync_entries": len(observer.full.get("day_orders") or {}),
@@ -133,7 +133,7 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
                 "after_reorder_type": type(orders).__name__,
                 "contains_reordered_tasks": isinstance(orders, dict) and all(t in orders for t in today[:2]),
                 "contains_unchanged_task": isinstance(orders, dict) and today[2] in orders,
-                "stored_before_reorder_entries": len(stored) if isinstance(stored, dict) else None,
+                "stored_before_reorder_entries": len(stored_orders) if isinstance(stored_orders, dict) else None,
             }
 
         # Delete the comment and the task.

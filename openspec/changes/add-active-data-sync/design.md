@@ -18,6 +18,7 @@ Findings of the contract tests against a Pro and a Free account (2026-10-18), re
 - **Deletion payloads** of tasks, comments and projects have every field of the live object, but with emptied values: `content: ""` or `name: ""`, `updated_at: null`, and for projects `created_at: null` and `access: null`. Comparing field names cannot tell them from full objects (D8).
 - **No restore path:** `item_undelete` and `item_restore` are rejected with `INVALID_COMMAND` (error code 39), and no other command restores a deleted object with the same id. D8 step 1 stays as a safeguard.
 - **Archiving** a project returns the project with `is_archived: true` in the next incremental sync. Its tasks are not in the response and stay live in the backup. This feeds the archived-projects questions of `add-completed-tasks-backup`.
+- **Day orders** are complete in incremental syncs: after two of three tasks due today were reordered, the incremental `day_orders` held all three entries, so `single` fits it.
 - **Plans:** the Free account has `comments: true`, so D12's only warning does not fire there.
 - **Undocumented resources:** both accounts return `calendar_accounts`, `calendars`, `completed_info`, `folders`, `incomplete_item_ids`, `incomplete_project_ids`, `suggestions`, `tooltips` and `user_item_orders`, and incremental syncs an empty `id_mapping` object, stored as `single` so that nothing is dropped if it ever carries data. `workspaces` is an array, not an object of objects. D6 lists them.
 
