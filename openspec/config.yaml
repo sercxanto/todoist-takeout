@@ -8,6 +8,17 @@ schema: spec-driven
 #   context: |
 #     Designs and tasks must cover Windows, macOS, and Linux
 #     Write all artifacts in Spanish
+context: |
+  Write all artifacts in English.
+  Designs and tasks must cover Windows, macOS and Linux (paths, file locking, atomic file replacement).
+  Python; talk to the Todoist API v1 directly, never through a Todoist SDK.
+  Production code prefers the standard library; a third-party dependency needs a stated reason in design.md. Test-only dependencies are fine.
+  Store API responses unchanged as the source of truth; never round-trip them through models that could drop unknown fields.
+  Every run must be idempotent and resumable: atomic writes, checkpoint written last, no re-download of data already stored.
+  Respect API rate limits (HTTP 429, retry_after).
+  Plan limitations (e.g. free accounts) must degrade to a warning, never to a failure.
+  On-disk formats must stay human- and machine-readable long term and be documented.
+  Tests run offline against recorded fixtures by default; an opt-in contract test against the real API detects API changes.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
