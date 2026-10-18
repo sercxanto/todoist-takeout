@@ -82,5 +82,4 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 ## Workflow follow-up
 
 - If the contract tests show stub deletion payloads, plan-restriction error tags or resource shapes that differ from the fixtures, record the findings in this change's design before archiving.
-- Record what the write contract test found about archiving a project in the open questions of `add-completed-tasks-backup`.
 - Archive this change once it is reviewed, so that `add-completed-tasks-backup` can modify `backup-storage`.
