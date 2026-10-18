@@ -10,7 +10,7 @@ from todoist_takeout.api import Client
 from todoist_takeout.resources import COLLECTION, KNOWN, ONE_OF, SINGLE, Classifier
 from todoist_takeout.sync import apply_response, run_backup
 
-from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, FakeApi, completed_fixture
+from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, TASKS_COMPLETED, FakeApi, completed_fixture
 
 
 def _format_description() -> str:
@@ -66,10 +66,11 @@ def _produced_completed_tree(tmp_path, sync_fixture):
     api.cursor_pages(BY_COMPLETION_DATE, september, [completed_fixture(f"by_completion_date_{i}") for i in (1, 2)])
     api.answer(COMMENTS, {"task_id": "6X8Gq4CfVh9xPm2R"}, completed_fixture("comments"))
     api.cursor_pages(ACTIVITIES, {}, [completed_fixture(f"activities_{i}") for i in (1, 2)])
+    api.answer(TASKS_COMPLETED, september, completed_fixture("tasks_completed"))
     run_backup(tmp_path, Client(api), now=lambda: datetime(2026, 10, 18, 12, tzinfo=timezone.utc))
 
 
-LAYOUTS = {"sync": (_produced_sync_tree, 8), "completed": (_produced_completed_tree, 6)}
+LAYOUTS = {"sync": (_produced_sync_tree, 8), "completed": (_produced_completed_tree, 8)}
 
 
 @pytest.fixture(params=sorted(LAYOUTS))

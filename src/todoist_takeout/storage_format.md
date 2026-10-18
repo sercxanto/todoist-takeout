@@ -104,6 +104,7 @@ attached files themselves are not downloaded.
 | `completed/<YYYY-MM>.json` | The tasks completed in that month, for example `completed/2026-09.json`. | `GET /api/v1/tasks/completed/by_completion_date` |
 | `completed/comments/<task id>.json` | The comments of one completed task, for example `completed/comments/6X8Gq4CfVh9xPm2R.json`. | `GET /api/v1/comments` |
 | `completed/activity/<YYYY-MM>.json` | The completion events from T0 on whose `event_date` is in that month, for example `completed/activity/2026-10.json`. | `GET /api/v1/activities` |
+| `completed/backfill/<YYYY-MM>.json` | The completions before T0 whose `completed_at` is in that month, for example `completed/backfill/2026-09.json`. | `GET /api/v1/tasks/completed` |
 
 **Contents.** Each file holds one JSON object shaped like the API response it comes from: its list
 of entries (`items` for tasks, `results` for comments and events) and every other top-level key of
@@ -147,9 +148,9 @@ no comments of completed tasks are stored.
 
 A completion event records one completion of a task, including each completion of a recurring task
 and completions by other people in shared projects. Completions before T0, the start of the first
-run that backed up completed tasks (`t0_utc` in `state.json`), come from the one-time backfill;
-completions from T0 on come from the activity log. The two sources cover separate time ranges, so
-no completion is in both.
+run that backed up completed tasks (`t0_utc` in `state.json`), come from the one-time
+[backfill](#backfill-of-earlier-completions); completions from T0 on come from the activity log. The
+two sources cover separate time ranges, so no completion is in both.
 
 `completed/activity/<YYYY-MM>.json` holds the `item:completed` events of the activity log
 (`GET /api/v1/activities`) from T0 on, in the month of their `event_date`; an event without a valid
@@ -168,6 +169,28 @@ be missing; the tool warns which period is affected.
 numbers as 64-bit integers or as doubles corrupt it, among them JavaScript (`JSON.parse`) and an
 SQLite `INTEGER` column. Read these files with a parser that keeps large integers, such as Python's
 `json`, or treat the `id` as text.
+
+### Backfill of earlier completions
+
+`completed/backfill/<YYYY-MM>.json` holds the completions before T0, fetched once from
+`GET /api/v1/tasks/completed`, month by month from the first month through the month of T0. The
+month of T0 holds only the completions before T0. A month without completions has a file too. The
+backfill can take several runs; `backfill_through` in `state.json` names the last month stored,
+and the next run continues with the month after it. Once the month of T0 is stored,
+`backfill_status` is `complete` and the endpoint is not requested again.
+
+Each entry in `items` is one completion, with its own `id` (a UUID), the `task_id` of the completed
+task and its `completed_at`; a recurring task has one entry per completion. `item_object` holds the
+full task object, with the same fields as in `sync/items/`; for a task deleted since, it may be the
+only full copy left. The maps `projects` and `sections` hold the projects and sections the entries
+refer to, keyed by their `id`, which may be the only names left of projects and sections deleted
+since. Unlike the activity log, this endpoint does not return completions by other people in
+shared projects, so those are missing before T0.
+
+The endpoint is deprecated. If the API no longer offers it (HTTP 404 or 410), `backfill_status`
+becomes `unavailable`, the months already stored are kept, the tool warns once, and it does not
+request the endpoint again. The completions of recurring tasks before T0 are then missing from the
+backup; other completed tasks are still in the month files.
 
 ## JSON encoding
 

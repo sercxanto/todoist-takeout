@@ -43,9 +43,9 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 6. One-time backfill
 
-- [ ] 6.1 Implement the backfill (design D10): months from `backfill_through + 1` (or `first_month`) through the month of T0, `until = t0_utc` in the last month, entries at or after T0 dropped, `annotate_items=true`, `limit=200` with offset pagination, `completed/backfill/<YYYY-MM>.json` written also when empty, `backfill_through` advanced after each month, and `backfill_status` set to `complete` after the month of T0. Verify with run tests for the spec scenarios "First run", "Interrupted backfill" and "Backfill complete", and that the request carries `annotate_items=true`
-- [ ] 6.2 Handle the deprecated endpoint: HTTP 404 or 410 sets `backfill_status: unavailable` with one warning and no further requests in later runs; `PlanRestricted` warns and is retried next run. Verify with run tests for "Endpoint removed" and "Later run", and that a plan restriction leaves `backfill_status` at `in_progress`
-- [ ] 6.3 Document `completed/backfill/` in `storage_format.md`: the source, `item_object`, the `projects` and `sections` maps, completions by other people missing, and what `unavailable` means. Verify with the path-pattern tests
+- [x] 6.1 Implement the backfill (design D10): months from `backfill_through + 1` (or `first_month`) through the month of T0, `until = t0_utc` in the last month, entries at or after T0 dropped, `annotate_items=true`, `limit=200` with offset pagination, `completed/backfill/<YYYY-MM>.json` written also when empty, `backfill_through` advanced after each month, and `backfill_status` set to `complete` after the month of T0. Verify with run tests for the spec scenarios "First run", "Interrupted backfill" and "Backfill complete", and that the request carries `annotate_items=true`
+- [x] 6.2 Handle the deprecated endpoint: HTTP 404 or 410 sets `backfill_status: unavailable` with one warning and no further requests in later runs; `PlanRestricted` warns and is retried next run. Verify with run tests for "Endpoint removed" and "Later run", and that a plan restriction leaves `backfill_status` at `in_progress`
+- [x] 6.3 Document `completed/backfill/` in `storage_format.md`: the source, `item_object`, the `projects` and `sections` maps, completions by other people missing, and what `unavailable` means. Verify with the path-pattern tests
 
 ## 7. Whole runs
 

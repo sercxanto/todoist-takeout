@@ -12,7 +12,15 @@ from todoist_takeout.cli import main
 from todoist_takeout.errors import ConfigError, StorageError
 from todoist_takeout.sync import run_backup
 
-from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, COMPLETED_FIXTURES, FakeApi, completed_fixture
+from fake_api import (
+    ACTIVITIES,
+    BY_COMPLETION_DATE,
+    COMMENTS,
+    COMPLETED_FIXTURES,
+    TASKS_COMPLETED,
+    FakeApi,
+    completed_fixture,
+)
 
 # --- 3.1 fixtures --------------------------------------------------------------------------
 
@@ -303,7 +311,9 @@ def test_first_run_fetches_every_month_through_the_current_one(tmp_path):
     api = run(tmp_path, september(FakeApi(account())))
     assert months_requested(api) == FIRST_MONTHS
     assert api.requested(BY_COMPLETION_DATE)[0] == {**window("2026-08"), "limit": "200"}
-    assert set(completed_tree(tmp_path)) == {"2026-08.json", "2026-09.json", "2026-10.json", f"comments/{TASK_WITH_COMMENTS}.json"}
+    months = {"2026-08.json", "2026-09.json", "2026-10.json"}
+    backfill = {f"backfill/{name}" for name in months}
+    assert set(completed_tree(tmp_path)) == months | backfill | {f"comments/{TASK_WITH_COMMENTS}.json"}
     assert completed_tree(tmp_path)["2026-08.json"] == b'{\n  "items": []\n}\n'
     assert progress(tmp_path)["tasks_closed_through"] == "2026-09"
 
@@ -753,3 +763,165 @@ def test_activity_log_restricted_by_the_plan(tmp_path, caplog):
         run(tmp_path, activity_api(plan={"activity_log_limit": 7}), now=NOW + timedelta(days=10))
     assert len(activity_warnings(caplog)) == 1
     assert "from 2026-10-18 12:00 UTC to 2026-10-21 12:00 UTC" in activity_warnings(caplog)[0]
+
+
+# --- 6.1 one-time backfill of earlier completions ------------------------------------------------
+
+T0 = "2026-10-18T12:00:00.000000Z"
+
+
+def backfill_months(api):
+    return [p["since"][:7] for p in api.requested(TASKS_COMPLETED) if p["offset"] == "0"]
+
+
+def backfill(target, month):
+    return stored(target, f"backfill/{month}.json")
+
+
+def completion(id, completed_at):
+    return {"id": id, "task_id": "6X8Gr7Mn2pQwVb4T", "content": "Take out the bins", "completed_at": completed_at}
+
+
+def test_first_backfill_stores_every_month_through_the_month_of_t0(tmp_path):
+    api = run(tmp_path, FakeApi(account(user={"joined_at": "2016-03-05T10:00:00.000000Z"})))
+    requested = backfill_months(api)
+    assert requested[0] == "2016-03" and requested[-1] == "2026-10" and len(requested) == 10 * 12 + 8
+    assert api.requested(TASKS_COMPLETED)[0] == {
+        "since": "2016-03-01T00:00:00.000000Z",
+        "until": "2016-03-31T23:59:59.999999Z",
+        "annotate_items": "true",
+        "limit": "200",
+        "offset": "0",
+    }
+    assert api.requested(TASKS_COMPLETED)[-1]["until"] == T0  # the last month only up to T0
+    assert len(list((tmp_path / "completed" / "backfill").iterdir())) == len(requested)
+    assert backfill(tmp_path, "2016-03") == {"items": [], "projects": {}, "sections": {}}  # empty months too
+    assert progress(tmp_path)["backfill_through"] == "2026-10"
+    assert progress(tmp_path)["backfill_status"] == "complete"
+
+
+def test_backfill_month_keeps_the_response_shape(tmp_path):
+    api = FakeApi(account()).answer(TASKS_COMPLETED, window("2026-09"), completed_fixture("tasks_completed"))
+    run(tmp_path, api)
+    fixture = completed_fixture("tasks_completed")
+    assert backfill(tmp_path, "2026-09") == {
+        "items": [fixture["items"][2], fixture["items"][1], fixture["items"][0]],  # ordered by completed_at
+        "projects": fixture["projects"],
+        "sections": fixture["sections"],
+    }
+    recurring = [e for e in backfill(tmp_path, "2026-09")["items"] if e["task_id"] == RECURRING_TASK]
+    assert len(recurring) == 2 and all(e["item_object"]["due"]["is_recurring"] for e in recurring)
+
+
+def test_backfill_follows_the_offset_pages(tmp_path):
+    entries = [completion(f"c{i:03d}", f"2026-09-{1 + i % 30:02d}T06:30:00.000000Z") for i in range(201)]
+    pages = [{"items": entries[:200], "projects": {}, "sections": {}}, {"items": entries[200:], "projects": {}, "sections": {}}]
+    api = run(tmp_path, FakeApi(account()).offset_pages(TASKS_COMPLETED, window("2026-09"), pages, 200))
+    assert [p["offset"] for p in api.requested(TASKS_COMPLETED) if p["since"].startswith("2026-09")] == ["0", "200"]
+    assert len(backfill(tmp_path, "2026-09")["items"]) == 201
+
+
+def test_backfill_drops_completions_at_or_after_t0(tmp_path):
+    october = {"since": "2026-10-01T00:00:00.000000Z", "until": T0}
+    before = completion("before", "2026-10-18T11:59:59.999999Z")
+    page = {"items": [before, completion("at", T0), completion("after", "2026-10-18T12:00:01.000000Z")], "projects": {}, "sections": {}}
+    run(tmp_path, FakeApi(account()).answer(TASKS_COMPLETED, october, page))
+    assert backfill(tmp_path, "2026-10")["items"] == [before]
+
+
+def test_interrupted_backfill_continues_with_the_first_month_not_stored(tmp_path):
+    joined = {"joined_at": "2026-05-02T00:00:00.000000Z"}
+
+    class Crashing(FakeApi):
+        def send(self, method, path, params):
+            if path == TASKS_COMPLETED and params["since"].startswith("2026-08"):
+                storage.set_fault_after(0)
+            return super().send(method, path, params)
+
+    with pytest.raises(storage.InjectedFault):
+        run(tmp_path, Crashing(account(user=joined)))
+    assert progress(tmp_path)["backfill_through"] == "2026-07"
+    assert progress(tmp_path)["backfill_status"] == "in_progress"
+    api = run(tmp_path, FakeApi(account(user=joined)))
+    assert backfill_months(api) == ["2026-08", "2026-09", "2026-10"]
+    assert progress(tmp_path)["backfill_status"] == "complete"
+
+
+def test_killed_after_the_last_month_before_the_status_is_complete(tmp_path, monkeypatch):
+    real = storage.update_completed_state
+
+    def killed(target_, state, **changes):
+        if changes.get("backfill_status") == "complete":
+            raise storage.InjectedFault("killed")
+        return real(target_, state, **changes)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(storage, "update_completed_state", killed)
+        with pytest.raises(storage.InjectedFault):
+            run(tmp_path)
+    assert progress(tmp_path)["backfill_through"] == "2026-10"
+    api = run(tmp_path, now=NOW + timedelta(hours=1))
+    assert api.requested(TASKS_COMPLETED) == []
+    assert progress(tmp_path)["backfill_status"] == "complete"
+
+
+def test_complete_backfill_makes_no_more_requests(tmp_path):
+    run(tmp_path)
+    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=timezone.utc))
+    assert api.requested(TASKS_COMPLETED) == []
+    assert progress(tmp_path)["backfill_through"] == "2026-10"
+
+
+def test_unknown_backfill_status_is_a_config_error(tmp_path):
+    run(tmp_path)
+    state = json.loads((tmp_path / "state.json").read_bytes())
+    state["completed"]["backfill_status"] = "done"
+    (tmp_path / "state.json").write_bytes(storage.encode_json(state))
+    with pytest.raises(ConfigError, match="backfill_status 'done' is unknown"):
+        run(tmp_path)
+
+
+# --- 6.2 the deprecated endpoint ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("status", [404, 410])
+def test_endpoint_removed_warns_once_keeps_the_stored_months_and_exits_with_status_0(tmp_path, monkeypatch, capsys, status):
+    api = september(FakeApi(account()))
+    api.answer(TASKS_COMPLETED, window("2026-09"), completed_fixture(f"error_{status}"), status=status)
+    monkeypatch.setenv("TODOIST_API_TOKEN", "0123456789abcdef0123456789abcdef01234567")
+    monkeypatch.setattr(sync, "_utc_now", lambda: NOW)
+    factory = lambda token, wait: Client(api, sleep=_no_sleep)  # noqa: E731
+    assert main(["backup", "--quiet", str(tmp_path)], client_factory=factory) == 0
+    assert capsys.readouterr().err.splitlines() == [
+        f"WARNING GET /tasks/completed is no longer available (HTTP {status}); completions of recurring tasks before "
+        "2026-10-18 12:00 UTC cannot be backed up. The backfill months already stored are kept"
+    ]
+    assert backfill_months(api) == ["2026-08", "2026-09"]
+    assert sorted(p.name for p in (tmp_path / "completed" / "backfill").iterdir()) == ["2026-08.json"]
+    assert progress(tmp_path)["backfill_status"] == "unavailable"
+    assert progress(tmp_path)["backfill_through"] == "2026-08"
+    assert len(stored(tmp_path, "2026-09.json")["items"]) == 3  # everything else is backed up
+
+    # A later run makes no request to the endpoint and prints no warning about it.
+    later = september(FakeApi(account()))
+    monkeypatch.setattr(sync, "_utc_now", lambda: NOW + timedelta(days=1))
+    assert main(["backup", "--quiet", str(tmp_path)], client_factory=lambda token, wait: Client(later, sleep=_no_sleep)) == 0
+    assert capsys.readouterr().err == ""
+    assert later.requested(TASKS_COMPLETED) == []
+
+
+def test_backfill_restricted_by_the_plan_is_tried_again_next_run(tmp_path, caplog):
+    api = FakeApi(account()).answer(TASKS_COMPLETED, {}, completed_fixture("error_plan_restricted"), status=403)
+    with caplog.at_level(logging.WARNING):
+        run(tmp_path, api)
+    assert [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING] == [
+        "the Todoist plan does not allow fetching the completions before 2026-10-18 12:00 UTC; they are tried again "
+        "on the next run"
+    ]
+    assert progress(tmp_path)["backfill_status"] == "in_progress"
+    assert progress(tmp_path)["backfill_through"] is None
+    assert json.loads((tmp_path / "state.json").read_bytes())["last_successful_run_utc"] is not None
+
+    api = run(tmp_path, now=NOW + timedelta(days=1))
+    assert backfill_months(api) == ["2026-08", "2026-09", "2026-10"]
+    assert progress(tmp_path)["backfill_status"] == "complete"

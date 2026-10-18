@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from todoist_takeout import storage, sync
-from todoist_takeout.api import Client, cursor_pages
+from todoist_takeout.api import Client, cursor_pages, offset_pages
 from todoist_takeout.errors import ApiError, ConfigError, PlanRestricted, StorageError
 
 log = logging.getLogger(__name__)
@@ -20,14 +20,24 @@ log = logging.getLogger(__name__)
 COMPLETED_DIR = "completed"
 COMMENTS_DIR = "comments"
 ACTIVITY_DIR = "activity"
+BACKFILL_DIR = "backfill"
 JSON_SUFFIX = ".json"
 
 BY_COMPLETION_DATE = "tasks/completed/by_completion_date"
 COMMENTS = "comments"
 ACTIVITIES = "activities"
+TASKS_COMPLETED = "tasks/completed"
 TASKS_PAGE_LIMIT = 200
 COMMENTS_PAGE_LIMIT = 100
 ACTIVITY_PAGE_LIMIT = 100
+BACKFILL_PAGE_LIMIT = 200
+
+# The values of `backfill_status` in state.json (design D3).
+IN_PROGRESS = "in_progress"
+COMPLETE = "complete"
+UNAVAILABLE = "unavailable"
+# The statuses with which `tasks/completed` tells that it is gone (design D10).
+GONE_STATUSES = frozenset({404, 410})
 
 # The activity log's filter for task completions; list-valued parameters are JSON text.
 COMPLETION_EVENTS = '["item:completed"]'
@@ -55,6 +65,7 @@ def run(target: Path, client: Client, state: dict, now: Callable[[], datetime]) 
     _start(target, state, now)
     _fetch_activity(target, client, state, now(), limits.get("activity_log_limit"))
     _fetch_months(target, client, state, now(), comments=limits.get("comments") is not False)
+    _backfill(target, client, state)
 
 
 def _start(target: Path, state: dict, now: Callable[[], datetime]) -> None:
@@ -279,6 +290,74 @@ def _id_text(value) -> str | None:
 
 def _is_int(value) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+# --- One-time backfill of the completions before T0 (design D10) -----------------------------
+
+
+def _backfill(target: Path, client: Client, state: dict) -> None:
+    """Store the completions before T0 month by month, resuming at the first month not stored."""
+    progress = storage.completed_state(state)
+    status = progress["backfill_status"]
+    if status in (COMPLETE, UNAVAILABLE):
+        return
+    if status != IN_PROGRESS:
+        raise ConfigError(f"{storage.STATE_FILE} is not a valid state file: backfill_status {status!r} is unknown")
+    t0 = _checked_time(progress["t0_utc"], "t0_utc")
+    done = _checked_month(progress["backfill_through"], "backfill_through")
+    month = next_month(done) if done else _checked_month(progress["first_month"], "first_month")
+    last = month_of(t0)
+    stored = []
+    while month <= last:
+        since, until = month_window(month)
+        if month == last:
+            until = precise_timestamp(t0)
+        params = {"since": since, "until": until, "annotate_items": "true"}
+        try:
+            pages = list(offset_pages(client, TASKS_COMPLETED, params, BACKFILL_PAGE_LIMIT))
+        except PlanRestricted:
+            log.warning(
+                "the Todoist plan does not allow fetching the completions before %s; they are tried again on "
+                "the next run",
+                _readable_time(t0),
+            )
+            return
+        except ApiError as exc:
+            if exc.http_status not in GONE_STATUSES:
+                raise
+            storage.update_completed_state(target, state, backfill_status=UNAVAILABLE)
+            log.warning(
+                "GET /%s is no longer available (HTTP %d); completions of recurring tasks before %s cannot be "
+                "backed up. The backfill months already stored are kept",
+                TASKS_COMPLETED,
+                exc.http_status,
+                _readable_time(t0),
+            )
+            return
+        # The boundary is exact whatever the precision of the endpoint's own `until`.
+        pages = [{**page, "items": [e for e in page["items"] if _before(e, t0)]} for page in pages]
+        response = merge_pages(pages, "items", "completed_at")
+        path = target / COMPLETED_DIR / BACKFILL_DIR / f"{month}{JSON_SUFFIX}"
+        storage.write_bytes_atomic(path, storage.encode_json(response))
+        stored.append(month)
+        storage.update_completed_state(target, state, backfill_through=month)
+        month = next_month(month)
+    storage.update_completed_state(target, state, backfill_status=COMPLETE)
+    if stored:
+        log.info(
+            "earlier completions: stored %d backfill months (%s to %s); the backfill is complete",
+            len(stored),
+            stored[0],
+            stored[-1],
+        )
+
+
+def _before(entry, t0: datetime) -> bool:
+    """Whether a backfill entry was completed before T0. One without a valid `completed_at` is kept."""
+    try:
+        return parse_time(entry.get("completed_at") if isinstance(entry, dict) else None) < t0
+    except ValueError:
+        return True
 
 
 # --- Pages and files (design D6) ------------------------------------------------------------
