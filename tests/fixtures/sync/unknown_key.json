@@ -1,0 +1,31 @@
+{
+  "sync_token": "INC-4",
+  "full_sync": false,
+  "items": [],
+  "projects": [],
+  "sections": [],
+  "labels": [],
+  "notes": [],
+  "project_notes": [],
+  "filters": [],
+  "reminders": [],
+  "collaborators": [],
+  "collaborator_states": [],
+  "view_options": [],
+  "project_view_options_defaults": [],
+  "live_notifications": [],
+  "brand_new_things": [
+    {
+      "id": "N1",
+      "name": "first"
+    },
+    {
+      "id": "N2",
+      "name": "second"
+    }
+  ],
+  "brand_new_setting": {
+    "enabled": true
+  },
+  "temp_id_mapping": {}
+}

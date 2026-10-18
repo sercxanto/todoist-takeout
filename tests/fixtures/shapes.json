@@ -1,0 +1,1059 @@
+{
+  "sources": [
+    "recorded/read/full.json",
+    "recorded/read/incremental.json",
+    "recorded/write/full.json",
+    "recorded/write/incremental.json"
+  ],
+  "keys": {
+    "calendar_accounts": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "calendars": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "collaborator_states": {
+      "kind": "collection(project_id,user_id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "is_deleted": [
+          "boolean"
+        ],
+        "project_id": [
+          "string"
+        ],
+        "state": [
+          "string"
+        ],
+        "user_id": [
+          "string"
+        ]
+      }
+    },
+    "collaborators": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "email": [
+          "string"
+        ],
+        "full_name": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "image_id": [
+          "null"
+        ],
+        "status": [
+          "null"
+        ],
+        "timezone": [
+          "string"
+        ]
+      }
+    },
+    "completed_info": {
+      "kind": "one_of(project_id,section_id,item_id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "archived_sections": [
+          "integer"
+        ],
+        "completed_items": [
+          "integer"
+        ],
+        "project_id": [
+          "string"
+        ],
+        "section_id": [
+          "string"
+        ]
+      }
+    },
+    "day_orders": {
+      "kind": "single",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {
+        "<id>": [
+          "integer"
+        ]
+      }
+    },
+    "filters": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "color": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "is_favorite": [
+          "boolean"
+        ],
+        "is_frozen": [
+          "boolean"
+        ],
+        "item_order": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ],
+        "order_key": [
+          "string"
+        ],
+        "query": [
+          "string"
+        ]
+      }
+    },
+    "folders": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "full_sync": {
+      "kind": "meta",
+      "types": [
+        "boolean"
+      ],
+      "full_sync": true
+    },
+    "full_sync_date_utc": {
+      "kind": "meta",
+      "types": [
+        "string"
+      ],
+      "full_sync": true
+    },
+    "id_mapping": {
+      "kind": "single",
+      "types": [
+        "object"
+      ],
+      "full_sync": false,
+      "fields": {}
+    },
+    "incomplete_item_ids": {
+      "kind": "single",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "incomplete_project_ids": {
+      "kind": "single",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "items": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "added_at": [
+          "string"
+        ],
+        "added_by_uid": [
+          "null",
+          "string"
+        ],
+        "assigned_by_uid": [
+          "null",
+          "string"
+        ],
+        "checked": [
+          "boolean"
+        ],
+        "child_order": [
+          "integer"
+        ],
+        "completed_at": [
+          "null"
+        ],
+        "completed_by_uid": [
+          "null"
+        ],
+        "completed_count": [
+          "integer"
+        ],
+        "content": [
+          "string"
+        ],
+        "day_order": [
+          "integer"
+        ],
+        "deadline": [
+          "null"
+        ],
+        "description": [
+          "string"
+        ],
+        "due": [
+          "null",
+          "object"
+        ],
+        "duration": [
+          "null"
+        ],
+        "id": [
+          "string"
+        ],
+        "is_collapsed": [
+          "boolean"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "labels": [
+          "array"
+        ],
+        "note_count": [
+          "integer"
+        ],
+        "order_key": [
+          "string"
+        ],
+        "parent_id": [
+          "null",
+          "string"
+        ],
+        "postponed_count": [
+          "integer"
+        ],
+        "priority": [
+          "integer"
+        ],
+        "project_id": [
+          "string"
+        ],
+        "responsible_uid": [
+          "null"
+        ],
+        "section_id": [
+          "null",
+          "string"
+        ],
+        "updated_at": [
+          "string"
+        ],
+        "user_id": [
+          "string"
+        ]
+      }
+    },
+    "labels": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "color": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "is_favorite": [
+          "boolean"
+        ],
+        "item_order": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ],
+        "order_key": [
+          "string"
+        ]
+      }
+    },
+    "live_notifications": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "assigned_by_uid": [
+          "null",
+          "string"
+        ],
+        "created_at": [
+          "string"
+        ],
+        "from_uid": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "is_unread": [
+          "boolean"
+        ],
+        "item_content": [
+          "string"
+        ],
+        "item_id": [
+          "string"
+        ],
+        "notification_key": [
+          "string"
+        ],
+        "notification_type": [
+          "string"
+        ],
+        "project_id": [
+          "string"
+        ],
+        "responsible_uid": [
+          "null",
+          "string"
+        ]
+      }
+    },
+    "live_notifications_last_read_id": {
+      "kind": "single",
+      "types": [
+        "string"
+      ],
+      "full_sync": true
+    },
+    "locations": {
+      "kind": "single",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "notes": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "content": [
+          "string"
+        ],
+        "file_attachment": [
+          "null"
+        ],
+        "id": [
+          "string"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "item_id": [
+          "string"
+        ],
+        "posted_at": [
+          "string"
+        ],
+        "posted_uid": [
+          "string"
+        ],
+        "reactions": [
+          "null"
+        ],
+        "uids_to_notify": [
+          "null"
+        ]
+      }
+    },
+    "project_notes": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "project_view_options_defaults": {
+      "kind": "collection(project_id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "calendar_settings": [
+          "null"
+        ],
+        "creator_uid": [
+          "integer"
+        ],
+        "filtered_by": [
+          "null"
+        ],
+        "grouped_by": [
+          "null"
+        ],
+        "project_id": [
+          "string"
+        ],
+        "show_completed_tasks": [
+          "boolean"
+        ],
+        "sort_order": [
+          "string"
+        ],
+        "sorted_by": [
+          "null"
+        ],
+        "updater_uid": [
+          "integer"
+        ],
+        "view_mode": [
+          "string"
+        ]
+      }
+    },
+    "projects": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "access": [
+          "object"
+        ],
+        "can_assign_tasks": [
+          "boolean"
+        ],
+        "can_comment": [
+          "boolean"
+        ],
+        "child_order": [
+          "integer"
+        ],
+        "color": [
+          "string"
+        ],
+        "created_at": [
+          "string"
+        ],
+        "creator_uid": [
+          "string"
+        ],
+        "default_order": [
+          "integer"
+        ],
+        "default_order_key": [
+          "null"
+        ],
+        "description": [
+          "string"
+        ],
+        "icon": [
+          "null"
+        ],
+        "id": [
+          "string"
+        ],
+        "inbox_project": [
+          "boolean"
+        ],
+        "is_archived": [
+          "boolean"
+        ],
+        "is_collapsed": [
+          "boolean"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "is_favorite": [
+          "boolean"
+        ],
+        "is_frozen": [
+          "boolean"
+        ],
+        "is_shared": [
+          "boolean"
+        ],
+        "name": [
+          "string"
+        ],
+        "order_key": [
+          "string"
+        ],
+        "parent_id": [
+          "null",
+          "string"
+        ],
+        "public_access": [
+          "boolean"
+        ],
+        "public_key": [
+          "string"
+        ],
+        "role": [
+          "string"
+        ],
+        "updated_at": [
+          "string"
+        ],
+        "view_style": [
+          "string"
+        ]
+      }
+    },
+    "reminders": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "role_actions": {
+      "kind": "single",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {
+        "project_collaborator_actions": [
+          "array"
+        ],
+        "workspace_collaborator_actions": [
+          "array"
+        ]
+      }
+    },
+    "sections": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "added_at": [
+          "string"
+        ],
+        "archived_at": [
+          "null"
+        ],
+        "description": [
+          "null"
+        ],
+        "id": [
+          "string"
+        ],
+        "is_archived": [
+          "boolean"
+        ],
+        "is_collapsed": [
+          "boolean"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "name": [
+          "string"
+        ],
+        "order_key": [
+          "string"
+        ],
+        "project_id": [
+          "string"
+        ],
+        "section_order": [
+          "integer"
+        ],
+        "updated_at": [
+          "string"
+        ],
+        "user_id": [
+          "string"
+        ]
+      }
+    },
+    "stats": {
+      "kind": "single",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {
+        "completed_count": [
+          "integer"
+        ],
+        "days_items": [
+          "array"
+        ],
+        "week_items": [
+          "array"
+        ]
+      }
+    },
+    "suggestions": {
+      "kind": "collection(type)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "content": [
+          "object"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "type": [
+          "string"
+        ],
+        "user_id": [
+          "string"
+        ]
+      }
+    },
+    "sync_status": {
+      "kind": "meta",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "sync_token": {
+      "kind": "meta",
+      "types": [
+        "string"
+      ],
+      "full_sync": true
+    },
+    "temp_id_mapping": {
+      "kind": "meta",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "tooltips": {
+      "kind": "single",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {
+        "scheduled": [
+          "array"
+        ],
+        "seen": [
+          "array"
+        ]
+      }
+    },
+    "user": {
+      "kind": "single",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {
+        "activated_user": [
+          "boolean"
+        ],
+        "auto_reminder": [
+          "integer"
+        ],
+        "business_account_id": [
+          "null"
+        ],
+        "capture_sessions_usage": [
+          "object"
+        ],
+        "daily_goal": [
+          "integer"
+        ],
+        "date_format": [
+          "integer"
+        ],
+        "days_off": [
+          "array"
+        ],
+        "deleted_at": [
+          "null"
+        ],
+        "email": [
+          "string"
+        ],
+        "feature_identifier": [
+          "string"
+        ],
+        "features": [
+          "object"
+        ],
+        "free_trial_expires_at": [
+          "null"
+        ],
+        "full_name": [
+          "string"
+        ],
+        "getting_started_guide_projects": [
+          "null"
+        ],
+        "has_consented_to_ai_training": [
+          "null"
+        ],
+        "has_magic_number": [
+          "boolean"
+        ],
+        "has_password": [
+          "boolean"
+        ],
+        "has_started_a_trial": [
+          "boolean"
+        ],
+        "id": [
+          "string"
+        ],
+        "image_id": [
+          "null"
+        ],
+        "inbox_project_id": [
+          "string"
+        ],
+        "is_celebrations_enabled": [
+          "boolean"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "is_onboarded": [
+          "boolean"
+        ],
+        "is_premium": [
+          "boolean"
+        ],
+        "joinable_workspace": [
+          "null"
+        ],
+        "joined_at": [
+          "string"
+        ],
+        "karma": [
+          "number"
+        ],
+        "karma_trend": [
+          "string"
+        ],
+        "lang": [
+          "string"
+        ],
+        "mfa_enabled": [
+          "boolean"
+        ],
+        "next_week": [
+          "integer"
+        ],
+        "onboarded_dated_tasks_created": [
+          "boolean"
+        ],
+        "onboarded_desktop_accessed": [
+          "boolean"
+        ],
+        "onboarded_mobile_accessed": [
+          "boolean"
+        ],
+        "onboarded_tasks_completed": [
+          "boolean"
+        ],
+        "onboarding_completed": [
+          "boolean"
+        ],
+        "onboarding_initiated": [
+          "boolean"
+        ],
+        "onboarding_level": [
+          "null",
+          "string"
+        ],
+        "onboarding_persona": [
+          "null",
+          "string"
+        ],
+        "onboarding_role": [
+          "null"
+        ],
+        "onboarding_started": [
+          "boolean"
+        ],
+        "onboarding_team_mode": [
+          "null"
+        ],
+        "onboarding_use_cases": [
+          "array",
+          "null"
+        ],
+        "premium_status": [
+          "string"
+        ],
+        "premium_until": [
+          "null",
+          "string"
+        ],
+        "ramble_sessions_usage": [
+          "object"
+        ],
+        "share_limit": [
+          "integer"
+        ],
+        "sort_order": [
+          "integer"
+        ],
+        "start_day": [
+          "integer"
+        ],
+        "start_page": [
+          "string"
+        ],
+        "status": [
+          "null"
+        ],
+        "team_inbox_id": [
+          "null"
+        ],
+        "theme_appearance": [
+          "string"
+        ],
+        "theme_id": [
+          "string"
+        ],
+        "time_format": [
+          "integer"
+        ],
+        "token": [
+          "string"
+        ],
+        "tz_info": [
+          "object"
+        ],
+        "unique_prefix": [
+          "integer"
+        ],
+        "urgent_reminder_device": [
+          "null"
+        ],
+        "verification_status": [
+          "string"
+        ],
+        "websocket_url": [
+          "string"
+        ],
+        "weekend_start_day": [
+          "integer"
+        ],
+        "weekly_goal": [
+          "integer"
+        ]
+      }
+    },
+    "user_item_orders": {
+      "kind": "collection(scope,scope_id,item_id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "is_deleted": [
+          "boolean"
+        ],
+        "item_id": [
+          "string"
+        ],
+        "order_key": [
+          "string"
+        ],
+        "scope": [
+          "string"
+        ],
+        "scope_id": [
+          "integer"
+        ]
+      }
+    },
+    "user_plan_limits": {
+      "kind": "single",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {
+        "current": [
+          "object"
+        ],
+        "next": [
+          "object"
+        ]
+      }
+    },
+    "user_settings": {
+      "kind": "single",
+      "types": [
+        "object"
+      ],
+      "full_sync": true,
+      "fields": {
+        "ai_email_assist": [
+          "boolean"
+        ],
+        "completed_sound_desktop": [
+          "boolean"
+        ],
+        "completed_sound_mobile": [
+          "boolean"
+        ],
+        "debug_logging_enabled_until": [
+          "null"
+        ],
+        "habit_push_notifications": [
+          "object"
+        ],
+        "legacy_pricing": [
+          "integer"
+        ],
+        "navigation": [
+          "object"
+        ],
+        "quick_add": [
+          "object"
+        ],
+        "reminder_desktop": [
+          "boolean"
+        ],
+        "reminder_email": [
+          "boolean"
+        ],
+        "reminder_push": [
+          "boolean"
+        ],
+        "reset_recurring_subtasks": [
+          "boolean"
+        ]
+      }
+    },
+    "view_options": {
+      "kind": "collection(view_type,object_id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {
+        "calendar_settings": [
+          "null"
+        ],
+        "filtered_by": [
+          "null"
+        ],
+        "grouped_by": [
+          "null"
+        ],
+        "id": [
+          "string"
+        ],
+        "is_deleted": [
+          "boolean"
+        ],
+        "object_id": [
+          "string"
+        ],
+        "show_completed_tasks": [
+          "boolean"
+        ],
+        "sort_order": [
+          "string"
+        ],
+        "sorted_by": [
+          "string"
+        ],
+        "view_mode": [
+          "string"
+        ],
+        "view_type": [
+          "string"
+        ]
+      }
+    },
+    "workspace_filters": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    },
+    "workspace_users": {
+      "kind": "collection(workspace_id,user_id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": false,
+      "fields": {}
+    },
+    "workspaces": {
+      "kind": "collection(id)",
+      "types": [
+        "array"
+      ],
+      "full_sync": true,
+      "fields": {}
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "4638879",
+  "name": "Important",
+  "query": "priority 1",
+  "color": "lime_green",
+  "item_order": 0,
+  "is_deleted": false,
+  "is_favorite": false,
+  "is_frozen": false
+}

@@ -1,0 +1,18 @@
+{
+  "id": "6X7rfFVQXwRmcvFp",
+  "posted_uid": "2671355",
+  "item_id": "6X7rM8997g3RQmvh",
+  "content": "Shop list attached",
+  "file_attachment": {
+    "resource_type": "file",
+    "file_name": "list.pdf",
+    "file_size": 10520,
+    "file_type": "application/pdf",
+    "file_url": "https://example.com/list.pdf",
+    "upload_state": "completed"
+  },
+  "uids_to_notify": [],
+  "is_deleted": false,
+  "posted_at": "2026-09-01T09:00:00.000000Z",
+  "reactions": {}
+}

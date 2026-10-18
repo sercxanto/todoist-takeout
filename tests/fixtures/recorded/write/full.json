@@ -1,0 +1,1188 @@
+{
+  "calendar_accounts": [],
+  "calendars": [],
+  "collaborator_states": [],
+  "collaborators": [],
+  "completed_info": [],
+  "day_orders": {},
+  "filters": [
+    {
+      "color": "charcoal",
+      "description": "",
+      "id": "8419358847",
+      "is_deleted": false,
+      "is_favorite": false,
+      "is_frozen": false,
+      "item_order": 0,
+      "name": "<scrubbed>",
+      "order_key": "<scrubbed>",
+      "query": "<scrubbed>"
+    },
+    {
+      "color": "charcoal",
+      "description": "",
+      "id": "7461721090",
+      "is_deleted": false,
+      "is_favorite": false,
+      "is_frozen": false,
+      "item_order": 0,
+      "name": "<scrubbed>",
+      "order_key": "<scrubbed>",
+      "query": "<scrubbed>"
+    }
+  ],
+  "folders": [],
+  "full_sync": true,
+  "full_sync_date_utc": "2000-01-01T00:00:00Z",
+  "incomplete_item_ids": [],
+  "incomplete_project_ids": [],
+  "items": [],
+  "labels": [],
+  "live_notifications": [],
+  "live_notifications_last_read_id": "5",
+  "locations": [],
+  "notes": [],
+  "project_notes": [],
+  "project_view_options_defaults": [
+    {
+      "calendar_settings": null,
+      "creator_uid": 90935042,
+      "filtered_by": null,
+      "grouped_by": null,
+      "project_id": "6et4cSPHngaIN1Sj",
+      "show_completed_tasks": false,
+      "sort_order": "<scrubbed>",
+      "sorted_by": null,
+      "updater_uid": 90935042,
+      "view_mode": "<scrubbed>"
+    }
+  ],
+  "projects": [
+    {
+      "access": {
+        "configuration": {},
+        "visibility": "<scrubbed>"
+      },
+      "can_assign_tasks": false,
+      "can_comment": true,
+      "child_order": 0,
+      "color": "charcoal",
+      "created_at": "2000-01-01T00:00:00.000000Z",
+      "creator_uid": "<scrubbed>",
+      "default_order": 0,
+      "default_order_key": null,
+      "description": "",
+      "icon": null,
+      "id": "6et4cSPHngaIN1Sj",
+      "inbox_project": true,
+      "is_archived": false,
+      "is_collapsed": false,
+      "is_deleted": false,
+      "is_favorite": false,
+      "is_frozen": false,
+      "is_shared": false,
+      "name": "<scrubbed>",
+      "order_key": "<scrubbed>",
+      "parent_id": null,
+      "public_access": false,
+      "public_key": "<scrubbed>",
+      "role": "<scrubbed>",
+      "updated_at": "2000-01-01T00:00:00.000000Z",
+      "view_style": "list"
+    }
+  ],
+  "reminders": [],
+  "role_actions": {
+    "project_collaborator_actions": [
+      {
+        "actions": [
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          }
+        ],
+        "name": "<scrubbed>"
+      },
+      {
+        "actions": [
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          }
+        ],
+        "name": "<scrubbed>"
+      },
+      {
+        "actions": [
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          }
+        ],
+        "name": "<scrubbed>"
+      },
+      {
+        "actions": [
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          }
+        ],
+        "name": "<scrubbed>"
+      },
+      {
+        "actions": [
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          }
+        ],
+        "name": "<scrubbed>"
+      }
+    ],
+    "workspace_collaborator_actions": [
+      {
+        "actions": [
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          }
+        ],
+        "name": "<scrubbed>"
+      },
+      {
+        "actions": [
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          },
+          {
+            "name": "<scrubbed>"
+          }
+        ],
+        "name": "<scrubbed>"
+      }
+    ]
+  },
+  "sections": [],
+  "stats": {
+    "completed_count": 0,
+    "days_items": [
+      {
+        "date": "2000-01-01",
+        "total_completed": 0
+      }
+    ],
+    "week_items": [
+      {
+        "from": "2000-01-01",
+        "to": "2000-01-01",
+        "total_completed": 0
+      }
+    ]
+  },
+  "suggestions": [
+    {
+      "content": {
+        "locale": "<scrubbed>",
+        "templates": [
+          {
+            "id": "tafvexc",
+            "name": "<scrubbed>",
+            "template_type": "<scrubbed>"
+          },
+          {
+            "id": "zzm-icwgyu-dbjqrg",
+            "name": "<scrubbed>",
+            "template_type": "<scrubbed>"
+          },
+          {
+            "id": "pzewaskv-oojovafi",
+            "name": "<scrubbed>",
+            "template_type": "<scrubbed>"
+          },
+          {
+            "id": "glfn-ppopktu",
+            "name": "<scrubbed>",
+            "template_type": "<scrubbed>"
+          }
+        ]
+      },
+      "is_deleted": false,
+      "type": "templates",
+      "user_id": "90935042"
+    }
+  ],
+  "sync_status": {},
+  "sync_token": "<scrubbed>",
+  "temp_id_mapping": {},
+  "tooltips": {
+    "scheduled": [
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>"
+    ],
+    "seen": [
+      "<scrubbed>",
+      "<scrubbed>",
+      "<scrubbed>"
+    ]
+  },
+  "user": {
+    "activated_user": false,
+    "auto_reminder": 0,
+    "business_account_id": null,
+    "capture_sessions_usage": {
+      "current_count": 0,
+      "limit": 0,
+      "remaining": 0,
+      "reset_date": "2000-01-01T00:00:00+00:00"
+    },
+    "daily_goal": 0,
+    "date_format": 0,
+    "days_off": [
+      0,
+      0
+    ],
+    "deleted_at": null,
+    "email": "user@example.invalid",
+    "feature_identifier": "<scrubbed>",
+    "features": {
+      "beta": 0,
+      "dateist_inline_disabled": false,
+      "dateist_lang": null,
+      "global.teams": true,
+      "has_push_reminders": true,
+      "karma_disabled": false,
+      "karma_vacation": false,
+      "kisa_consent_timestamp": null,
+      "restriction": 0
+    },
+    "free_trial_expires_at": null,
+    "full_name": "<scrubbed>",
+    "getting_started_guide_projects": null,
+    "has_consented_to_ai_training": null,
+    "has_magic_number": false,
+    "has_password": true,
+    "has_started_a_trial": false,
+    "id": "90935042",
+    "image_id": null,
+    "inbox_project_id": "6et4cSPHngaIN1Sj",
+    "is_celebrations_enabled": true,
+    "is_deleted": false,
+    "is_onboarded": false,
+    "is_premium": false,
+    "joinable_workspace": null,
+    "joined_at": "2000-01-01T00:00:00.000000Z",
+    "karma": 0.0,
+    "karma_trend": "<scrubbed>",
+    "lang": "<scrubbed>",
+    "mfa_enabled": false,
+    "next_week": 0,
+    "onboarded_dated_tasks_created": false,
+    "onboarded_desktop_accessed": true,
+    "onboarded_mobile_accessed": false,
+    "onboarded_tasks_completed": false,
+    "onboarding_completed": true,
+    "onboarding_initiated": true,
+    "onboarding_level": "<scrubbed>",
+    "onboarding_persona": "<scrubbed>",
+    "onboarding_role": null,
+    "onboarding_started": false,
+    "onboarding_team_mode": null,
+    "onboarding_use_cases": [
+      "<scrubbed>"
+    ],
+    "premium_status": "<scrubbed>",
+    "premium_until": null,
+    "ramble_sessions_usage": {
+      "current_count": 0,
+      "limit": 0,
+      "remaining": 0,
+      "reset_date": "2000-01-01T00:00:00+00:00"
+    },
+    "share_limit": 0,
+    "sort_order": 0,
+    "start_day": 0,
+    "start_page": "<scrubbed>",
+    "status": null,
+    "team_inbox_id": null,
+    "theme_appearance": "<scrubbed>",
+    "theme_id": "5",
+    "time_format": 0,
+    "token": "<scrubbed>",
+    "tz_info": {
+      "gmt_string": "<scrubbed>",
+      "hours": 0,
+      "is_dst": 0,
+      "minutes": 0,
+      "timezone": "<scrubbed>"
+    },
+    "unique_prefix": 0,
+    "urgent_reminder_device": null,
+    "verification_status": "<scrubbed>",
+    "websocket_url": "https://example.invalid/",
+    "weekend_start_day": 0,
+    "weekly_goal": 0
+  },
+  "user_item_orders": [],
+  "user_plan_limits": {
+    "current": {
+      "activity_log": true,
+      "activity_log_limit": 7,
+      "advanced_permissions": false,
+      "automatic_backups": false,
+      "calendar_feeds": true,
+      "calendar_layout": false,
+      "comments": true,
+      "completed_tasks": true,
+      "custom_app_icon": false,
+      "customization_color": false,
+      "deadlines": false,
+      "durations": false,
+      "email_ai_forwarding": false,
+      "email_forwarding": true,
+      "filters": true,
+      "labels": true,
+      "max_calendar_accounts": 1,
+      "max_collaborators": 5,
+      "max_filters": 3,
+      "max_folders_per_workspace": 5,
+      "max_free_workspaces_created": 1,
+      "max_guests_per_workspace": 5,
+      "max_labels": 500,
+      "max_live_notifications": 500,
+      "max_monthly_capture": 10,
+      "max_monthly_ramble": 10,
+      "max_projects": 5,
+      "max_projects_joined": 500,
+      "max_reminders_location": 300,
+      "max_reminders_time": 700,
+      "max_sections": 20,
+      "max_tasks": 300,
+      "max_user_templates": 100,
+      "plan_name": "<scrubbed>",
+      "project_icons": true,
+      "project_insights_light": false,
+      "reminders": false,
+      "reminders_at_due": true,
+      "templates": true,
+      "upload_limit_mb": 5,
+      "uploads": true,
+      "weekly_trends": true
+    },
+    "next": {
+      "activity_log": true,
+      "activity_log_limit": -1,
+      "advanced_permissions": true,
+      "automatic_backups": true,
+      "calendar_feeds": true,
+      "calendar_layout": true,
+      "comments": true,
+      "completed_tasks": true,
+      "custom_app_icon": true,
+      "customization_color": true,
+      "deadlines": true,
+      "durations": true,
+      "email_ai_forwarding": true,
+      "email_forwarding": true,
+      "filters": true,
+      "labels": true,
+      "max_calendar_accounts": 1,
+      "max_collaborators": 5,
+      "max_filters": 150,
+      "max_folders_per_workspace": 25,
+      "max_free_workspaces_created": 1,
+      "max_guests_per_workspace": 25,
+      "max_labels": 500,
+      "max_live_notifications": 500,
+      "max_monthly_capture": 1000,
+      "max_monthly_ramble": 1000,
+      "max_projects": 300,
+      "max_projects_joined": 500,
+      "max_reminders_location": 300,
+      "max_reminders_time": 700,
+      "max_sections": 20,
+      "max_tasks": 300,
+      "max_user_templates": 100,
+      "plan_name": "<scrubbed>",
+      "project_icons": true,
+      "project_insights_light": true,
+      "reminders": true,
+      "reminders_at_due": true,
+      "templates": true,
+      "upload_limit_mb": 100,
+      "uploads": true,
+      "weekly_trends": true
+    }
+  },
+  "user_settings": {
+    "ai_email_assist": true,
+    "completed_sound_desktop": true,
+    "completed_sound_mobile": true,
+    "debug_logging_enabled_until": null,
+    "habit_push_notifications": {
+      "features": [
+        {
+          "enabled": false,
+          "name": "<scrubbed>",
+          "send_at": "<scrubbed>"
+        },
+        {
+          "enabled": false,
+          "name": "<scrubbed>",
+          "send_at": "<scrubbed>"
+        },
+        {
+          "enabled": false,
+          "name": "<scrubbed>",
+          "send_at": null
+        }
+      ]
+    },
+    "legacy_pricing": 0,
+    "navigation": {
+      "counts_shown": true,
+      "features": [
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        }
+      ]
+    },
+    "quick_add": {
+      "description_shown": false,
+      "features": [
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": true
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        }
+      ],
+      "labels_shown": true
+    },
+    "reminder_desktop": true,
+    "reminder_email": true,
+    "reminder_push": true,
+    "reset_recurring_subtasks": true
+  },
+  "view_options": [],
+  "workspace_filters": [],
+  "workspaces": []
+}

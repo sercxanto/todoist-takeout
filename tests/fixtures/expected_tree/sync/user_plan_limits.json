@@ -1,0 +1,16 @@
+{
+  "current": {
+    "plan_name": "free",
+    "comments": true,
+    "reminders": false,
+    "max_projects": 5,
+    "max_collaborators": 5
+  },
+  "next": {
+    "plan_name": "pro",
+    "comments": true,
+    "reminders": true,
+    "max_projects": 300,
+    "max_collaborators": 25
+  }
+}

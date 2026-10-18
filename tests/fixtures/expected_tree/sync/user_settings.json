@@ -1,0 +1,6 @@
+{
+  "reminder_push": true,
+  "reminder_desktop": true,
+  "reminder_email": false,
+  "completed_sound_desktop": true
+}

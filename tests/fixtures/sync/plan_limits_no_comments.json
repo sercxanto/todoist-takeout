@@ -1,0 +1,34 @@
+{
+  "sync_token": "INC-5",
+  "full_sync": false,
+  "items": [],
+  "projects": [],
+  "sections": [],
+  "labels": [],
+  "notes": [],
+  "project_notes": [],
+  "filters": [],
+  "reminders": [],
+  "collaborators": [],
+  "collaborator_states": [],
+  "view_options": [],
+  "project_view_options_defaults": [],
+  "live_notifications": [],
+  "user_plan_limits": {
+    "current": {
+      "plan_name": "free",
+      "comments": false,
+      "reminders": false,
+      "max_projects": 5,
+      "max_collaborators": 5
+    },
+    "next": {
+      "plan_name": "pro",
+      "comments": true,
+      "reminders": true,
+      "max_projects": 300,
+      "max_collaborators": 25
+    }
+  },
+  "temp_id_mapping": {}
+}

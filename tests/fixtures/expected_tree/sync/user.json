@@ -1,0 +1,16 @@
+{
+  "id": "2671355",
+  "email": "me@example.com",
+  "full_name": "Sam Example",
+  "inbox_project_id": "6Jf8VQXxpwv56VQ7",
+  "lang": "de",
+  "tz_info": {
+    "timezone": "Europe/Berlin",
+    "gmt_string": "+02:00",
+    "hours": 2,
+    "minutes": 0,
+    "is_dst": 1
+  },
+  "is_premium": false,
+  "premium_status": "not_premium"
+}

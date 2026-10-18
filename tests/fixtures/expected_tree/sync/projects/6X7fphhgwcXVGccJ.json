@@ -1,0 +1,16 @@
+{
+  "id": "6X7fphhgwcXVGccJ",
+  "name": "Shopping",
+  "color": "grey",
+  "parent_id": null,
+  "child_order": 0,
+  "is_collapsed": false,
+  "shared": true,
+  "can_assign_tasks": true,
+  "is_deleted": false,
+  "is_archived": false,
+  "is_favorite": false,
+  "view_style": "list",
+  "created_at": "2026-01-01T00:00:00.000000Z",
+  "updated_at": "2026-01-01T00:00:00.000000Z"
+}

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "todoist-takeout"
+description = "Keeps a complete, long-term readable local backup of a Todoist account."
+readme = "README.md"
+requires-python = ">=3.11"
+dynamic = ["version"]
+dependencies = []
+classifiers = [
+    "Environment :: Console",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+todoist-takeout = "todoist_takeout.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "todoist_takeout.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+todoist_takeout = ["storage_format.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "-m", "not contract"]
+markers = [
+    "contract: runs against the real Todoist API; select with `pytest -m contract`",
+]

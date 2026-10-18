@@ -1,0 +1,23 @@
+{
+  "sync_token": "INC-3",
+  "full_sync": false,
+  "items": [],
+  "projects": [
+    {
+      "id": "6X7fphhgwcXVGccJ",
+      "is_deleted": true
+    }
+  ],
+  "sections": [],
+  "labels": [],
+  "notes": [],
+  "project_notes": [],
+  "filters": [],
+  "reminders": [],
+  "collaborators": [],
+  "collaborator_states": [],
+  "view_options": [],
+  "project_view_options_defaults": [],
+  "live_notifications": [],
+  "temp_id_mapping": {}
+}
