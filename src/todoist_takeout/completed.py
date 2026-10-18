@@ -1,4 +1,4 @@
-"""Backing up completed tasks and the comments of completed tasks (design D2).
+"""Backing up completed tasks, completion events and the comments of completed tasks (design D2).
 
 Each file under `completed/` is shaped like the API response it comes from (design D6). The
 `completed` object of `state.json` records how far this part has come; each of its fields advances
@@ -19,12 +19,20 @@ log = logging.getLogger(__name__)
 
 COMPLETED_DIR = "completed"
 COMMENTS_DIR = "comments"
+ACTIVITY_DIR = "activity"
 JSON_SUFFIX = ".json"
 
 BY_COMPLETION_DATE = "tasks/completed/by_completion_date"
 COMMENTS = "comments"
+ACTIVITIES = "activities"
 TASKS_PAGE_LIMIT = 200
 COMMENTS_PAGE_LIMIT = 100
+ACTIVITY_PAGE_LIMIT = 100
+
+# The activity log's filter for task completions; list-valued parameters are JSON text.
+COMPLETION_EVENTS = '["item:completed"]'
+# Each fetch of the activity log starts this long before the previous one (design D9).
+ACTIVITY_OVERLAP = timedelta(days=1)
 
 # A month closes once it was fetched at least this long after it ended (design D7).
 GRACE_PERIOD = timedelta(days=7)
@@ -35,12 +43,17 @@ CURSOR = "next_cursor"
 
 
 def run(target: Path, client: Client, state: dict, now: Callable[[], datetime]) -> None:
-    """Back up completed tasks and their comments, unless the plan leaves them out."""
+    """Back up completion events, completed tasks and their comments, unless the plan leaves them out.
+
+    The activity log comes first because its history is limited, so that a run that fails later has
+    still secured its events.
+    """
     target = Path(target)
     limits = sync.current_plan_limits(target)
     if limits.get("completed_tasks") is False:
         return  # the plan warnings of the run name this part
     _start(target, state, now)
+    _fetch_activity(target, client, state, now(), limits.get("activity_log_limit"))
     _fetch_months(target, client, state, now(), comments=limits.get("comments") is not False)
 
 
@@ -65,6 +78,81 @@ def _first_month(target: Path) -> str:
             "the account's creation date is unknown; completed tasks are backed up from %s on", FALLBACK_FIRST_MONTH
         )
         return FALLBACK_FIRST_MONTH
+
+
+# --- Completion events from the activity log (design D9) ------------------------------------
+
+
+def _fetch_activity(target: Path, client: Client, state: dict, start: datetime, log_limit) -> None:
+    """Fetch the completion events since the previous fetch and merge them into their months' files."""
+    progress = storage.completed_state(state)
+    t0 = _checked_time(progress["t0_utc"], "t0_utc")
+    previous = _checked_time(progress["activity_fetched_utc"], "activity_fetched_utc") or t0
+    _warn_about_gap(previous, start, log_limit)
+    date_from = (previous - ACTIVITY_OVERLAP).date().isoformat()
+    params = {"object_event_types": COMPLETION_EVENTS, "date_from": date_from}
+    try:
+        pages = fetch_pages(client, ACTIVITIES, params, ACTIVITY_PAGE_LIMIT, "results")
+    except PlanRestricted:
+        # The checkpoint stays, so the gap warning appears once the log is available again.
+        log.warning(
+            "the Todoist plan does not allow fetching the activity log; completion events cannot be backed up "
+            "on this plan"
+        )
+        return
+    response = merge_pages(pages, "results", "event_date")
+    by_month: dict[str, list] = {}
+    for event in response["results"]:
+        month = _event_month(event, t0, start)
+        if month is not None:
+            by_month.setdefault(month, []).append(event)
+    new = 0
+    for month, events in sorted(by_month.items()):
+        path = target / COMPLETED_DIR / ACTIVITY_DIR / f"{month}{JSON_SUFFIX}"
+        fetched = {**response, "results": events}
+        stored = read_stored(path, "results")
+        known = {_id_order(e.get("id")) for e in stored["results"] if isinstance(e, dict)} if stored else set()
+        new += sum(1 for e in events if not isinstance(e, dict) or _id_order(e.get("id")) not in known)
+        merged = merge_pages([stored, fetched] if stored is not None else [fetched], "results", "event_date", by_id=True)
+        storage.write_bytes_atomic(path, storage.encode_json(merged))
+    storage.update_completed_state(target, state, activity_fetched_utc=precise_timestamp(start))
+    log.info("completion events: fetched the activity log since %s; %d new events stored", date_from, new)
+
+
+def _event_month(event, t0: datetime, start: datetime) -> str | None:
+    """The month whose file an event goes into, or None for an event before T0."""
+    date = event.get("event_date") if isinstance(event, dict) else None
+    try:
+        moment = parse_time(date)
+    except ValueError:
+        log.warning(
+            "an event of the activity log has no valid event_date (%r); it is stored in the month of the fetch, %s",
+            date,
+            month_of(start),
+        )
+        return month_of(start)
+    # Completions before T0 come from the one-time backfill.
+    return month_of(moment) if moment >= t0 else None
+
+
+def _warn_about_gap(previous: datetime, start: datetime, log_limit) -> None:
+    """Warn if events may have dropped out of the activity log since `previous`.
+
+    `log_limit` is the plan's `activity_log_limit` in days; a missing value or -1 means no limit.
+    """
+    if not isinstance(log_limit, (int, float)) or isinstance(log_limit, bool) or log_limit <= 0:
+        return
+    kept_since = start - timedelta(days=log_limit)
+    if previous >= kept_since:
+        return
+    log.warning(
+        "the Todoist plan keeps the activity log for only %s days, and it was not fetched for %d days; "
+        "completion events from %s to %s may be missing from the backup",
+        f"{log_limit:g}",
+        (start - previous).days,
+        _readable_time(previous),
+        _readable_time(kept_since),
+    )
 
 
 # --- Completed tasks by month (design D5, D7) -----------------------------------------------
@@ -293,6 +381,10 @@ def precise_timestamp(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
+def _readable_time(moment: datetime) -> str:
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
 def month_of(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).strftime("%Y-%m")
 
@@ -321,3 +413,14 @@ def _checked_month(value, field: str) -> str | None:
     except ValueError:
         pass
     raise ConfigError(f"{storage.STATE_FILE} is not a valid state file: {field} {value!r} is not a month (YYYY-MM)")
+
+
+def _checked_time(value, field: str) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        return parse_time(value)
+    except ValueError:
+        raise ConfigError(
+            f"{storage.STATE_FILE} is not a valid state file: {field} {value!r} is not a UTC timestamp"
+        ) from None

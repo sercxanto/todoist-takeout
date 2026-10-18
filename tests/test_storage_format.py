@@ -10,7 +10,7 @@ from todoist_takeout.api import Client
 from todoist_takeout.resources import COLLECTION, KNOWN, ONE_OF, SINGLE, Classifier
 from todoist_takeout.sync import apply_response, run_backup
 
-from fake_api import BY_COMPLETION_DATE, COMMENTS, FakeApi, completed_fixture
+from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, FakeApi, completed_fixture
 
 
 def _format_description() -> str:
@@ -65,10 +65,11 @@ def _produced_completed_tree(tmp_path, sync_fixture):
     september = dict(zip(["since", "until"], completed.month_window("2026-09")))
     api.cursor_pages(BY_COMPLETION_DATE, september, [completed_fixture(f"by_completion_date_{i}") for i in (1, 2)])
     api.answer(COMMENTS, {"task_id": "6X8Gq4CfVh9xPm2R"}, completed_fixture("comments"))
+    api.cursor_pages(ACTIVITIES, {}, [completed_fixture(f"activities_{i}") for i in (1, 2)])
     run_backup(tmp_path, Client(api), now=lambda: datetime(2026, 10, 18, 12, tzinfo=timezone.utc))
 
 
-LAYOUTS = {"sync": (_produced_sync_tree, 8), "completed": (_produced_completed_tree, 2)}
+LAYOUTS = {"sync": (_produced_sync_tree, 8), "completed": (_produced_completed_tree, 6)}
 
 
 @pytest.fixture(params=sorted(LAYOUTS))
@@ -115,3 +116,9 @@ def test_documented_kinds_match_the_resource_table():
 
     assert listed("Resources keyed by one of several fields") == {k for k, v in KNOWN.items() if v.name == ONE_OF}
     assert listed("Resources stored as single values") == {k for k, v in KNOWN.items() if v.name == SINGLE}
+
+
+def test_description_warns_about_large_event_ids():
+    text = " ".join(_format_description().split())
+    assert "The `id` of an event is an integer larger than 64 bits" in text
+    assert "JavaScript (`JSON.parse`) and an SQLite `INTEGER` column" in text

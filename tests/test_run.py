@@ -270,7 +270,7 @@ def test_missing_plan_information_does_not_warn(tmp_path, caplog):
 # follow-up the pending response, the edited task, state.json and the pending removal, then for the
 # completed tasks state.json with T0, the months 2026-08 and 2026-09 each with state.json closing
 # it, and the open month 2026-10, and finally state.json.
-FIRST_RUN_WRITES = 46
+FIRST_RUN_WRITES = 47
 # For each request of the first run, the number of writes after which its response is saved in
 # `pending/`. From then on, it must never be requested again.
 RESPONSE_SAVED_AFTER = {"*": 2, "FULL-1": 36}
@@ -344,4 +344,9 @@ def test_repeat_run_changes_only_the_state_file(tmp_path):
     assert changed == {"state.json"}
     touched = {path for path in tree(tmp_path) if (tmp_path / path).stat().st_mtime_ns != OLD}
     assert touched == {"state.json"}
-    assert state(tmp_path) == {**before_state, "last_successful_run_utc": "2026-10-18T13:00:00Z"}
+    # Only the run time and the time of the activity log's fetch advance.
+    assert state(tmp_path) == {
+        **before_state,
+        "last_successful_run_utc": "2026-10-18T13:00:00Z",
+        "completed": {**before_state["completed"], "activity_fetched_utc": "2026-10-18T13:00:00.000000Z"},
+    }

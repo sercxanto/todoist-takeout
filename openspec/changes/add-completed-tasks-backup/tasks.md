@@ -37,9 +37,9 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 5. Completion events from the activity log
 
-- [ ] 5.1 Implement the activity fetch (design D9): `object_event_types=["item:completed"]`, `date_from` one day before the checkpoint (or T0), the cursor walk, events before T0 dropped, grouping by the month of `event_date` (an unparseable one goes to the fetch month with a warning), the merge by `id` into `completed/activity/<YYYY-MM>.json`, and `activity_fetched_utc` set after the files are written. Verify with run tests for the spec scenarios "Recurring task", "Overlapping fetches", "Large event ID" and "Event before T0", and the checkpoint scenario "Killed before the checkpoint"
-- [ ] 5.2 Implement the gap warning (`activity_log_limit` in days, `-1` and missing mean no limit) and the `PlanRestricted` handling, in which the checkpoint stays. Verify with run tests for the spec scenarios "Free plan, long pause" and "Within the limit", and for "Activity log restricted"
-- [ ] 5.3 Document `completed/activity/` in `storage_format.md`: the source, the T0 split, months by `event_date`, merging by `id`, and the warning that event IDs exceed 64 bits and are corrupted by JavaScript and SQLite `INTEGER`. Verify with the path-pattern tests and a test that the description contains the warning
+- [x] 5.1 Implement the activity fetch (design D9): `object_event_types=["item:completed"]`, `date_from` one day before the checkpoint (or T0), the cursor walk, events before T0 dropped, grouping by the month of `event_date` (an unparseable one goes to the fetch month with a warning), the merge by `id` into `completed/activity/<YYYY-MM>.json`, and `activity_fetched_utc` set after the files are written. Verify with run tests for the spec scenarios "Recurring task", "Overlapping fetches", "Large event ID" and "Event before T0", and the checkpoint scenario "Killed before the checkpoint"
+- [x] 5.2 Implement the gap warning (`activity_log_limit` in days, `-1` and missing mean no limit) and the `PlanRestricted` handling, in which the checkpoint stays. Verify with run tests for the spec scenarios "Free plan, long pause" and "Within the limit", and for "Activity log restricted"
+- [x] 5.3 Document `completed/activity/` in `storage_format.md`: the source, the T0 split, months by `event_date`, merging by `id`, and the warning that event IDs exceed 64 bits and are corrupted by JavaScript and SQLite `INTEGER`. Verify with the path-pattern tests and a test that the description contains the warning
 
 ## 6. One-time backfill
 

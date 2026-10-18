@@ -14,7 +14,7 @@ kept up to date by every run.
 | `README.md` | This description. |
 | `state.json` | The checkpoint and run metadata. See [State file](#state-file). |
 | `sync/` | The account's active data, as returned by the Todoist sync API. See [Active data](#active-data). |
-| `completed/` | Completed tasks and the comments of completed tasks. See [Completed tasks](#completed-tasks). |
+| `completed/` | Completed tasks, completion events and the comments of completed tasks. See [Completed tasks](#completed-tasks). |
 | `pending/` | A downloaded response that has not been applied yet. Normally empty. See [Pending response](#pending-response). |
 | `.lock` | Lock file that keeps two runs from working on the same backup. See [Lock file](#lock-file). |
 
@@ -95,20 +95,23 @@ attached files themselves are not downloaded.
 
 ## Completed tasks
 
-`completed/` holds the account's completed tasks, month by month, and the comments of completed
-tasks. The sync in `sync/` does not include them. Months are UTC months in the form `YYYY-MM`.
+`completed/` holds the account's completed tasks, month by month, one event per completion
+(including the completions of recurring tasks), and the comments of completed tasks. The sync in
+`sync/` does not include them. Months are UTC months in the form `YYYY-MM`.
 
 | Path | Content | Source |
 |---|---|---|
 | `completed/<YYYY-MM>.json` | The tasks completed in that month, for example `completed/2026-09.json`. | `GET /api/v1/tasks/completed/by_completion_date` |
 | `completed/comments/<task id>.json` | The comments of one completed task, for example `completed/comments/6X8Gq4CfVh9xPm2R.json`. | `GET /api/v1/comments` |
+| `completed/activity/<YYYY-MM>.json` | The completion events from T0 on whose `event_date` is in that month, for example `completed/activity/2026-10.json`. | `GET /api/v1/activities` |
 
 **Contents.** Each file holds one JSON object shaped like the API response it comes from: its list
-of entries (`items` for tasks, `results` for comments) and every other top-level key of the
-response, except the pagination cursor `next_cursor`. The tool adds no keys. When the entries arrive
-in several pages, they are merged into the one list, each entry exactly as the API returned it. The
-entries are ordered by time (`completed_at` for tasks, `posted_at` for comments) and then by `id`;
-an entry without the time field comes first.
+of entries (`items` for tasks, `results` for comments and events) and every other top-level key of
+the response, except the pagination cursor `next_cursor`. The tool adds no keys. When the entries
+arrive in several pages, they are merged into the one list, each entry exactly as the API returned
+it. The entries are ordered by time (`completed_at` for tasks, `posted_at` for comments,
+`event_date` for events) and then by `id`, with integer IDs compared as numbers; an entry without
+the time field comes first.
 
 A task entry is the task's full payload, with the same fields as in `sync/items/`, as it was when its
 month was last fetched. A task belongs to the month of its `completed_at`, so a task completed at
@@ -129,7 +132,7 @@ close as soon as they are stored. A closed month is never fetched again. As a co
 - Tasks in archived projects are not included: the API returns them only for a request filtered
   by project.
 - Completions of recurring tasks are not included: such a task is never completed as a whole, it
-  moves to its next date.
+  moves to its next date. Its completions are in the [completion events](#completion-events).
 
 **Comments.** For each completed task whose `note_count` is greater than 0, the file
 `completed/comments/<task id>.json` holds its comments; the file name follows the rules of
@@ -139,6 +142,32 @@ changed ones replace the stored version (matched by `id`). A comment once stored
 even after it is deleted in Todoist. Comments keep their attachment metadata (`file_attachment`)
 exactly as the API returned it; the attached files are not downloaded. On a plan without comments,
 no comments of completed tasks are stored.
+
+### Completion events
+
+A completion event records one completion of a task, including each completion of a recurring task
+and completions by other people in shared projects. Completions before T0, the start of the first
+run that backed up completed tasks (`t0_utc` in `state.json`), come from the one-time backfill;
+completions from T0 on come from the activity log. The two sources cover separate time ranges, so
+no completion is in both.
+
+`completed/activity/<YYYY-MM>.json` holds the `item:completed` events of the activity log
+(`GET /api/v1/activities`) from T0 on, in the month of their `event_date`; an event without a valid
+`event_date` is in the month in which it was fetched. Only months with events have a file. Each run
+fetches the events since the day before the previous fetch, so fetches overlap, and merges them into
+the stored files by `id`: an event is stored once, with the content of its latest fetch, and an
+event once stored stays. An event's `extra_data` holds a snapshot of the task (content, due date,
+`is_recurring`, labels, `note_count`, section), not the full task.
+
+The activity log keeps a limited history: on the Free plan, 7 days (`activity_log_limit` in
+`sync/user_plan_limits.json`). If the backup is not run within that period, events in the gap may
+be missing; the tool warns which period is affected.
+
+**Large integers.** The `id` of an event is an integer larger than 64 bits, for example
+`152735830295847392018475629384756102938`. The files hold it exactly, but tools that parse JSON
+numbers as 64-bit integers or as doubles corrupt it, among them JavaScript (`JSON.parse`) and an
+SQLite `INTEGER` column. Read these files with a parser that keeps large integers, such as Python's
+`json`, or treat the `id` as text.
 
 ## JSON encoding
 

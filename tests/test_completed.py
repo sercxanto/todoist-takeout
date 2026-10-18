@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from todoist_takeout import completed, storage
+from todoist_takeout import completed, storage, sync
 from todoist_takeout.api import Client, cursor_pages
 from todoist_takeout.cli import main
 from todoist_takeout.errors import ConfigError, StorageError
@@ -584,3 +584,172 @@ def test_crash_after_the_comments_and_before_the_month_file(tmp_path, monkeypatc
     api = run(target, october_api(2, [C1, C2]))
     assert len(api.requested(COMMENTS)) == 1
     assert completed_tree(target) == completed_tree(reference)
+
+
+# --- 5.1 completion events from the activity log ------------------------------------------------
+
+RECURRING_TASK = "6X8Gr7Mn2pQwVb4T"
+LARGE_EVENT_ID = 152735830295847392018475629384756102938
+NOVEMBER = datetime(2026, 11, 2, 12, tzinfo=timezone.utc)
+
+
+def activity_api(pages=None, **kwargs):
+    """Let the activity log return the fixture events: two completions of a recurring task after T0,
+    one completion before T0, and one in November."""
+    pages = pages or [completed_fixture("activities_1"), completed_fixture("activities_2")]
+    return FakeApi(account(**kwargs)).cursor_pages(ACTIVITIES, {}, pages)
+
+
+def events(target, month):
+    return stored(target, f"activity/{month}.json")["results"]
+
+
+def test_activity_log_is_requested_for_completions_since_the_day_before_t0(tmp_path):
+    api = run(tmp_path)
+    assert api.requested(ACTIVITIES) == [
+        {"object_event_types": '["item:completed"]', "date_from": "2026-10-17", "limit": "100"}
+    ]
+    assert progress(tmp_path)["activity_fetched_utc"] == "2026-10-18T12:00:00.000000Z"
+    assert not (tmp_path / "completed" / "activity").exists()  # only months with events get a file
+
+
+def test_recurring_task_completed_twice_between_two_runs_gives_two_events(tmp_path):
+    run(tmp_path)
+    api = run(tmp_path, activity_api(), now=NOVEMBER)
+    assert api.requested(ACTIVITIES)[0]["date_from"] == "2026-10-17"
+    assert len(api.requested(ACTIVITIES)) == 2  # the cursor walk
+    recurring = [e for e in events(tmp_path, "2026-10") if e["object_id"] == RECURRING_TASK]
+    assert [e["event_date"] for e in recurring] == ["2026-10-19T06:30:00.000000Z", "2026-10-20T06:45:30.000000Z"]
+    assert events(tmp_path, "2026-10") == completed_fixture("activities_1")["results"]  # unchanged
+    assert [e["event_date"] for e in events(tmp_path, "2026-11")] == ["2026-11-01T00:00:01.000000Z"]
+    assert list(stored(tmp_path, "activity/2026-10.json")) == ["results"]  # no next_cursor
+    assert progress(tmp_path)["activity_fetched_utc"] == "2026-11-02T12:00:00.000000Z"
+
+
+def test_event_before_t0_is_not_stored(tmp_path):
+    run(tmp_path)  # T0 is 2026-10-18T12:00:00Z
+    run(tmp_path, activity_api(), now=NOVEMBER)
+    dates = [e["event_date"] for month in ("2026-10", "2026-11") for e in events(tmp_path, month)]
+    assert "2026-10-18T09:59:59.000000Z" not in dates
+    assert len(dates) == 3
+
+
+def test_event_at_t0_is_stored(tmp_path):
+    at_t0 = {**completed_fixture("activities_2")["results"][0], "event_date": "2026-10-18T12:00:00.000000Z"}
+    run(tmp_path, activity_api([{"results": [at_t0], "next_cursor": None}]))
+    assert events(tmp_path, "2026-10") == [at_t0]
+
+
+def test_large_event_id_is_stored_exactly(tmp_path):
+    run(tmp_path)
+    run(tmp_path, activity_api(), now=NOVEMBER)
+    data = (tmp_path / "completed" / "activity" / "2026-10.json").read_bytes()
+    assert f'"id": {LARGE_EVENT_ID},'.encode() in data
+    assert events(tmp_path, "2026-10")[0]["id"] == LARGE_EVENT_ID
+
+
+def test_overlapping_fetches_store_each_event_once_with_the_latest_content(tmp_path):
+    run(tmp_path)
+    run(tmp_path, activity_api(), now=NOVEMBER)
+    first, second = completed_fixture("activities_1")["results"]
+    edited = {**second, "extra_data": {**second["extra_data"], "content": "Take out the bins (edited)"}}
+    api = run(tmp_path, activity_api([{"results": [edited, first], "next_cursor": None}]), now=NOVEMBER + timedelta(hours=1))
+    assert api.requested(ACTIVITIES)[0]["date_from"] == "2026-11-01"
+    assert events(tmp_path, "2026-10") == [first, edited]
+
+
+def test_killed_before_the_activity_checkpoint(tmp_path, monkeypatch):
+    reference = tmp_path / "reference"
+    run(reference)
+    run(reference, activity_api(), now=NOVEMBER)
+
+    target = tmp_path / "target"
+    run(target)
+    real = storage.update_completed_state
+
+    def killed(target_, state, **changes):
+        if "activity_fetched_utc" in changes:
+            raise storage.InjectedFault("killed")
+        return real(target_, state, **changes)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(storage, "update_completed_state", killed)
+        with pytest.raises(storage.InjectedFault):
+            run(target, activity_api(), now=NOVEMBER)
+    assert (target / "completed" / "activity" / "2026-10.json").is_file()
+    assert progress(target)["activity_fetched_utc"] == "2026-10-18T12:00:00.000000Z"
+
+    api = run(target, activity_api(), now=NOVEMBER)
+    assert api.requested(ACTIVITIES)[0]["date_from"] == "2026-10-17"  # fetched again
+    assert len(events(target, "2026-10")) == 2
+    assert completed_tree(target) == completed_tree(reference)
+
+
+def test_event_without_a_valid_date_goes_to_the_month_of_the_fetch(tmp_path, caplog):
+    undated = {**completed_fixture("activities_1")["results"][0], "event_date": None}
+    with caplog.at_level(logging.WARNING):
+        run(tmp_path, activity_api([{"results": [undated], "next_cursor": None}]))
+    assert events(tmp_path, "2026-10") == [undated]
+    assert [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING] == [
+        "an event of the activity log has no valid event_date (None); it is stored in the month of the fetch, 2026-10"
+    ]
+
+
+def test_invalid_activity_checkpoint_is_a_config_error(tmp_path):
+    run(tmp_path)
+    state = json.loads((tmp_path / "state.json").read_bytes())
+    state["completed"]["activity_fetched_utc"] = "last week"
+    (tmp_path / "state.json").write_bytes(storage.encode_json(state))
+    with pytest.raises(ConfigError, match="activity_fetched_utc 'last week' is not a UTC timestamp"):
+        run(tmp_path)
+
+
+# --- 5.2 gaps in the activity log and plan restrictions ---------------------------------------
+
+
+def activity_warnings(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING and "activity log" in r.getMessage()]
+
+
+def test_free_plan_long_pause_warns_about_the_gap_and_exits_with_status_0(tmp_path, monkeypatch, capsys):
+    run(tmp_path, FakeApi(account(plan={"activity_log_limit": 7})))
+    api = activity_api(plan={"activity_log_limit": 7})
+    monkeypatch.setenv("TODOIST_API_TOKEN", "0123456789abcdef0123456789abcdef01234567")
+    monkeypatch.setattr(sync, "_utc_now", lambda: NOW + timedelta(days=10))
+    status = main(["backup", "--quiet", str(tmp_path)], client_factory=lambda token, wait: Client(api, sleep=_no_sleep))
+    assert status == 0
+    assert capsys.readouterr().err.splitlines() == [
+        "WARNING the Todoist plan keeps the activity log for only 7 days, and it was not fetched for 10 days; "
+        "completion events from 2026-10-18 12:00 UTC to 2026-10-21 12:00 UTC may be missing from the backup"
+    ]
+    assert len(events(tmp_path, "2026-10")) == 2  # the events the log still returns are stored
+    assert progress(tmp_path)["activity_fetched_utc"] == "2026-10-28T12:00:00.000000Z"
+
+
+@pytest.mark.parametrize("plan", [{"activity_log_limit": 7}, {"activity_log_limit": -1}, {}])
+def test_within_the_limit_or_without_one_there_is_no_warning(tmp_path, caplog, plan):
+    run(tmp_path, FakeApi(account(plan=plan)))
+    days = 2 if plan.get("activity_log_limit") == 7 else 400
+    with caplog.at_level(logging.WARNING):
+        run(tmp_path, FakeApi(account(plan=plan)), now=NOW + timedelta(days=days))
+    assert activity_warnings(caplog) == []
+
+
+def test_activity_log_restricted_by_the_plan(tmp_path, caplog):
+    api = september(FakeApi(account(plan={"activity_log_limit": 7})))
+    api.answer(ACTIVITIES, {}, completed_fixture("error_plan_restricted"), status=403)
+    with caplog.at_level(logging.WARNING):
+        run(tmp_path, api)
+    assert activity_warnings(caplog) == [
+        "the Todoist plan does not allow fetching the activity log; completion events cannot be backed up on this plan"
+    ]
+    assert progress(tmp_path)["activity_fetched_utc"] is None  # the checkpoint stays
+    assert len(stored(tmp_path, "2026-09.json")["items"]) == 3  # the completed tasks are stored
+    assert json.loads((tmp_path / "state.json").read_bytes())["last_successful_run_utc"] is not None
+
+    # Once the log is available again, the warning names the gap since T0.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        run(tmp_path, activity_api(plan={"activity_log_limit": 7}), now=NOW + timedelta(days=10))
+    assert len(activity_warnings(caplog)) == 1
+    assert "from 2026-10-18 12:00 UTC to 2026-10-21 12:00 UTC" in activity_warnings(caplog)[0]
