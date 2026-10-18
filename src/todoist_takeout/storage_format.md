@@ -140,6 +140,14 @@ points past data that is not on disk.
   "sync_token": "…",
   "last_full_sync_utc": "2026-10-18T10:00:00Z",
   "last_successful_run_utc": "2026-10-18T10:00:05Z",
+  "completed": {
+    "t0_utc": "2026-10-18T10:00:05.123456Z",
+    "first_month": "2016-03",
+    "tasks_closed_through": "2026-09",
+    "backfill_through": "2026-10",
+    "backfill_status": "complete",
+    "activity_fetched_utc": "2026-10-18T10:00:05.123456Z"
+  },
   "tool_version": "0.1.0"
 }
 ```
@@ -150,7 +158,23 @@ points past data that is not on disk.
 | `sync_token` | The sync token of the last applied response, or `null` before the first one is applied. |
 | `last_full_sync_utc` | The `full_sync_date_utc` of the last full sync, or `null`. |
 | `last_successful_run_utc` | When the last run completed, or `null`. |
+| `completed` | The checkpoint of the completed tasks, see below. Missing until a run backs up completed tasks. |
 | `tool_version` | The version of todoist-takeout that last wrote the file. |
+
+The `completed` object records how far the backup of completed tasks, completion events and the
+comments of completed tasks has come. Months are UTC months in the form `YYYY-MM`.
+
+| Field | Meaning |
+|---|---|
+| `t0_utc` | The start of the first run that backed up completed tasks (T0). It never changes. Completion events from T0 on come from the activity log; completions before T0 come from the one-time backfill. |
+| `first_month` | The first month that is backed up: the month the account was created (`joined_at` of the user), or `2007-01` if that is unknown. It never changes. |
+| `tasks_closed_through` | The last closed month of completed tasks, or `null`. A month closes once it was fetched at least 7 days after it ended; closed months are never fetched again. |
+| `backfill_through` | The last month the one-time backfill has stored, or `null`. |
+| `backfill_status` | `in_progress` while the backfill has months left, `complete` once it has stored the month of T0, or `unavailable` if the API no longer offers its endpoint. |
+| `activity_fetched_utc` | When the last complete fetch of the activity log started, or `null`. The next fetch continues from there. |
+
+Each field advances only after the files it covers are written. A backup without the `completed`
+object starts this part as on a first run.
 
 Times are UTC in ISO 8601 format. The first run creates `state.json` without a sync token before
 it writes anything else, which marks the directory as a todoist-takeout backup. Fields that a later

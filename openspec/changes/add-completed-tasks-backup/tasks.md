@@ -19,8 +19,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 2. State file
 
-- [ ] 2.1 Add helpers that read and update the `completed` object of `state.json` (design D3); `FORMAT_VERSION` stays 1 (D4). Verify with tests in `tests/test_state.py` that the object round-trips with unknown fields kept, and that a state without it starts this part as on a first run
-- [ ] 2.2 Document the `completed` object of `state.json` in `storage_format.md`, with the meaning of each field; the format version stays 1. Verify that `tests/test_storage_format.py` passes with the new state example
+- [x] 2.1 Add helpers that read and update the `completed` object of `state.json` (design D3); `FORMAT_VERSION` stays 1 (D4). Verify with tests in `tests/test_state.py` that the object round-trips with unknown fields kept, and that a state without it starts this part as on a first run
+- [x] 2.2 Document the `completed` object of `state.json` in `storage_format.md`, with the meaning of each field; the format version stays 1. Verify that `tests/test_storage_format.py` passes with the new state example
 
 ## 3. Fixtures and test harness
 

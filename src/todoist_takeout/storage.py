@@ -341,3 +341,42 @@ def load_or_create_state(target: Path) -> dict:
         state = new_state()
         write_state(target, state)
     return state
+
+
+# The `completed` object of state.json: the checkpoint of the completed-tasks backup.
+COMPLETED_KEY = "completed"
+
+
+def new_completed_state() -> dict:
+    """The `completed` object of a backup that has not started this part yet."""
+    return {
+        "t0_utc": None,
+        "first_month": None,
+        "tasks_closed_through": None,
+        "backfill_through": None,
+        "backfill_status": "in_progress",
+        "activity_fetched_utc": None,
+    }
+
+
+def completed_state(state: dict) -> dict:
+    """Return a copy of the `completed` object of `state`, with defaults for missing fields.
+
+    A state without the object, such as one written before this part existed, starts this part as
+    on a first run. Fields this version does not know are kept.
+    """
+    stored = state.get(COMPLETED_KEY)
+    if stored is None:
+        return new_completed_state()
+    if not isinstance(stored, dict):
+        raise ConfigError(f"{STATE_FILE} is not a valid state file: {COMPLETED_KEY!r} is not a JSON object")
+    return {**new_completed_state(), **stored}
+
+
+def update_completed_state(target: Path, state: dict, **changes) -> None:
+    """Set fields of the `completed` object of `state` and write `state.json`.
+
+    The caller writes the files a change covers first.
+    """
+    state[COMPLETED_KEY] = {**completed_state(state), **changes}
+    write_state(target, state)

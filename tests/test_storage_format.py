@@ -1,3 +1,4 @@
+import json
 import re
 from importlib import resources
 
@@ -17,6 +18,14 @@ def test_format_version_matches_code():
 
 def test_state_example_uses_current_format_version():
     assert f'"format_version": {storage.FORMAT_VERSION},' in _format_description()
+
+
+def test_state_example_holds_the_completed_object():
+    [example] = re.findall(r"^## State file$.*?^```json$(.*?)^```$", _format_description(), re.M | re.S)
+    state = json.loads(example.replace("…", "x"))
+    assert list(state["completed"]) == list(storage.new_completed_state())
+    table = re.findall(r"^\| `([a-z_0-9]+)` \|", _format_description().split("The `completed` object records")[1], re.M)
+    assert table[: len(state["completed"])] == list(state["completed"])
 
 
 def test_documented_names_match_the_encoding():
