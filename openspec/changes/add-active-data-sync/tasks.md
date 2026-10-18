@@ -15,9 +15,9 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 1. Project scaffolding
 
-- [ ] 1.1 Add `pyproject.toml` (setuptools backend, `requires-python = ">=3.11"`, no runtime dependencies, `test` extra with `pytest`, console script `todoist-takeout = todoist_takeout.cli:main`, package data `storage_format.md`) and a `.gitignore` for Python artifacts. Verify that `pip install -e '.[test]'` succeeds in the dev container
-- [ ] 1.2 Create the `src/todoist_takeout/` package with `__init__.py` (`__version__ = "0.1.0"`), `__main__.py`, a stub `cli.py` that handles `--version` and `--help` only, and `errors.py` with the `UsageError`/`ConfigError`/`RunError` hierarchy from design D3. Verify that `todoist-takeout --version` and `python -m todoist_takeout --version` both print `0.1.0` and exit 0
-- [ ] 1.3 Add the `tests/` layout, a `pytest` configuration in `pyproject.toml` that registers the `contract` marker and deselects it by default, and one smoke test for `--version`. Verify that `pytest` passes and reports the contract marker as deselected
+- [x] 1.1 Add `pyproject.toml` (setuptools backend, `requires-python = ">=3.11"`, no runtime dependencies, `test` extra with `pytest`, console script `todoist-takeout = todoist_takeout.cli:main`, package data `storage_format.md`) and a `.gitignore` for Python artifacts. Verify that `pip install -e '.[test]'` succeeds in the dev container
+- [x] 1.2 Create the `src/todoist_takeout/` package with `__init__.py` (`__version__ = "0.1.0"`), `__main__.py`, a stub `cli.py` that handles `--version` and `--help` only, and `errors.py` with the `UsageError`/`ConfigError`/`RunError` hierarchy from design D3. Verify that `todoist-takeout --version` and `python -m todoist_takeout --version` both print `0.1.0` and exit 0
+- [x] 1.3 Add the `tests/` layout, a `pytest` configuration in `pyproject.toml` that registers the `contract` marker and deselects it by default, and one smoke test for `--version`. Verify that `pytest` passes and reports the contract marker as deselected
 
 ## 2. Storage primitives
 
