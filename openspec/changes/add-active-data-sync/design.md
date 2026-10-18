@@ -130,7 +130,7 @@ Each key component is encoded separately, and the encoded components are joined 
 
 For each object, `apply` computes the target path and the encoded bytes, then:
 
-1. **Live object** (`is_deleted` is not true): write `<key>.json` if its bytes differ from the stored ones.
+1. **Live object** (`is_deleted` is not true): write `<key>.json` if its bytes differ from the stored ones. Then, if `<key>.deleted.json` exists, remove it and fsync the directory on POSIX: the object was restored. This check runs even when `<key>.json` is unchanged, so that a run interrupted between the write and the removal completes the removal when it applies the response again. This is the only file the tool ever removes under `sync/`.
 2. **Deletion payload:**
    - no stored `<key>.json` → write the payload as `<key>.json`;
    - the stored live object's top-level keys ⊆ the payload's keys → overwrite `<key>.json`;
@@ -229,3 +229,4 @@ None. This is the first release and format version 1. To roll back, delete the t
 
 - The exact error tags Todoist uses for plan restrictions. They only extend the D4 table.
 - Whether `full_sync_date_utc` can lag so far that one follow-up incremental sync is not enough. If so, the round limit in D10 can be raised without other changes.
+- Whether Todoist can restore a deleted object with the same id, and what the sync returns for it. The write contract test (7.4) checks this; until then, D8 step 1 handles the case defensively.

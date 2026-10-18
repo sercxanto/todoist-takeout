@@ -8,7 +8,7 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 - Commit after each completed group, once its tests pass.
 - Session 1: groups 1 and 2, high effort. Atomic writes, file locking and file-name encoding fail only on Windows or macOS, or after a crash, so the dev container would not catch mistakes there.
 - Session 2: groups 3 and 4, medium effort.
-- Session 3: group 5, high effort. Pending response, checkpoint order, crash and resume tests.
+- Session 3: task 4.7, then group 5, high effort. Pending response, checkpoint order, crash and resume tests.
 - Session 4: group 6, medium effort.
 - Session 5: groups 7 and 8, medium effort. Tasks 7.1, 7.3 and 7.4 need the user with a real Todoist token, and 7.4 with a dedicated test account. Ask the user before starting them.
 - Alternative for sessions 1 and 3: medium effort, followed by `/code-review high` over that session's diff.
@@ -44,6 +44,7 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 - [x] 4.4 Implement the tombstone rules from D8 (no stored file, superset payload, stub payload → `<key>.deleted.json`), with idempotent re-application. Verify with tests on the full and stub deletion fixtures that the resulting files match the spec scenarios and that applying the same payload twice changes nothing
 - [x] 4.5 Implement the missing-object count for full syncs (one warning with the total, no changes). Verify with a test on the server-initiated full-sync fixture that 3 stored objects stay unchanged and the warning reports 3
 - [x] 4.6 Extend `storage_format.md` with the `sync/` layout, resource kinds, composite keys and tombstones. Verify that the documented layout matches the tree produced in tests 4.3 and 4.4, in a test that checks every path pattern named in the document
+- [ ] 4.7 Implement restoring a deleted object (D8 step 1): a live payload removes an existing `<key>.deleted.json` after `<key>.json` is written, also when `<key>.json` is unchanged. Update `storage_format.md` and the `sync.py` docstring, which currently say that no file is ever removed. Verify with tests that applying the stub deletion fixture and then a live payload for the same project leaves the live payload in `<key>.json` and no `<key>.deleted.json`, that a tombstone next to an already up-to-date `<key>.json` (a run interrupted between the write and the removal) is removed when the response is applied again, and that applying the live payload a second time changes nothing
 
 ## 5. Sync run orchestration
 
@@ -66,7 +67,7 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 - [ ] 7.1 Write `scripts/record_fixtures.py`, which records a full and an incremental sync with a real token and replaces every string except IDs, keys and enum-like values with placeholders. Verify with an offline unit test of the scrubber on a fixture containing names, emails and task content
 - [ ] 7.2 Create `tests/fixtures/shapes.json` from the fixtures (top-level keys, kinds, per-object field names and JSON types), with a generator in the recorder script. Verify that a test regenerates shapes from the fixtures and finds no difference from the committed file
 - [ ] 7.3 Implement the read-only contract test (`pytest -m contract`, skipped without `TODOIST_CONTRACT_TOKEN`). It runs a full sync, compares the response with `shapes.json`, and asserts that every top-level key is classified by `resources.py` without the fallback. Verify that it is skipped without the variable, and with a manual run against a test account if a token is available
-- [ ] 7.4 Implement the write contract test (also requires `TODOIST_CONTRACT_ALLOW_WRITES=1`). It creates a temporary project, task and comment through sync commands, deletes them, syncs incrementally, asserts that the tool's tombstone handling stores the result as specified, and records the deletion payload shape. It then archives a second temporary project with a task, syncs incrementally, and records what the sync returns for the project and the task (`is_archived`, `is_deleted`, or absent). It cleans up in a `finally` block. Verify that it is skipped without the variables
+- [ ] 7.4 Implement the write contract test (also requires `TODOIST_CONTRACT_ALLOW_WRITES=1`). It creates a temporary project, task and comment through sync commands, deletes them, syncs incrementally, asserts that the tool's tombstone handling stores the result as specified, and records the deletion payload shape. It then checks whether the API can restore a deleted object with the same id (for example through an undo or undelete command). If it can, the test restores the temporary task, syncs incrementally, asserts that the tombstone is removed as specified, and records the payload; otherwise it records that no restore path was found. It then archives a second temporary project with a task, syncs incrementally, and records what the sync returns for the project and the task (`is_archived`, `is_deleted`, or absent). It cleans up in a `finally` block. Verify that it is skipped without the variables
 - [ ] 7.5 Document fixture recording and both contract-test modes in the README's Development section, including the recommendation to use a dedicated test account for writes. Verify that the documented commands run as written (the skipped path at minimum)
 
 ## 8. Cross-platform integration
@@ -79,4 +80,5 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 - If the contract tests show stub deletion payloads, plan-restriction error tags or resource shapes that differ from the fixtures, record the findings in this change's design before archiving.
 - Record what the write contract test found about archiving a project in the open questions of `add-completed-tasks-backup`.
+- Record what the write contract test found about restoring deleted objects in this change's design.
 - Archive this change once it is reviewed, so that `add-completed-tasks-backup` can modify `backup-storage`.

@@ -53,6 +53,13 @@ When a deletion payload lacks top-level fields that the stored object has, the t
 - **WHEN** a stored project at `sync/projects/P1.json` is deleted and the API returns only `{"id": "P1", "is_deleted": true}`
 - **THEN** `sync/projects/P1.json` keeps its previous content and `sync/projects/P1.deleted.json` contains `{"id": "P1", "is_deleted": true}`
 
+### Requirement: Restored objects
+When a live payload (`is_deleted` is not true) arrives for an object that has a `<key>.deleted.json`, the tool SHALL write the payload to `<key>.json` and then remove `<key>.deleted.json`, so that the object counts as live again. This is the only case in which the tool removes a file under `sync/`.
+
+#### Scenario: Restored object
+- **WHEN** `sync/projects/P1.json` holds the last full content of project `P1`, `sync/projects/P1.deleted.json` exists, and the sync returns project `P1` with `is_deleted: false`
+- **THEN** `sync/projects/P1.json` contains the returned payload and `sync/projects/P1.deleted.json` no longer exists
+
 ### Requirement: Portable file names
 File names SHALL be valid and unique on Windows, macOS and Linux, including case-insensitive file systems. A key that consists only of ASCII letters, digits, `-` and `_`, and is not a reserved Windows device name, SHALL be used as is. Any other key SHALL be encoded reversibly, as the format description documents. If two different keys would map to the same file, the run SHALL fail rather than overwrite one object with another.
 

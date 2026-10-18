@@ -43,7 +43,7 @@ When the API answers an incremental request with a full sync (`full_sync` is tru
 - **THEN** the tool stores all returned objects, keeps the 3 missing objects unchanged, warns that 3 stored objects were not in the full sync, and exits with status 0
 
 ### Requirement: Tombstones for deleted objects
-When a sync response marks an object as deleted (`is_deleted` is true), the tool SHALL keep it in the backup as deleted and SHALL NOT remove any file. Afterwards, the stored data SHALL include the deletion payload as the API returned it, and SHALL still include the last full content of the object if the deletion payload omits any of its top-level fields.
+When a sync response marks an object as deleted (`is_deleted` is true), the tool SHALL keep it in the backup as deleted and SHALL NOT remove any file, except as the Restored objects requirement allows. Afterwards, the stored data SHALL include the deletion payload as the API returned it, and SHALL still include the last full content of the object if the deletion payload omits any of its top-level fields.
 
 #### Scenario: Deletion payload is the full object
 - **WHEN** a stored task is deleted in Todoist and the sync returns the full task with `is_deleted: true`
@@ -56,6 +56,13 @@ When a sync response marks an object as deleted (`is_deleted` is true), the tool
 #### Scenario: Deleted before it was ever stored
 - **WHEN** the sync reports an object as deleted that the backup has never stored
 - **THEN** the tool stores the deletion payload as that object
+
+### Requirement: Restored objects
+When a sync returns an object as live (`is_deleted` is not true) that the backup stores as deleted, the tool SHALL store the returned payload and remove the object's tombstone file, so that the object no longer counts as deleted.
+
+#### Scenario: Deleted object restored
+- **WHEN** a task is stored as deleted, and a later sync returns it with `is_deleted: false`
+- **THEN** the stored task becomes that payload, its tombstone file is removed, and the task no longer counts as deleted
 
 ### Requirement: Comments on active tasks and projects
 The backup SHALL include the task comments (`notes`) and project comments (`project_notes`) that the sync returns, with their attachment metadata as it appears in the payload. Attachment files SHALL NOT be downloaded.
