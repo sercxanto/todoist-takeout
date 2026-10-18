@@ -23,3 +23,11 @@ class RunError(TakeoutError):
     """The run failed after it started working with the API or the target directory."""
 
     exit_code = 1
+
+
+class StorageError(RunError):
+    """A file in the target directory could not be written or would be overwritten wrongly."""
+
+
+class LockHeld(RunError):
+    """Another run holds the lock on the target directory."""
