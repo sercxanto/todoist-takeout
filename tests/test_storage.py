@@ -271,8 +271,9 @@ def test_full_sync_uses_f_fullfsync_where_available(tmp_path, monkeypatch, fail)
     fsyncs.clear()
     storage.write_bytes_atomic(tmp_path / "state.json", b"2\n", full_sync=True)
     assert fake.calls == [51]
-    # Without F_FULLFSYNC support only the directory is fsynced; with the fallback the file is too.
-    assert len(fsyncs) == (2 if fail else 1)
+    # F_FULLFSYNC replaces the file's fsync; only when it fails does the file get a plain fsync.
+    # The directory is fsynced on POSIX only (design D9).
+    assert len(fsyncs) == (1 if fail else 0) + (0 if storage._WINDOWS else 1)
     assert (tmp_path / "state.json").read_bytes() == b"2\n"
 
 
