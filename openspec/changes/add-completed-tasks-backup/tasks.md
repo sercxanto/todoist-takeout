@@ -66,4 +66,4 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 9. Integration
 
-- [ ] 9.1 Run the full offline suite and `openspec validate add-completed-tasks-backup --strict`. Verify that both pass, and that the CI matrix (Linux, macOS, Windows × Python 3.11 and 3.13) is green once the branch is pushed
+- [x] 9.1 Run the full offline suite and `openspec validate add-completed-tasks-backup --strict`. Verify that both pass, and that the CI matrix (Linux, macOS, Windows × Python 3.11 and 3.13) is green once the branch is pushed
