@@ -925,3 +925,136 @@ def test_backfill_restricted_by_the_plan_is_tried_again_next_run(tmp_path, caplo
     api = run(tmp_path, now=NOW + timedelta(days=1))
     assert backfill_months(api) == ["2026-08", "2026-09", "2026-10"]
     assert progress(tmp_path)["backfill_status"] == "complete"
+
+
+# --- 7.1 the order of the parts and a failure in the last one ------------------------------------
+
+
+def test_backfill_on_the_rate_limit_fails_the_run_and_keeps_what_the_earlier_parts_stored(tmp_path, monkeypatch, capsys):
+    api = september(FakeApi(account()))
+    api.answer(TASKS_COMPLETED, window("2026-09"), {"error": "Too many requests", "http_code": 429}, status=429)
+    monkeypatch.setenv("TODOIST_API_TOKEN", "0123456789abcdef0123456789abcdef01234567")
+    monkeypatch.setattr(sync, "_utc_now", lambda: NOW)
+
+    def factory(token, wait):
+        return Client(api, max_rate_limit_wait=0, sleep=_no_sleep, jitter=lambda: 0.0)
+
+    assert main(["backup", str(tmp_path)], client_factory=factory) == 1
+
+    # The activity log first, then the months with their comments, then the backfill (design D2).
+    parts = [path for path, _ in api.get_requests]
+    assert parts == [ACTIVITIES, *[BY_COMPLETION_DATE] * 3, COMMENTS, BY_COMPLETION_DATE, TASKS_COMPLETED, TASKS_COMPLETED]
+    lines = capsys.readouterr().err.splitlines()
+    prefixes = ("INFO completion events", "INFO completed tasks", "INFO earlier completions")
+    assert [line for line in lines if line.startswith(prefixes)] == [
+        "INFO completion events: fetched the activity log since 2026-10-17; 0 new events stored",
+        "INFO completed tasks: fetched 3 months (2026-08 to 2026-10), closed through 2026-09; 1 comment files written",
+        "INFO earlier completions: stored 1 backfill months (2026-08 to 2026-08); the next run continues with 2026-09",
+    ]
+    assert lines[-1].startswith("ERROR the Todoist API kept rate-limiting GET /tasks/completed;")
+
+    # The checkpoints of the earlier parts are kept.
+    assert progress(tmp_path)["activity_fetched_utc"] == "2026-10-18T12:00:00.000000Z"
+    assert progress(tmp_path)["tasks_closed_through"] == "2026-09"
+    assert len(stored(tmp_path, "2026-09.json")["items"]) == 3
+    assert comments_file(tmp_path)["results"]
+    assert progress(tmp_path)["backfill_through"] == "2026-08"
+    assert progress(tmp_path)["backfill_status"] == "in_progress"
+    assert json.loads((tmp_path / "state.json").read_bytes()).get("last_successful_run_utc") is None
+
+    # The next run fetches only the open month and continues the backfill where it stopped.
+    later = run(tmp_path, september(FakeApi(account())), now=NOW + timedelta(hours=1))
+    assert months_requested(later) == ["2026-10"]
+    assert later.requested(COMMENTS) == []
+    assert backfill_months(later) == ["2026-09", "2026-10"]
+    assert progress(tmp_path)["backfill_status"] == "complete"
+
+
+# --- 7.2 crash and resume -----------------------------------------------------------------------
+
+
+def full_api():
+    """An account with data in every source of this part: the fixture tasks of 2026-09 in two pages
+    with the comments of one of them, the backfill of 2026-09, and an event before and one at T0."""
+    api = september(FakeApi(account()))
+    api.answer(TASKS_COMPLETED, window("2026-09"), completed_fixture("tasks_completed"))
+    before_t0 = completed_fixture("activities_2")["results"][0]
+    at_t0 = {**completed_fixture("activities_1")["results"][0], "event_date": T0}
+    api.answer(ACTIVITIES, {}, {"results": [at_t0, before_t0], "next_cursor": None})
+    return api
+
+
+def snapshot(target):
+    return {p.relative_to(target).as_posix(): p.read_bytes() for p in target.rglob("*") if p.is_file()}
+
+
+# Writes and removals of an uninterrupted first run with full_api(): 39 for the sync (see
+# tests/test_run.py), then state.json with T0, the activity month 2026-10 and state.json with its
+# fetch time, 2026-08 and state.json closing it, the comments file, 2026-09 and state.json closing
+# it, the open month 2026-10, the backfill months 2026-08 to 2026-10 each followed by state.json,
+# state.json with the complete backfill, and finally state.json.
+SYNC_WRITES = 39
+FIRST_RUN_WRITES = 56
+
+
+@pytest.fixture(scope="module")
+def full_reference(tmp_path_factory):
+    target = tmp_path_factory.mktemp("reference")
+    run(target, full_api())
+    return snapshot(target)
+
+
+def crash(target, fault_after):
+    storage.set_fault_after(fault_after)
+    with pytest.raises(storage.InjectedFault):
+        run(target, full_api())
+    storage.set_fault_after(None)
+
+
+def test_crash_points_cover_this_part_of_the_first_run(tmp_path, full_reference):
+    crash(tmp_path / "first", SYNC_WRITES)
+    assert progress(tmp_path / "first") is None  # T0 is the first write of this part
+    crash(tmp_path / "last", FIRST_RUN_WRITES - 1)
+    storage.set_fault_after(FIRST_RUN_WRITES)
+    run(tmp_path / "beyond", full_api())
+    assert storage._fault_after == 0  # armed, never reached
+    tree = full_reference
+    assert {"completed/activity/2026-10.json", f"completed/comments/{TASK_WITH_COMMENTS}.json",
+            "completed/2026-09.json", "completed/backfill/2026-09.json"} <= tree.keys()
+
+
+@pytest.mark.parametrize("fault_after", range(SYNC_WRITES, FIRST_RUN_WRITES))
+def test_resume_after_a_crash_in_this_part_gives_the_uninterrupted_result(tmp_path, full_reference, fault_after):
+    crash(tmp_path, fault_after)
+    before = progress(tmp_path) or {}
+
+    api = run(tmp_path, full_api())
+
+    assert snapshot(tmp_path) == full_reference
+    closed = before.get("tasks_closed_through")
+    assert closed is None or all(month > closed for month in months_requested(api))
+    stored_backfill = before.get("backfill_through")
+    assert stored_backfill is None or all(month > stored_backfill for month in backfill_months(api))
+    if before.get("backfill_status") == "complete":
+        assert api.requested(TASKS_COMPLETED) == []
+
+
+# --- 7.3 idempotence ----------------------------------------------------------------------------
+
+
+def test_repeat_run_leaves_every_file_of_this_part_unchanged(tmp_path):
+    run(tmp_path, full_api())
+    paths = [p for p in (tmp_path / "completed").rglob("*") if p.is_file()]
+    for path in paths:
+        os.utime(path, ns=(OLD, OLD))
+    before = completed_tree(tmp_path)
+
+    api = run(tmp_path, full_api(), now=NOW + timedelta(hours=1))
+
+    # The open month and the activity log are fetched again, and give the same bytes.
+    assert months_requested(api) == ["2026-10"]
+    assert len(api.requested(ACTIVITIES)) == 1
+    assert completed_tree(tmp_path) == before
+    assert set(before) == {*(f"{m}.json" for m in FIRST_MONTHS), *(f"backfill/{m}.json" for m in FIRST_MONTHS),
+                           "activity/2026-10.json", f"comments/{TASK_WITH_COMMENTS}.json"}
+    assert [p for p in paths if p.stat().st_mtime_ns != OLD] == []

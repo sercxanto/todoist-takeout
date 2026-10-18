@@ -11,14 +11,14 @@ from pathlib import Path
 
 import pytest
 
-from todoist_takeout import storage, sync
+from todoist_takeout import completed, storage, sync
 from todoist_takeout.api import Client
 from todoist_takeout.cli import main
 from todoist_takeout.errors import StorageError
 from todoist_takeout.lock import LOCK_FILE
 from todoist_takeout.resources import Classifier
 
-from fake_api import FakeApi
+from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, TASKS_COMPLETED, FakeApi, completed_fixture
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EXPECTED_TREE = FIXTURES / "expected_tree"
@@ -61,6 +61,20 @@ def files(root: Path) -> dict[str, bytes]:
     }
 
 
+def completed_answers(api: FakeApi) -> FakeApi:
+    """Completed tasks of 2026-09 in two pages with the comments of one task, the backfill of
+    2026-09, and an event before and one at T0. The other months are empty."""
+    since, until = completed.month_window("2026-09")
+    september = {"since": since, "until": until}
+    pages = [completed_fixture("by_completion_date_1"), completed_fixture("by_completion_date_2")]
+    api.cursor_pages(BY_COMPLETION_DATE, september, pages)
+    api.answer(COMMENTS, {"task_id": "6X8Gq4CfVh9xPm2R"}, completed_fixture("comments"))
+    api.answer(TASKS_COMPLETED, september, completed_fixture("tasks_completed"))
+    before_t0 = completed_fixture("activities_2")["results"][0]
+    at_t0 = {**completed_fixture("activities_1")["results"][0], "event_date": completed.precise_timestamp(NOW)}
+    return api.answer(ACTIVITIES, {}, {"results": [before_t0, at_t0], "next_cursor": None})
+
+
 def test_cli_backup_matches_the_expected_tree(tmp_path, monkeypatch):
     responses = {
         "*": (FIXTURES / "sync" / "full_sync.json").read_bytes(),
@@ -71,7 +85,7 @@ def test_cli_backup_matches_the_expected_tree(tmp_path, monkeypatch):
     target = tmp_path / "backup"
 
     def factory(token, max_rate_limit_wait):
-        return Client(FakeApi(responses), sleep=lambda delay: None)
+        return Client(completed_answers(FakeApi(responses)), sleep=lambda delay: None)
 
     assert main(["backup", "--quiet", str(target)], client_factory=factory) == 0
     produced = files(target)

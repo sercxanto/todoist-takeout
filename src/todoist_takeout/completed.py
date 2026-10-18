@@ -178,33 +178,39 @@ def _fetch_months(target: Path, client: Client, state: dict, moment: datetime, *
     comment_store = _CommentStore(target, client, enabled=comments)
     fetched = []
     closing = True
-    while month <= current:
-        since, until = month_window(month)
-        try:
-            pages = fetch_pages(client, BY_COMPLETION_DATE, {"since": since, "until": until}, TASKS_PAGE_LIMIT, "items")
-        except PlanRestricted:
-            log.warning("the Todoist plan does not allow fetching completed tasks; they cannot be backed up on this plan")
-            return
-        response = merge_pages(pages, "items", "completed_at")
-        path = target / COMPLETED_DIR / f"{month}{JSON_SUFFIX}"
-        # The comments come first: a crash before the month file makes the next run fetch them again.
-        comment_store.update(read_stored(path, "items"), response["items"])
-        storage.write_bytes_atomic(path, storage.encode_json(response))
-        fetched.append(month)
-        # Months close in order, so the checkpoint never skips an open month.
-        closing = closing and moment >= month_start(next_month(month)) + GRACE_PERIOD
-        if closing:
-            storage.update_completed_state(target, state, tasks_closed_through=month)
-        month = next_month(month)
-    if fetched:
-        log.info(
-            "completed tasks: fetched %d months (%s to %s), closed through %s; %d comment files written",
-            len(fetched),
-            fetched[0],
-            fetched[-1],
-            storage.completed_state(state)["tasks_closed_through"] or "none",
-            comment_store.written,
-        )
+    # The progress is logged also when the run fails, for example on the rate limit (design D13).
+    try:
+        while month <= current:
+            since, until = month_window(month)
+            params = {"since": since, "until": until}
+            try:
+                pages = fetch_pages(client, BY_COMPLETION_DATE, params, TASKS_PAGE_LIMIT, "items")
+            except PlanRestricted:
+                log.warning(
+                    "the Todoist plan does not allow fetching completed tasks; they cannot be backed up on this plan"
+                )
+                return
+            response = merge_pages(pages, "items", "completed_at")
+            path = target / COMPLETED_DIR / f"{month}{JSON_SUFFIX}"
+            # The comments come first: a crash before the month file makes the next run fetch them again.
+            comment_store.update(read_stored(path, "items"), response["items"])
+            storage.write_bytes_atomic(path, storage.encode_json(response))
+            fetched.append(month)
+            # Months close in order, so the checkpoint never skips an open month.
+            closing = closing and moment >= month_start(next_month(month)) + GRACE_PERIOD
+            if closing:
+                storage.update_completed_state(target, state, tasks_closed_through=month)
+            month = next_month(month)
+    finally:
+        if fetched:
+            log.info(
+                "completed tasks: fetched %d months (%s to %s), closed through %s; %d comment files written",
+                len(fetched),
+                fetched[0],
+                fetched[-1],
+                storage.completed_state(state)["tasks_closed_through"] or "none",
+                comment_store.written,
+            )
 
 
 class _CommentStore:
@@ -308,48 +314,56 @@ def _backfill(target: Path, client: Client, state: dict) -> None:
     month = next_month(done) if done else _checked_month(progress["first_month"], "first_month")
     last = month_of(t0)
     stored = []
-    while month <= last:
-        since, until = month_window(month)
-        if month == last:
-            until = precise_timestamp(t0)
-        params = {"since": since, "until": until, "annotate_items": "true"}
-        try:
-            pages = list(offset_pages(client, TASKS_COMPLETED, params, BACKFILL_PAGE_LIMIT))
-        except PlanRestricted:
-            log.warning(
-                "the Todoist plan does not allow fetching the completions before %s; they are tried again on "
-                "the next run",
-                _readable_time(t0),
+    # The progress is logged also when the run fails, for example on the rate limit (design D13).
+    try:
+        while month <= last:
+            since, until = month_window(month)
+            if month == last:
+                until = precise_timestamp(t0)
+            params = {"since": since, "until": until, "annotate_items": "true"}
+            try:
+                pages = list(offset_pages(client, TASKS_COMPLETED, params, BACKFILL_PAGE_LIMIT))
+            except PlanRestricted:
+                log.warning(
+                    "the Todoist plan does not allow fetching the completions before %s; they are tried again on "
+                    "the next run",
+                    _readable_time(t0),
+                )
+                return
+            except ApiError as exc:
+                if exc.http_status not in GONE_STATUSES:
+                    raise
+                storage.update_completed_state(target, state, backfill_status=UNAVAILABLE)
+                log.warning(
+                    "GET /%s is no longer available (HTTP %d); completions of recurring tasks before %s cannot be "
+                    "backed up. The backfill months already stored are kept",
+                    TASKS_COMPLETED,
+                    exc.http_status,
+                    _readable_time(t0),
+                )
+                return
+            # The boundary is exact whatever the precision of the endpoint's own `until`.
+            pages = [{**page, "items": [e for e in page["items"] if _before(e, t0)]} for page in pages]
+            response = merge_pages(pages, "items", "completed_at")
+            path = target / COMPLETED_DIR / BACKFILL_DIR / f"{month}{JSON_SUFFIX}"
+            storage.write_bytes_atomic(path, storage.encode_json(response))
+            stored.append(month)
+            storage.update_completed_state(target, state, backfill_through=month)
+            month = next_month(month)
+        storage.update_completed_state(target, state, backfill_status=COMPLETE)
+    finally:
+        if stored:
+            outcome = {
+                COMPLETE: "the backfill is complete",
+                UNAVAILABLE: "the backfill stopped",
+            }.get(storage.completed_state(state)["backfill_status"], f"the next run continues with {month}")
+            log.info(
+                "earlier completions: stored %d backfill months (%s to %s); %s",
+                len(stored),
+                stored[0],
+                stored[-1],
+                outcome,
             )
-            return
-        except ApiError as exc:
-            if exc.http_status not in GONE_STATUSES:
-                raise
-            storage.update_completed_state(target, state, backfill_status=UNAVAILABLE)
-            log.warning(
-                "GET /%s is no longer available (HTTP %d); completions of recurring tasks before %s cannot be "
-                "backed up. The backfill months already stored are kept",
-                TASKS_COMPLETED,
-                exc.http_status,
-                _readable_time(t0),
-            )
-            return
-        # The boundary is exact whatever the precision of the endpoint's own `until`.
-        pages = [{**page, "items": [e for e in page["items"] if _before(e, t0)]} for page in pages]
-        response = merge_pages(pages, "items", "completed_at")
-        path = target / COMPLETED_DIR / BACKFILL_DIR / f"{month}{JSON_SUFFIX}"
-        storage.write_bytes_atomic(path, storage.encode_json(response))
-        stored.append(month)
-        storage.update_completed_state(target, state, backfill_through=month)
-        month = next_month(month)
-    storage.update_completed_state(target, state, backfill_status=COMPLETE)
-    if stored:
-        log.info(
-            "earlier completions: stored %d backfill months (%s to %s); the backfill is complete",
-            len(stored),
-            stored[0],
-            stored[-1],
-        )
 
 
 def _before(entry, t0: datetime) -> bool:

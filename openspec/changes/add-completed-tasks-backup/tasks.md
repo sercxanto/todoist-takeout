@@ -49,11 +49,11 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 7. Whole runs
 
-- [ ] 7.1 Fix the order activity log → months → backfill (design D2) and add the INFO lines of D13. Verify with a run test in which the backfill fails with `RateLimitExhausted`: the exit status is 1, and the activity checkpoint and the closed months of that run are kept
-- [ ] 7.2 Add crash and resume tests for this part: with the fault-injection hook at several counts during a first run with completed tasks, a rerun produces the tree of an uninterrupted run byte for byte, and requests no closed month and no completed backfill month again
-- [ ] 7.3 Add an idempotence test: two runs with unchanged fake responses leave every file under `completed/` with the same bytes and modification time
-- [ ] 7.4 Extend the end-to-end CLI test of `tests/test_cross_platform.py` and `tests/fixtures/expected_tree/` with `completed/` files, with the clock fixed by the test. Verify that the produced tree matches byte for byte on Linux, and that the test runs in the CI matrix
-- [ ] 7.5 Update the project `README.md`: status and roadmap step 2, the backup scope, and advice for the first run on a large account (several runs or a larger `--max-rate-limit-wait`). Verify that every link in the changed sections resolves
+- [x] 7.1 Fix the order activity log → months → backfill (design D2) and add the INFO lines of D13. Verify with a run test in which the backfill fails with `RateLimitExhausted`: the exit status is 1, and the activity checkpoint and the closed months of that run are kept
+- [x] 7.2 Add crash and resume tests for this part: with the fault-injection hook at several counts during a first run with completed tasks, a rerun produces the tree of an uninterrupted run byte for byte, and requests no closed month and no completed backfill month again
+- [x] 7.3 Add an idempotence test: two runs with unchanged fake responses leave every file under `completed/` with the same bytes and modification time
+- [x] 7.4 Extend the end-to-end CLI test of `tests/test_cross_platform.py` and `tests/fixtures/expected_tree/` with `completed/` files, with the clock fixed by the test. Verify that the produced tree matches byte for byte on Linux, and that the test runs in the CI matrix
+- [x] 7.5 Update the project `README.md`: status and roadmap step 2, the backup scope, and advice for the first run on a large account (several runs or a larger `--max-rate-limit-wait`). Verify that every link in the changed sections resolves
 
 ## 8. Fixture recording and contract tests
 

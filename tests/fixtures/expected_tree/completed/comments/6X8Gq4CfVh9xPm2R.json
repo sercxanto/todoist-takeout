@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "id": "6X8Hc2Jf4mQpRw9V",
+      "posted_uid": "2671355",
+      "item_id": "6X8Gq4CfVh9xPm2R",
+      "content": "Price list attached",
+      "file_attachment": {
+        "resource_type": "file",
+        "file_name": "preise.pdf",
+        "file_size": 20480,
+        "file_type": "application/pdf",
+        "file_url": "https://example.com/preise.pdf",
+        "upload_state": "completed"
+      },
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2026-09-12T17:00:00.000000Z",
+      "reactions": {}
+    },
+    {
+      "id": "6X8Hc3Kg5nRqSx2W",
+      "posted_uid": "2671355",
+      "item_id": "6X8Gq4CfVh9xPm2R",
+      "content": "Bought the small ones",
+      "file_attachment": null,
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2026-09-12T18:30:00.000000Z",
+      "reactions": {}
+    }
+  ]
+}
