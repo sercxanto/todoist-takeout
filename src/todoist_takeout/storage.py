@@ -330,7 +330,7 @@ def read_state(target: Path) -> dict | None:
 
 def write_state(target: Path, state: dict) -> None:
     """Write `state.json`, keeping fields this version does not know. The caller writes it last."""
-    state = {**state, "tool_version": __version__}
+    state = {**{k: v for k, v in state.items() if k != "tool_version"}, "tool_version": __version__}
     write_bytes_atomic(Path(target) / STATE_FILE, encode_json(state), full_sync=True)
 
 

@@ -3,5 +3,13 @@
   "sync_token": "INC-1",
   "last_full_sync_utc": "2026-10-18T10:00:00Z",
   "last_successful_run_utc": "2026-10-18T10:00:05Z",
+  "completed": {
+    "t0_utc": "2026-10-18T10:00:05.000000Z",
+    "first_month": "2026-08",
+    "tasks_closed_through": "2026-09",
+    "backfill_through": null,
+    "backfill_status": "in_progress",
+    "activity_fetched_utc": null
+  },
   "tool_version": "0.1.0"
 }

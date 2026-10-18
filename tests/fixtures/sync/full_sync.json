@@ -329,7 +329,8 @@
       "is_dst": 1
     },
     "is_premium": false,
-    "premium_status": "not_premium"
+    "premium_status": "not_premium",
+    "joined_at": "2026-08-14T07:30:00.000000Z"
   },
   "user_settings": {
     "reminder_push": true,
