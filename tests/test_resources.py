@@ -29,7 +29,7 @@ EXPECTED = {
     "project_view_options_defaults": (COLLECTION, ("project_id",)),
     "workspace_users": (COLLECTION, ("workspace_id", "user_id")),
     "workspaces": (COLLECTION, ("id",)),
-    "completed_info": (ONE_OF, ("project_id", "section_id")),
+    "completed_info": (ONE_OF, ("project_id", "section_id", "item_id")),
     "user": (SINGLE, ()),
     "user_settings": (SINGLE, ()),
     "user_plan_limits": (SINGLE, ()),
@@ -130,11 +130,14 @@ def test_one_of_key_is_the_present_field_and_its_value():
     kind = resources.KNOWN["completed_info"]
     assert resources.object_key(kind, {"project_id": "P1", "completed_items": 3}) == ("project_id", "P1")
     assert resources.object_key(kind, {"section_id": 7, "project_id": None}) == ("section_id", "7")
+    assert resources.object_key(kind, {"item_id": "T1", "completed_items": 1}) == ("item_id", "T1")
     assert resources.object_key(kind, {"completed_items": 3}) is None
     assert resources.object_key(kind, {"project_id": "P1", "section_id": "S1"}) is None
 
 
-@pytest.mark.parametrize("entry", [{"completed_items": 3}, {"project_id": "P1", "section_id": "S1"}])
+@pytest.mark.parametrize(
+    "entry", [{"completed_items": 3}, {"project_id": "P1", "section_id": "S1"}, {"section_id": "S1", "item_id": "T1"}]
+)
 def test_one_of_entry_with_neither_or_both_fields_falls_back_with_one_warning(entry, caplog):
     classifier = Classifier()
     with caplog.at_level(logging.WARNING):
@@ -142,7 +145,7 @@ def test_one_of_entry_with_neither_or_both_fields_falls_back_with_one_warning(en
         classifier.classify("completed_info", [entry])
     assert kind.name == SINGLE
     [record] = caplog.records
-    assert "'completed_info'" in record.getMessage() and "one of project_id | section_id" in record.getMessage()
+    assert "'completed_info'" in record.getMessage() and "one of project_id | section_id | item_id" in record.getMessage()
 
 
 RECORDED = sorted((Path(__file__).parent / "fixtures" / "recorded").glob("*/*.json"))

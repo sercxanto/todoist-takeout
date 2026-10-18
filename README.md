@@ -202,7 +202,7 @@ The contract tests detect when Todoist changes its API. They are deselected by d
 | `TODOIST_CONTRACT_WRITE_TOKEN` | the write account: a **dedicated test account, never a personal one** | read-only tests, and the write test |
 | `TODOIST_CONTRACT_ALLOW_WRITES=1` | | unlocks the write test |
 
-Each test skips when its variables are not set. The write test uses only `TODOIST_CONTRACT_WRITE_TOKEN`, never the read token. Before it writes anything, it refuses to run if both variables hold the same token or tokens of the same Todoist user.
+Each test skips when its variables are not set. The write test uses only `TODOIST_CONTRACT_WRITE_TOKEN`, never the read token. It needs both variables: before it writes anything, it compares the two accounts and refuses to run if the read token is missing, if both variables hold the same token, or if they hold tokens of the same Todoist user.
 
 ```sh
 # Read-only: the shape of a full sync of each configured account, compared with tests/fixtures/shapes.json.

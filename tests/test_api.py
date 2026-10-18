@@ -31,12 +31,19 @@ class _Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         type(self).received.append((self.path, dict(self.headers), self.rfile.read(length)))
         status, headers, body = type(self).response
+        headers = dict(headers)
+        # Announce more bytes than are sent, so that the client sees the body cut off.
+        missing = int(headers.pop("X-Test-Truncate", 0))
         self.send_response(status)
         for name, value in headers.items():
             self.send_header(name, value)
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Length", str(len(body) + missing))
+        if missing:
+            self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
+        if missing:
+            self.close_connection = True
 
     def log_message(self, format, *args):
         pass
@@ -80,6 +87,37 @@ def test_transport_decodes_gzip(server):
     _Handler.response = (200, {"Content-Encoding": "gzip"}, gzip.compress(payload))
     _status, _headers, body = api.UrllibTransport(TOKEN, base_url=base_url).send("POST", "sync", {})
     assert body == payload
+
+
+def corrupt_gzip(payload: bytes) -> bytes:
+    data = bytearray(gzip.compress(payload))
+    data[10] = 0xFF  # the first deflate block gets a reserved type: gzip.decompress raises zlib.error
+    return bytes(data)
+
+
+def test_transport_wraps_a_corrupt_gzip_body(server):
+    _httpd, base_url = server
+    _Handler.response = (200, {"Content-Encoding": "gzip"}, corrupt_gzip(b'{"items": []}' * 20))
+    with pytest.raises(api.TransportError) as info:
+        api.UrllibTransport(TOKEN, base_url=base_url).send("POST", "sync", {})
+    assert info.value.retryable
+
+
+def test_transport_wraps_a_cut_off_error_body(server):
+    _httpd, base_url = server
+    _Handler.response = (503, {"X-Test-Truncate": "100"}, b'{"error": "Service unav')
+    with pytest.raises(api.TransportError) as info:
+        api.UrllibTransport(TOKEN, base_url=base_url).send("POST", "sync", {})
+    assert info.value.retryable and "HTTP 503" in str(info.value)
+
+
+def test_corrupt_responses_are_retried_until_the_last_attempt(server):
+    _httpd, base_url = server
+    _Handler.response = (200, {"Content-Encoding": "gzip"}, corrupt_gzip(b'{"items": []}' * 20))
+    client = api.Client(api.UrllibTransport(TOKEN, base_url=base_url), sleep=lambda delay: None, jitter=lambda: 0.0)
+    with pytest.raises(NetworkError, match="gave up after 5 attempts"):
+        client.sync("*")
+    assert len(_Handler.received) == api.MAX_ATTEMPTS
 
 
 def test_transport_returns_error_statuses(server):

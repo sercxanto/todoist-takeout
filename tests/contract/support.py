@@ -40,12 +40,16 @@ def user_id(client: Client):
 def check_write_account(write_token: str, read_token: str, client_for) -> None:
     """Raise AccountGuardError unless the write token clearly belongs to another account.
 
-    `client_for(token)` returns a Client. Only read-only requests are made.
+    Both tokens are required: without the read token, nothing shows that the write token is not the
+    personal one. `client_for(token)` returns a Client. Only read-only requests are made.
     """
     if not write_token:
         raise AccountGuardError(f"{WRITE_TOKEN} is not set")
     if not read_token:
-        return
+        raise AccountGuardError(
+            f"{READ_TOKEN} is not set; the write test needs it to check that {WRITE_TOKEN} "
+            "belongs to another account"
+        )
     if write_token == read_token:
         raise AccountGuardError(f"{WRITE_TOKEN} equals {READ_TOKEN}; writes must go to a dedicated test account")
     if user_id(client_for(write_token)) == user_id(client_for(read_token)):

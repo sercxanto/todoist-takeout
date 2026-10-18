@@ -72,8 +72,11 @@ MIN_CHECKED_ID_LENGTH = 6
 
 _ENUM_LIKE = re.compile(r"[a-z][a-z0-9_]{0,39}\Z")
 _ID_LIKE = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
-# Object keys that are IDs, such as the task IDs in `day_orders`, rather than field names.
-_ID_KEY = re.compile(r"(?=[A-Za-z]*[0-9])[A-Za-z0-9]{6,64}\Z")
+# Object keys that look like IDs rather than field names: letters and digits with a digit or with
+# both letter cases. Field names are snake_case. Keys that are known IDs are replaced in any case.
+_ID_KEY = re.compile(r"(?=.*[0-9]|(?=.*[a-z])(?=.*[A-Z]))[A-Za-z0-9]{6,64}\Z")
+# Resources whose object keys are all IDs, such as the task IDs in `day_orders`.
+ID_KEYED = frozenset({"day_orders"})
 _DATE_LIKE = re.compile(r"\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?)?(Z|[+-]\d{2}:?\d{2})?\Z")
 _EMAIL_LIKE = re.compile(r"[^@\s]+@[^@\s]+\Z")
 _DATE_TEMPLATE = "2000-01-01T00:00:00.000000"
@@ -135,7 +138,7 @@ class Scrubber:
         """
         plan = plan or field == PLAN_LIMITS
         if isinstance(value, dict):
-            return {self._key(key): self.scrub(item, key, plan=plan) for key, item in value.items()}
+            return {self._key(key, field): self.scrub(item, key, plan=plan) for key, item in value.items()}
         if isinstance(value, list):
             return [self.scrub(item, field, plan=plan) for item in value]
         if isinstance(value, bool) or value is None:
@@ -152,8 +155,23 @@ class Scrubber:
             return value if plan else 0.0
         return value
 
-    def _key(self, key: str) -> str:
-        if key in self._pseudonyms or _ID_KEY.match(key):
+    def collect(self, value, field: str | None = None) -> None:
+        """Register the IDs in the values of ID fields, so that object keys holding them are known.
+
+        Call it for every response of a recording before scrubbing any of them.
+        """
+        if isinstance(value, dict):
+            for key, item in value.items():
+                self.collect(item, key)
+        elif isinstance(value, list):
+            for item in value:
+                self.collect(item, field)
+        elif is_id_field(field) and not isinstance(value, bool):
+            if isinstance(value, int) or (isinstance(value, str) and _ID_LIKE.match(value)):
+                self.pseudonym(str(value))
+
+    def _key(self, key: str, parent: str | None) -> str:
+        if key in self._pseudonyms or parent in ID_KEYED or _ID_KEY.match(key):
             return self.pseudonym(key)
         return key
 
@@ -330,7 +348,10 @@ def token_for(account: str) -> str:
 def scrubbed_bytes(bodies: list[bytes], token: str | None = None) -> list[bytes]:
     """Scrub the responses of one recording with one scrubber, and check the result."""
     scrubber = Scrubber()
-    results = [storage.encode_json(scrubber.scrub(json.loads(body))) for body in bodies]
+    values = [json.loads(body) for body in bodies]
+    for value in values:
+        scrubber.collect(value)
+    results = [storage.encode_json(scrubber.scrub(value)) for value in values]
     for data in results:
         if token and token.encode() in data:
             raise SystemExit("error: the scrubbed response still contains the API token; nothing was written")

@@ -71,7 +71,7 @@
       }
     },
     "completed_info": {
-      "kind": "one_of(project_id,section_id)",
+      "kind": "one_of(project_id,section_id,item_id)",
       "types": [
         "array"
       ],

@@ -122,6 +122,24 @@ def test_scrubbed_bytes_are_consistent_across_the_responses_of_a_recording(recor
     assert incremental_out["items"][0]["id"] == full_out["items"][0]["id"]
 
 
+def test_all_letter_ids_as_object_keys_are_pseudonymized(recorder):
+    # About 7 % of Todoist IDs have no digit. One that is only a day-order key, and one that is also
+    # a task ID but lowercase-free of digits, must both be replaced.
+    response = {
+        "items": [{"id": "abcDEFghiJKLmnoP", "content": "x"}],
+        "day_orders": {"abcDEFghiJKLmnoP": 1, "qrsTUVwxyZABcdeF": 2, "onlylowercaseid": 3},
+        "user_settings": {"reminder_push": True, "global.teams": True, "❤️": ["1"]},
+    }
+    [data] = recorder.scrubbed_bytes([json.dumps(response).encode()])
+    scrubbed = json.loads(data)
+    for original in ["abcDEFghiJKLmnoP", "qrsTUVwxyZABcdeF", "onlylowercaseid"]:
+        assert original not in data.decode()
+    assert scrubbed["items"][0]["id"] in scrubbed["day_orders"]
+    # Field names stay. Todoist's are snake_case; a camelCase key would count as an ID and be
+    # replaced, which errs on the side of removing data.
+    assert list(scrubbed["user_settings"]) == ["reminder_push", "global.teams", "❤️"]
+
+
 def test_scrubbed_bytes_refuses_output_that_contains_the_token_or_an_id(recorder):
     leaked_token = json.dumps({"projects": [{"name": "x", "url_token": TOKEN}]}).encode()
     assert TOKEN.encode() not in recorder.scrubbed_bytes([leaked_token], TOKEN)[0]

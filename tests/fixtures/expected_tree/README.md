@@ -45,7 +45,7 @@ For example, the view option with `view_type` `project` and `object_id` `6X7fphh
 stored at `sync/view_options/project~6X7fphhgwcXVGccJ.json`. Integer key fields are written in
 decimal.
 
-The objects of `completed_info` each have exactly one of `project_id` and `section_id`. Their key
+The objects of `completed_info` each have exactly one of `project_id`, `section_id` and `item_id`. Their key
 is the name of that field followed by its value, so the entry with `project_id` `6Jf8VQXxpwv5XvQ2`
 is stored at `sync/completed_info/project_id~6Jf8VQXxpwv5XvQ2.json`. A project and a section with
 the same id therefore never share a file.

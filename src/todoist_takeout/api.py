@@ -14,6 +14,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 from collections.abc import Callable, Mapping
 from typing import Protocol
 
@@ -46,6 +47,11 @@ AUTH_ERROR_TAGS = frozenset({"UNAUTHORIZED", "AUTHENTICATION_ERROR"})
 AUTH_ERROR_TAG_PREFIX = "AUTH_"
 
 TOKEN_HINT = "check that TODOIST_API_TOKEN holds a valid personal API token"
+
+
+# A corrupt deflate stream raises zlib.error, which is not an OSError.
+_DECODE_ERRORS = (OSError, EOFError, zlib.error)
+_READ_ERRORS = (*_DECODE_ERRORS, http.client.HTTPException)
 
 
 class TransportError(Exception):
@@ -97,12 +103,17 @@ class UrllibTransport:
                 body = gzip.decompress(body)
         except urllib.error.HTTPError as exc:
             # Raised for every non-2xx status. It still carries the response.
-            with exc:
-                status, headers, body = exc.code, exc.headers, exc.read()
+            try:
+                with exc:
+                    status, headers, body = exc.code, exc.headers, exc.read()
+            except _READ_ERRORS as read_exc:
+                raise TransportError(
+                    f"request failed while reading the HTTP {exc.code} response: {type(read_exc).__name__}: {read_exc}"
+                ) from read_exc
             try:
                 if headers.get("Content-Encoding", "").lower() == "gzip":
                     body = gzip.decompress(body)
-            except (OSError, EOFError):
+            except _DECODE_ERRORS:
                 body = b""
         except urllib.error.URLError as exc:
             reason = exc.reason
@@ -113,7 +124,7 @@ class UrllibTransport:
                     retryable=False,
                 ) from exc
             raise TransportError(f"cannot reach {urllib.parse.urlsplit(url).hostname}: {reason}") from exc
-        except (OSError, EOFError, http.client.HTTPException) as exc:
+        except _READ_ERRORS as exc:
             # Timeouts, dropped connections, truncated or corrupt gzip bodies.
             raise TransportError(f"request failed: {type(exc).__name__}: {exc}") from exc
         return status, headers, body

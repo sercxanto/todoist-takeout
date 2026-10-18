@@ -38,7 +38,8 @@ class Observer:
 
     def __init__(self, client):
         self.client = client
-        self.token = json.loads(client.sync("*"))["sync_token"]
+        self.full = json.loads(client.sync("*"))
+        self.token = self.full["sync_token"]
 
     def changes(self) -> dict:
         response = json.loads(self.client.sync(self.token))
@@ -109,6 +110,31 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
         findings["comment_created"] = note is not None
         observer.changes()
         backup()
+
+        # Reorder two of three tasks due today: are incremental day_orders complete, or only the
+        # changes? Only a returned entry for the third, unchanged task tells the two apart.
+        today = [
+            commands.add("item_add", {"content": f"{PREFIX}: today {n}", "project_id": project, "due": {"string": "today"}})
+            for n in (1, 2, 3)
+        ]
+        changes = observer.changes()
+        if all(today):
+            commands.run("item_update_day_orders", {"ids_to_orders": {today[0]: 2, today[1]: 1, today[2]: 3}})
+            observer.changes()  # all three orders are set; from here on the third stays unchanged
+            commands.run("item_update_day_orders", {"ids_to_orders": {today[0]: 1, today[1]: 2}})
+            reordered = observer.changes()
+            orders = reordered.get("day_orders")
+            stored = json.loads(storage.read_bytes(target / SYNC_DIR / "day_orders.json") or b"null")
+            backup()
+            findings["day_orders"] = {
+                "full_sync_entries": len(observer.full.get("day_orders") or {}),
+                "after_adding_entries": len(changes.get("day_orders") or {}),
+                "after_reorder_entries": len(orders or {}) if isinstance(orders, dict) else None,
+                "after_reorder_type": type(orders).__name__,
+                "contains_reordered_tasks": isinstance(orders, dict) and all(t in orders for t in today[:2]),
+                "contains_unchanged_task": isinstance(orders, dict) and today[2] in orders,
+                "stored_before_reorder_entries": len(stored) if isinstance(stored, dict) else None,
+            }
 
         # Delete the comment and the task.
         before = {"task": stored(target, "items", task)[0], "note": note and stored(target, "notes", note)[0]}

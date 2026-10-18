@@ -156,6 +156,23 @@ def test_colliding_composite_key_raises(tmp_path, sync_fixture):
     assert path.read_bytes() == other
 
 
+def test_completed_info_entries_are_named_after_their_key_field(tmp_path):
+    response = {
+        "full_sync": False,
+        "completed_info": [
+            {"project_id": "P1", "completed_items": 2},
+            {"section_id": "S1", "completed_items": 1},
+            {"item_id": "T1", "completed_items": 1},
+        ],
+    }
+    apply(tmp_path, response)
+    assert tree(tmp_path) == {
+        "sync/completed_info/project_id~P1.json",
+        "sync/completed_info/section_id~S1.json",
+        "sync/completed_info/item_id~T1.json",
+    }
+
+
 # --- 4.4 tombstones -----------------------------------------------------------
 
 

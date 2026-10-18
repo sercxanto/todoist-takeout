@@ -58,8 +58,12 @@ def test_guard_accepts_two_accounts(contract_support):
     assert all("commands" not in form for form in requests)
 
 
-def test_guard_without_read_token_makes_no_request(contract_support):
-    assert guard(contract_support, WRITE, "", {}) == []
+def test_guard_refuses_a_missing_read_token_without_a_request(contract_support):
+    requests = []
+    transport = UserTransport({}, requests)
+    with pytest.raises(contract_support.AccountGuardError, match="TODOIST_CONTRACT_TOKEN is not set"):
+        contract_support.check_write_account(WRITE, "", transport.for_token)
+    assert requests == []
 
 
 def test_guard_refuses_a_missing_write_token(contract_support):

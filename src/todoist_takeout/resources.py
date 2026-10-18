@@ -53,7 +53,8 @@ KNOWN: dict[str, Kind] = {
     "collaborators_states": Kind(COLLECTION, ("project_id", "user_id")),
     "user_item_orders": Kind(COLLECTION, ("scope", "scope_id", "item_id")),
     "suggestions": Kind(COLLECTION, ("type",)),
-    "completed_info": Kind(ONE_OF, ("project_id", "section_id")),
+    # Recorded with project_id and section_id; item_id for completed subtasks of a task.
+    "completed_info": Kind(ONE_OF, ("project_id", "section_id", "item_id")),
     **dict.fromkeys(
         [
             "user",
