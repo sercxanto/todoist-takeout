@@ -48,11 +48,11 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 5. Sync run orchestration
 
-- [ ] 5.1 Implement the run sequence from D10 in `sync.py` (lock, target validation, state creation, temp cleanup, apply a leftover pending response first, full sync plus one follow-up incremental sync, incremental runs, pending file written before parsing and deleted after the checkpoint, state written last). Verify with fixture-transport tests that a first run makes exactly two requests (`*`, then the returned token), that a second run makes one, and that `pending/` is empty afterwards
-- [ ] 5.2 Write the format description into the backup as `README.md` (only when changed) before the checkpoint. Verify with a test that a completed backup contains `README.md` with the format version from `state.json`
-- [ ] 5.3 Implement the plan-limit warnings from D12. Verify with a test on the `comments: false` fixture that one warning names comments and the run still succeeds
-- [ ] 5.4 Add crash and resume tests: for several fault-injection counts during a first run, and after the pending file is written, rerun and verify that the resulting tree is byte-identical to an uninterrupted run and that a saved full response is not requested again
-- [ ] 5.5 Add idempotence tests: two runs with an unchanged incremental response leave all object files byte-identical with unchanged mtimes, and only `state.json` changes
+- [x] 5.1 Implement the run sequence from D10 in `sync.py` (lock, target validation, state creation, temp cleanup, apply a leftover pending response first, full sync plus one follow-up incremental sync, incremental runs, pending file written before parsing and deleted after the checkpoint, state written last). Verify with fixture-transport tests that a first run makes exactly two requests (`*`, then the returned token), that a second run makes one, and that `pending/` is empty afterwards
+- [x] 5.2 Write the format description into the backup as `README.md` (only when changed) before the checkpoint. Verify with a test that a completed backup contains `README.md` with the format version from `state.json`
+- [x] 5.3 Implement the plan-limit warnings from D12. Verify with a test on the `comments: false` fixture that one warning names comments and the run still succeeds
+- [x] 5.4 Add crash and resume tests: for several fault-injection counts during a first run, and after the pending file is written, rerun and verify that the resulting tree is byte-identical to an uninterrupted run and that a saved full response is not requested again
+- [x] 5.5 Add idempotence tests: two runs with an unchanged incremental response leave all object files byte-identical with unchanged mtimes, and only `state.json` changes
 
 ## 6. Command-line interface
 

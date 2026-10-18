@@ -5,7 +5,7 @@ Format version: 1
 This directory is a backup of a [Todoist](https://www.todoist.com) account, written by
 todoist-takeout. Every file is plain JSON or
 Markdown, so you can read the backup without the tool. This file describes the format and is
-rewritten by every run.
+kept up to date by every run.
 
 ## Directory layout
 

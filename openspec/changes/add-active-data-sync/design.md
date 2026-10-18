@@ -158,8 +158,8 @@ JSON encoding: `json.dumps(value, ensure_ascii=False, indent=2) + "\n"`, encoded
 ### D10: Run sequence and resume
 
 ```
-acquire lock (target/.lock)
 validate target; read or create state.json (format_version=1, no token)
+acquire lock (target/.lock); read state.json again
 remove leftover temp files
 if pending/sync-response.json exists: apply it, write state (token from response), delete pending
 loop (at most 2 rounds: full + follow-up incremental, or 1 incremental):
@@ -169,6 +169,8 @@ loop (at most 2 rounds: full + follow-up incremental, or 1 incremental):
 check plan limits from user_plan_limits → warnings
 write state.json (last_successful_run) ; print summary ; release lock
 ```
+
+The target is validated and `state.json` is created before the lock is taken, because the specs require that a rejected directory stays unchanged and that `state.json` is the first file of a backup. Validation therefore also accepts a directory that holds only `.lock` or a `.state.json.*.tmp` file, which a first run killed at that point leaves behind. Two first runs racing on an empty directory both write the same initial `state.json` atomically, and then one of them fails on the lock.
 
 The follow-up incremental sync runs only after a full sync, whether the tool requested it or the server initiated it. Applying a stale pending response again is harmless, because applying is idempotent and that response's token matches or follows the stored one.
 
@@ -180,7 +182,7 @@ The follow-up incremental sync runs only after a full sync, whether the tool req
 
 ### D12: Plan limitations
 
-After the sync, the tool reads the stored `user_plan_limits.current` and compares it with a small table that maps plan flags to parts of this backup, for example `comments` → task and project comments. Each disabled feature produces one warning. If plan information is missing, no warning is produced. Later changes add rows (completed tasks) and use `PlanRestricted` for their optional endpoints.
+After the sync, the tool reads the stored `user_plan_limits.current` and compares it with a small table that maps plan flags to parts of this backup: `comments` → task and project comments, and `reminders` → reminders. Each disabled feature produces one warning. If plan information is missing, no warning is produced. Later changes add rows (completed tasks) and use `PlanRestricted` for their optional endpoints.
 
 ### D13: State file
 

@@ -1,17 +1,22 @@
-"""Applying sync responses to the backup (design D8).
+"""Running a backup (design D10) and applying sync responses to it (design D8).
 
 Every object of a response is written as its own file under `sync/`, unchanged. Deleted objects
 become tombstones. The only file ever removed under `sync/` is the tombstone of an object that the
 sync returns as live again.
 """
 
+import importlib.resources
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from todoist_takeout import resources, storage
-from todoist_takeout.errors import StorageError
+from todoist_takeout.api import Client
+from todoist_takeout.errors import ConfigError, RunError, StorageError
+from todoist_takeout.lock import LOCK_FILE, TargetLock
 from todoist_takeout.resources import COLLECTION, MAPPING, META, SINGLE, Classifier, Kind
 
 log = logging.getLogger(__name__)
@@ -19,6 +24,20 @@ log = logging.getLogger(__name__)
 SYNC_DIR = "sync"
 JSON_SUFFIX = ".json"
 DELETED_SUFFIX = ".deleted.json"
+PENDING_DIR = "pending"
+PENDING_FILE = "sync-response.json"
+README_FILE = "README.md"
+PLAN_LIMITS = "user_plan_limits"
+
+# A full sync is followed by one incremental sync, so a run makes at most this many requests.
+MAX_ROUNDS = 2
+
+# Flags in `user_plan_limits.current` that, when false, mean that the plan leaves a part of the
+# account out of the backup (design D12), and the part each one names.
+PLAN_FEATURES = {
+    "comments": "task and project comments",
+    "reminders": "reminders",
+}
 
 
 @dataclass
@@ -33,6 +52,149 @@ class ApplyStats:
         self.unchanged += other.unchanged
         self.deleted += other.deleted
         self.missing += other.missing
+
+
+# --- Run sequence ------------------------------------------------------------
+
+
+def run_backup(target: Path, client: Client, *, now: Callable[[], datetime] | None = None) -> ApplyStats:
+    """Bring the backup in `target` up to date with the account, and return what changed.
+
+    Every step can be interrupted: the next run resumes from the last checkpoint and applies a
+    downloaded response that was not checkpointed yet instead of requesting it again.
+    """
+    target = Path(target)
+    now = now or _utc_now
+    prepare_target(target)
+    with TargetLock(target):
+        state = storage.load_or_create_state(target)  # again, under the lock
+        removed = storage.remove_temp_files(target)
+        if removed:
+            log.info("removed %d temporary files left by an interrupted run", removed)
+
+        classifier = Classifier()
+        stats = ApplyStats()
+        pending = target / PENDING_DIR / PENDING_FILE
+        body = storage.read_bytes(pending)
+        if body is not None:
+            log.info("applying the sync response that an interrupted run downloaded")
+            _apply_pending(target, state, body, classifier, stats, now)
+
+        for _ in range(MAX_ROUNDS):
+            token = state.get("sync_token")
+            if token:
+                log.info("requesting an incremental sync")
+            else:
+                log.info("requesting a full sync of the account")
+            body = client.sync(token or "*")
+            storage.write_bytes_atomic(pending, body)
+            if not _apply_pending(target, state, body, classifier, stats, now):
+                break
+            log.info("following the full sync with an incremental sync to catch up")
+
+        _warn_about_plan_limits(target)
+        state["last_successful_run_utc"] = _timestamp(now())
+        storage.write_state(target, state)
+    return stats
+
+
+def prepare_target(target: Path) -> None:
+    """Make sure `target` is a directory that holds a backup, creating it and `state.json` if needed.
+
+    A directory that is rejected is left unchanged. Raises ConfigError.
+    """
+    if target.exists() and not target.is_dir():
+        raise ConfigError(f"the target {target} is not a directory")
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+        names = [p.name for p in target.iterdir()]
+    except OSError as exc:
+        raise ConfigError(f"cannot use the target directory {target}: {exc.strerror or exc}") from exc
+    if storage.STATE_FILE not in names and not all(_left_by_first_run(name) for name in names):
+        raise ConfigError(
+            f"the target directory {target} is not empty and is not a todoist-takeout backup "
+            f"(it has no {storage.STATE_FILE}); choose a new or empty directory"
+        )
+    # Before any other file, so that the directory is recognized as a backup from now on.
+    storage.load_or_create_state(target)
+
+
+def _left_by_first_run(name: str) -> bool:
+    # A first run killed while it created state.json, or just after it took the lock.
+    return name == LOCK_FILE or (name.startswith(f".{storage.STATE_FILE}.") and name.endswith(".tmp"))
+
+
+def _apply_pending(
+    target: Path, state: dict, body: bytes, classifier: Classifier, stats: ApplyStats, now
+) -> bool:
+    """Apply the response saved in `pending/`, checkpoint it, then remove it. Return whether it was a full sync."""
+    pending = target / PENDING_DIR / PENDING_FILE
+    response = _parse_response(pending, body)
+    full = response.get("full_sync") is True
+    applied = apply_response(target, response, classifier)
+    stats.add(applied)
+    log.info(
+        "applied the %s: %d objects written, %d unchanged, %d marked deleted",
+        "full sync" if full else "incremental sync",
+        applied.written,
+        applied.unchanged,
+        applied.deleted,
+    )
+    storage.write_bytes_atomic(target / README_FILE, format_description())
+    state["sync_token"] = response["sync_token"]
+    if full:
+        date = response.get("full_sync_date_utc")
+        state["last_full_sync_utc"] = date if isinstance(date, str) else _timestamp(now())
+    storage.write_state(target, state)
+    storage.remove_file(pending)
+    return full
+
+
+def _parse_response(pending: Path, body: bytes) -> dict:
+    try:
+        response = json.loads(body)
+    except ValueError as exc:
+        problem = f"is not valid JSON ({exc})"
+    else:
+        if isinstance(response, dict) and isinstance(response.get("sync_token"), str):
+            return response
+        problem = "has no sync_token"
+    # Nothing was taken from it, so the next run can simply request it again.
+    storage.remove_file(pending)
+    raise RunError(f"the sync response {problem}; the backup was not changed")
+
+
+def format_description() -> bytes:
+    """The format description that every backup holds as README.md, with LF line endings."""
+    text = importlib.resources.files("todoist_takeout").joinpath("storage_format.md").read_text(encoding="utf-8")
+    return text.replace("\r\n", "\n").encode("utf-8")
+
+
+def _warn_about_plan_limits(target: Path) -> None:
+    path = target / SYNC_DIR / f"{storage.encode_key(PLAN_LIMITS)}{JSON_SUFFIX}"
+    data = storage.read_bytes(path)
+    if data is None:
+        return
+    limits = _parse_stored(path, data)
+    current = limits.get("current") if isinstance(limits, dict) else None
+    if not isinstance(current, dict):
+        return
+    plan = current.get("plan_name")
+    plan = f"Todoist plan {plan!r}" if isinstance(plan, str) else "Todoist plan"
+    for flag, part in PLAN_FEATURES.items():
+        if current.get(flag) is False:
+            log.warning("the %s does not include %s; %s cannot be backed up on this plan", plan, flag, part)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _timestamp(moment: datetime) -> str:
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# --- Applying a response -----------------------------------------------------
 
 
 def apply_response(target: Path, response: dict, classifier: Classifier) -> ApplyStats:
