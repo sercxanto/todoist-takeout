@@ -1,6 +1,6 @@
 # Proposal
 
-> Status: the API questions are answered by contract probes (2026-10-18, see API findings), and the source of recurring completions is decided (variant D below). Next: specs and design. Archived projects were split off into `add-archived-projects-backup` (2026-10-18).
+> Status: the API questions are answered by contract probes (2026-10-18, see API findings), and the source of recurring completions is decided (variant D below). Specs, design and tasks are written (2026-10-18); next: implementation. Archived projects were split off into `add-archived-projects-backup` (2026-10-18).
 
 ## Why
 
@@ -65,11 +65,11 @@ From contract probes against a Pro and a Free account (2026-10-18, `tests/contra
 
 ## Open Questions
 
-For the design:
+None. The design resolves the questions of the earlier draft (2026-10-18):
 
-- **Checkpoint:** a month marker is recommended over a timestamp marker. `closed_through` names the last closed month. Every run fetches whole months after it through the current month, and a month closes once it has been fetched at least a grace period after its end. A timestamp marker with an overlap would rewrite the previous month and is easy to get wrong.
-- **Backdated completions** in closed months: accept the loss and document it, or re-check closed months occasionally.
-- **Layout** of completion events and comments: inside the month files or beside them, and the key of each (event `id` per source, comment `id`).
-- **T0:** how it is recorded in `state.json`, and how the one-time backfill from `tasks/completed` stays resumable (for example month by month with `since` and `until`).
-- **Comments added after completion:** fetched once when the task is stored, consistent with frozen months, or refreshed while the month is open.
-- **Contract tests:** which probes become permanent contract tests, and removal of the probe spike.
+- **Checkpoint:** a month marker; a month closes once it was fetched at least 7 days after its end (design D3, D7).
+- **Backdated completions** in closed months: the loss is accepted and documented (spec: Closed months are frozen).
+- **Layout:** one directory per source under `completed/`, each file shaped like the API response (design D6, backup-storage spec).
+- **T0:** recorded in `state.json` before the first request of this part; the backfill resumes month by month (design D3, D10).
+- **Comments added after completion:** fetched again while the month is open, when `note_count` changes (design D8).
+- **Contract tests:** a read-only test of the four endpoints and an extension of the write test. The probe spike stays until `add-archived-projects-backup` (design D14).

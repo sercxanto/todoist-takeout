@@ -31,7 +31,7 @@ The sync endpoint returns neither archived projects nor the sections, tasks and 
 
 ## Impact
 
-- Builds on the CLI, API access, storage and checkpoint handling of `add-active-data-sync` (archived), and on `add-completed-tasks-backup` for GET requests, fetching completed tasks and comments, and the month files.
+- Builds on the CLI, API access, storage and checkpoint handling of `add-active-data-sync` (archived), and on `add-completed-tasks-backup` for GET requests and pagination, fetching completed tasks and comments, and the comment files of completed tasks.
 - Requests per archived project: one for `/full`, one per 3-month window of its lifetime for completed tasks, and one per task with comments plus one for project comments. An account with 56 archived projects needs a few hundred requests on the first run; later runs fetch only newly archived projects.
 
 ## API findings
@@ -50,7 +50,8 @@ From contract probes against a Pro and a Free account (2026-10-18, `tests/contra
 For the design:
 
 - **Storage location:** `sync/projects/<id>.json` like active projects, since the payload carries `is_archived`, or a separate `archived/` tree. Where the open tasks, sections and comments of archived projects go.
-- **Completed tasks of archived projects:** the payload and the endpoint are those of `add-completed-tasks-backup`, so its month files are the natural place.
+- **Completed tasks of archived projects:** the payload and the endpoint are those of `add-completed-tasks-backup`, but its month files `completed/<YYYY-MM>.json` cannot hold them. Those files mirror the unfiltered `by_completion_date` query and are replaced while the month is open (its design D6), so anything added from another source would be dropped again. They need a location of their own, for example per project. The comment files `completed/comments/<task id>.json` can be shared.
+- **Project archived while a month is open:** the next fetch of that month no longer returns the project's completed tasks, so they drop out of `completed/<YYYY-MM>.json`. They are back in the backup once this change fetches the newly archived project. Tasks of that project in months that were already closed stay there too, so they are stored twice; the format description should say so.
 - **Detecting newly archived projects:** for example projects listed as archived that are not stored as archived yet. What happens when a project is unarchived and archived again.
 - **Missing-object count:** the rule for excluding objects of archived projects, for example by the stored project's `is_archived`.
 - **Archived sub-projects:** none occurred in the probed accounts; whether they are listed separately or only as `subprojects` of their parent.

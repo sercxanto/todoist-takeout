@@ -170,7 +170,7 @@ These will be written up in more detail in the design documents of the correspon
 ## Roadmap
 
 1. **Sync active data** *(implemented)*: a full sync, then incremental syncs, with checkpointing and tombstones. The format is described in [storage_format.md](src/todoist_takeout/storage_format.md). The behaviour is specified in [openspec/specs/](openspec/specs/); the planning is archived in [openspec/changes/archive/2026-10-18-add-active-data-sync/](openspec/changes/archive/2026-10-18-add-active-data-sync/).
-2. **Back up completed tasks:** month files for completed tasks, written incrementally, with every completion of recurring tasks and the comments of completed tasks. The API questions are answered; specs and design are next. See [openspec/changes/add-completed-tasks-backup/](openspec/changes/add-completed-tasks-backup/).
+2. **Back up completed tasks:** month files for completed tasks, written incrementally, with every completion of recurring tasks and the comments of completed tasks. Specs, design and tasks are ready; implementation is next. See [openspec/changes/add-completed-tasks-backup/](openspec/changes/add-completed-tasks-backup/).
 3. **Back up archived projects** with their sections, tasks and comments, which the sync endpoint does not return. The API questions are answered; specs and design are next. See [openspec/changes/add-archived-projects-backup/](openspec/changes/add-archived-projects-backup/).
 4. **Download attachment files.**
 5. **Derive a SQLite database** from the raw JSON, for queries and migration.
