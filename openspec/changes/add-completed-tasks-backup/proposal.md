@@ -1,50 +1,75 @@
 # Proposal
 
-> Status: placeholder. The scope is agreed, but several questions below depend on facts about the API. Answer them, preferably with the contract test from `add-active-data-sync`, before writing the specs and design.
+> Status: the API questions are answered by contract probes (2026-10-18, see API findings), and the source of recurring completions is decided (variant D below). Next: specs and design. Archived projects were split off into `add-archived-projects-backup` (2026-10-18).
 
 ## Why
 
 Completed tasks are the part of the history the user cares about most, and the incremental sync of active data does not include them. Without them the backup is incomplete and not good enough for a migration. Accounts can hold tens of thousands of completed tasks, so they have to be fetched efficiently and in a way that survives interruptions.
 
-Archived projects have the same gap. The sync endpoint returns neither archived projects nor the sections and tasks inside them, so today they are missing from the backup entirely, although they are often exactly the history a user wants to keep.
+A recurring task is never completed as a task: each completion moves it to its next date. Its completions exist only as events, and the endpoint for completed tasks does not return them. In the sampled month of a real account, about a third of all completions were of this kind.
 
 ## What Changes
 
-- The tool backs up all completed tasks through the endpoint `/api/v1/tasks/completed/by_completion_date`, including the full history from the start of the account.
-- Completed tasks are stored as one JSON file per month, at `completed/<YYYY-MM>.json`, with month boundaries in UTC. Each file holds the raw API payloads unchanged.
+- **Completed tasks:** the tool backs up every completed task since the account was created, from `GET /api/v1/tasks/completed/by_completion_date`. It returns full task objects, the same payload as the sync's `items`.
+- **Completion events:** the tool also backs up one event per completion, including the completions of recurring tasks. Completions before the start of the first run (T0) come once from `GET /api/v1/tasks/completed`; completions from T0 on come from the activity log (`GET /api/v1/activities`). The two sources cover separate time ranges, so events never need to be matched across them.
+- **Comments of completed tasks:** for each completed task whose payload has `note_count > 0`, the tool backs up its comments from `GET /api/v1/comments?task_id=…`, with their attachment metadata as it appears in the payload. Attachment files are not downloaded.
+- Completed tasks are stored as one JSON file per month, at `completed/<YYYY-MM>.json`, with month boundaries in UTC. Files hold the raw API payloads unchanged. Where events and comments go within this layout is a design question.
 - The current month is written too, so the backup is complete after every run and could be used for a migration at any time.
-- Proposed but not yet confirmed: a single forward marker in `state.json`, called `completed_until`, covers both the initial backfill and later incremental runs. A run walks month by month from the marker to now, fetches each month with a small overlap, merges the results into the month file without duplicates, writes the file atomically, and only then advances the marker.
-- Months that have passed are never rewritten. Changes made later to completed or archived tasks are deliberately not captured.
-- On plans without access to completed tasks, the tool warns and skips this part instead of failing.
-- The tool also backs up archived projects, archived sections, and the tasks they contain, both completed and not completed, together with their comments where the API provides them.
-- A project that is archived after it was backed up keeps its stored data; its tasks do not silently disappear from the backup.
+- A checkpoint in `state.json` covers both the initial backfill and later incremental runs, so that an interrupted run resumes without fetching stored months again. Months that have been closed are never fetched again; changes made later to completed tasks are deliberately not captured.
+- Limitations degrade to warnings, never to failures:
+  - the plan does not include completed tasks (`user_plan_limits.current.completed_tasks` is false): this part is skipped;
+  - `tasks/completed` is no longer available: recurring completions before T0 cannot be backed up;
+  - the time since the last run exceeds the activity log's limit (7 days on the Free plan): completion events in the gap may be lost.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `completed-tasks-backup`: fetching completed tasks incrementally, splitting them into month files, removing duplicates, and handling plan limitations.
-- `archived-projects-backup`: listing archived projects and archived sections, and backing up their content, including tasks that are not completed.
+- `completed-tasks-backup`: fetching completed tasks, completion events and the comments of completed tasks incrementally, the checkpoint, and handling plan limitations and the deprecated endpoint.
 
 ### Modified Capabilities
 
-- `backup-storage`: adds the `completed/` layout, the `completed_until` checkpoint, and the storage location for archived projects and their content. This capability is introduced by `add-active-data-sync` and must be archived before this change modifies it.
+- `backup-storage`: adds the `completed/` layout, the completed-tasks checkpoint and T0 in `state.json`, and their description in the format documentation.
 
 ## Impact
 
-- Depends on `add-active-data-sync`, for the CLI, API access, storage and checkpoint handling.
-- The first run on large accounts takes several hundred requests and must stay within the rate limits.
-- Depends on the API endpoints for archived projects and their content. The number of requests grows with the number of archived projects.
+- Builds on the CLI, API access, storage and checkpoint handling of `add-active-data-sync` (archived).
+- The API client sends only form-encoded POST requests today; all endpoints here are GET requests with query parameters.
+- The plan-limit check gains a row for `completed_tasks`.
+- Requests on the first run: one or more per month since the account was created (about 120 for ten years), the pages of the one-time event backfill (200 events per page), and one per completed task with comments. Later runs: a few requests for the open months, the activity log since the last run, and new comments.
+- Activity log event IDs are integers larger than 64 bits. The tool keeps them exactly; the format description warns that JavaScript and SQLite `INTEGER` would corrupt them.
+- Completed tasks inside archived projects are not returned without a project filter; `add-archived-projects-backup` fetches them. Completion events from both sources include archived projects.
+
+## API findings
+
+From contract probes against a Pro and a Free account (2026-10-18, `tests/contract/test_probe_*.py`). The findings files are not committed, so the results are recorded here.
+
+- **`by_completion_date`:**
+  - One entry per task, in its current state, with `id` being the task ID. The payload is identical to the task's payload in the incremental sync.
+  - Cursor pagination with `limit` up to 200; `next_cursor` is absent on the last page.
+  - `since` and `until` are both inclusive, compared to the microsecond, so a month ends at `…T23:59:59.999999Z`. Windows of 93 days are accepted, 100 days are rejected (`INVALID_ARGUMENT_VALUE`, "must not exceed 3 months").
+  - An uncompleted task disappears; completed again, it returns with a new `completed_at`. New completions are visible within a second.
+  - It includes shared projects, with completions by other people. It excludes archived projects unless `project_id` is given. It never includes completions of recurring tasks.
+  - History reaches back to the start of the account on the Pro account. The Free plan does not hide old completions: one backdated by 30 days was visible despite `activity_log_limit: 7`.
+- **`tasks/completed`:**
+  - Deprecated: every response carries `Warning: 119 - "Deprecated endpoint, please use GET /api/v*/completed/by_completion_date instead."`
+  - One entry per completion, with its own UUID `id` and the `task_id`, including recurring completions and archived projects, but not completions by other people.
+  - Offset pagination; `annotate_items` adds the full task as `item_object`, `annotate_notes` adds the comments as `notes`.
+- **Activity log:**
+  - `object_event_types=["item:completed"]`, a JSON list, selects completions; a plain value is rejected.
+  - One event per completion, including recurring tasks and other people's completions, with `extra_data` holding a snapshot (content, due date, `is_recurring`, labels, `note_count`, section), not a full task.
+  - Its history is limited: it had no events in a window about eight years back where `by_completion_date` has completions, and the Free plan keeps 7 days. New events appeared within 14 seconds.
+- **Comments:** `GET comments?task_id=…` returns the comments of a completed task, also in archived projects. `note_count` in the payloads of `by_completion_date` and the activity log tells which tasks have comments.
+- **Sync:** a completed task appears in the incremental sync with `checked: true`, with the same payload as in `by_completion_date`, and is absent from a full sync. Both copies are kept; there is nothing to reconcile.
+- **Backdating:** `item_complete` accepts a `completed_at` in the past, so a completion can land in a month that is already closed.
 
 ## Open Questions
 
-- **Deduplication key:** Recurring tasks may be completed several times under the same task ID. Is there a separate ID for each completion, or is the key task ID plus `completed_at`?
-- **Comments and attachments of completed tasks:** Does the completed-tasks endpoint include them, for example through a parameter like the old `annotate_notes`? If it does not, fetching comments per task means tens of thousands of requests, and this becomes a separate design problem. The source code of the official SDK may answer this.
-- **Overlap with the sync:** Tasks completed while the tool is running may show up both in `sync/items/` and in `completed/`. Do the two endpoints return the same object format? Where are the two sources reconciled?
-- **Free plans:** Does the endpoint reject the request, return a limited history, or return nothing? The tool must handle every case without failing. *Observed (2026-10-18):* the Free test account's `user_plan_limits.current` has `completed_tasks: true` and `activity_log_limit: 7`. The endpoint is therefore probably available with a limited history; a contract test must confirm it.
-- **Forward marker:** Confirm the `completed_until` approach, and the account start date (for example `joined_at`) as the starting point of the backfill.
-- **Archived projects endpoint:** Which endpoint lists them (`/api/v1/projects/archived`?), and how does it paginate?
-- **Open tasks in archived projects:** Can uncompleted tasks of an archived project be fetched at all, and through which endpoint? If they cannot, which part is lost, and can the backup at least warn about it?
-- **Storage location:** Do archived projects go into `sync/projects/<id>.json` like active ones (the payload carries `is_archived`), or into a separate `archived/` tree? Where do their open tasks go, since they do not fit the month files?
-- **Archiving between runs:** What does the incremental sync return when a stored project is archived? Does it send the project with `is_archived: true`, and are its tasks reported as deleted? The tool must not turn them into tombstones. *Answered by the write contract test of `add-active-data-sync` (2026-10-18):* the next incremental sync returns the project with `is_archived: true` and `is_deleted: false`, so `sync/projects/<id>.json` is updated with that payload. Its tasks are not in the response at all, neither as deleted nor as archived. They therefore stay live and unchanged in `sync/items/`, and no tombstones are written. Still open: whether a later full sync omits them too, so that the missing-object warning of `add-active-data-sync` (design D8) counts them, and how the backup should mark these tasks as belonging to an archived project.
-- **Archived sections in active projects:** Does the full sync include them, or only the incremental sync at the moment of archiving?
+For the design:
+
+- **Checkpoint:** a month marker is recommended over a timestamp marker. `closed_through` names the last closed month. Every run fetches whole months after it through the current month, and a month closes once it has been fetched at least a grace period after its end. A timestamp marker with an overlap would rewrite the previous month and is easy to get wrong.
+- **Backdated completions** in closed months: accept the loss and document it, or re-check closed months occasionally.
+- **Layout** of completion events and comments: inside the month files or beside them, and the key of each (event `id` per source, comment `id`).
+- **T0:** how it is recorded in `state.json`, and how the one-time backfill from `tasks/completed` stays resumable (for example month by month with `since` and `until`).
+- **Comments added after completion:** fetched once when the task is stored, consistent with frozen months, or refreshed while the month is open.
+- **Contract tests:** which probes become permanent contract tests, and removal of the probe spike.

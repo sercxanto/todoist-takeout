@@ -8,43 +8,12 @@ spec, after the findings are written.
 
 import json
 
-import pytest
-
 from todoist_takeout import storage
 from todoist_takeout.sync import DELETED_SUFFIX, JSON_SUFFIX, SYNC_DIR, run_backup
 
 PREFIX = "todoist-takeout contract test"
 # Candidate commands for undeleting a task. None is documented; the test records what happens.
 RESTORE_COMMANDS = ["item_undelete", "item_restore"]
-
-
-@pytest.fixture
-def write_client(contract_support, client_for):
-    write_token = contract_support.env_token(contract_support.WRITE_TOKEN)
-    if not write_token:
-        pytest.skip(f"{contract_support.WRITE_TOKEN} is not set")
-    if not contract_support.writes_allowed():
-        pytest.skip(f"{contract_support.ALLOW_WRITES} is not 1")
-    read_token = contract_support.env_token(contract_support.READ_TOKEN)
-    try:
-        contract_support.check_write_account(write_token, read_token, client_for)
-    except contract_support.AccountGuardError as exc:
-        pytest.fail(f"refusing to write: {exc}")
-    return write_token, client_for(write_token)
-
-
-class Observer:
-    """Follows the account with its own sync token, to see the raw response of each step."""
-
-    def __init__(self, client):
-        self.client = client
-        self.full = json.loads(client.sync("*"))
-        self.token = self.full["sync_token"]
-
-    def changes(self) -> dict:
-        response = json.loads(self.client.sync(self.token))
-        self.token = response["sync_token"]
-        return response
 
 
 def find(response: dict, resource: str, object_id):
@@ -97,7 +66,7 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
         return scrubber.scrub(find(response, resource, object_id))
 
     try:
-        observer = Observer(client)
+        observer = contract_support.Observer(client)
         backup()
 
         # Create a project with a task and a comment.

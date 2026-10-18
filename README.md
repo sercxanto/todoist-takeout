@@ -170,8 +170,8 @@ These will be written up in more detail in the design documents of the correspon
 ## Roadmap
 
 1. **Sync active data** *(implemented)*: a full sync, then incremental syncs, with checkpointing and tombstones. The format is described in [storage_format.md](src/todoist_takeout/storage_format.md). The behaviour is specified in [openspec/specs/](openspec/specs/); the planning is archived in [openspec/changes/archive/2026-10-18-add-active-data-sync/](openspec/changes/archive/2026-10-18-add-active-data-sync/).
-2. **Back up completed tasks and archived projects:** month files for completed tasks, written incrementally, plus archived projects with their sections and tasks, which the sync endpoint does not return. Several open questions remain. See [openspec/changes/add-completed-tasks-backup/](openspec/changes/add-completed-tasks-backup/).
-3. **Comments and attachments of completed tasks.** How expensive this is depends on the API (see the open questions in step 2).
+2. **Back up completed tasks:** month files for completed tasks, written incrementally, with every completion of recurring tasks and the comments of completed tasks. The API questions are answered; specs and design are next. See [openspec/changes/add-completed-tasks-backup/](openspec/changes/add-completed-tasks-backup/).
+3. **Back up archived projects** with their sections, tasks and comments, which the sync endpoint does not return. The API questions are answered; specs and design are next. See [openspec/changes/add-archived-projects-backup/](openspec/changes/add-archived-projects-backup/).
 4. **Download attachment files.**
 5. **Derive a SQLite database** from the raw JSON, for queries and migration.
 6. **Download Todoist's own backups** (`/api/v1/backups`) as an additional safety net. This is an idea, not yet evaluated.
@@ -215,6 +215,18 @@ TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_write.py
 ```
 
 Findings, such as the shape of deletion payloads, rejected commands and the plan limits of each account, are written to `tests/contract/findings/`. That directory is not committed, and the API payloads in it are scrubbed. If the write test fails during cleanup, it names the projects to delete by hand.
+
+### API probes for completed tasks and archived projects
+
+`tests/contract/test_probe_read.py` and `tests/contract/test_probe_write.py` are a temporary spike. They answer the open questions of [add-completed-tasks-backup](openspec/changes/add-completed-tasks-backup/proposal.md) and [add-archived-projects-backup](openspec/changes/add-archived-projects-backup/proposal.md), whose proposals record the results (probes R1-R7 and W1-W7). They use the same variables and the same write guard as the contract tests above, and record what they observe in `tests/contract/findings/probe-read-<account>.json` and `probe-write.json`. They fail only when a probe crashes, not because of what the API answers.
+
+```sh
+# Read-only probes R1-R7, for each configured account. Several dozen requests on large accounts.
+pytest -m contract tests/contract/test_probe_read.py
+
+# Write probes W1-W7, against the write account only: complete, uncomplete and archive in temporary projects.
+TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_probe_write.py
+```
 
 ### Recording fixtures
 
