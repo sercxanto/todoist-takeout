@@ -36,6 +36,7 @@ These are the goals the tool is built against. As each one is implemented, it mo
 ### Scope of the backup
 
 - Active data and **all** completed tasks.
+- Archived projects, with their sections, tasks and comments.
 - Efficient even with tens of thousands of completed tasks.
 - As much metadata as the API offers, not just task titles: projects, sections, labels, comments, attachments and so on.
 
@@ -56,7 +57,7 @@ These will be written up in more detail in the design documents of the correspon
 ## Roadmap
 
 1. **Sync active data:** a full sync, then incremental syncs, with checkpointing and tombstones. See [openspec/changes/add-active-data-sync/](openspec/changes/add-active-data-sync/).
-2. **Back up completed tasks:** month files, written incrementally. Several open questions remain. See [openspec/changes/add-completed-tasks-backup/](openspec/changes/add-completed-tasks-backup/).
+2. **Back up completed tasks and archived projects:** month files for completed tasks, written incrementally, plus archived projects with their sections and tasks, which the sync endpoint does not return. Several open questions remain. See [openspec/changes/add-completed-tasks-backup/](openspec/changes/add-completed-tasks-backup/).
 3. **Comments and attachments of completed tasks.** How expensive this is depends on the API (see the open questions in step 2).
 4. **Download attachment files.**
 5. **Derive a SQLite database** from the raw JSON, for queries and migration.
