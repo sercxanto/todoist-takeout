@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from todoist_takeout import archived, completed, resources, storage
+from todoist_takeout import archived, attachments, completed, resources, storage
 from todoist_takeout.api import Client
 from todoist_takeout.errors import ConfigError, RunError, StorageError
 from todoist_takeout.lock import LOCK_FILE, TargetLock
@@ -100,6 +100,7 @@ def run_backup(target: Path, client: Client, *, now: Callable[[], datetime] | No
 
         completed.run(target, client, state, now)
         archived.run(target, client, state, now)
+        attachments.run(target, client, now)
         _warn_about_plan_limits(target)
         state["last_successful_run_utc"] = _timestamp(now())
         storage.write_state(target, state)

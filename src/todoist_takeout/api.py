@@ -365,7 +365,7 @@ class Client:
                 reason = "its URL does not use HTTPS"
             else:
                 reason = f"{host or 'its URL'} is not a Todoist host"
-            raise UnexpectedHost(f"not requested: {reason}", host=host)
+            raise UnexpectedHost(reason, host=host)
         label = f"GET {_loggable_url(url)}"
 
         def failure(status: int, body: bytes, suffix: str) -> Exception:

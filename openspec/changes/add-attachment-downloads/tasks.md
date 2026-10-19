@@ -31,10 +31,10 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 4. Download step
 
-- [ ] 4.1 Extend `tests/fake_api.py` with the fake file transport of design D12, and move the `file_url` of the hand-written fixtures to `files.todoist.com` with invented paths. Add fixtures for a link attachment, an incomplete upload and a foreign host. Verify that the existing offline suite passes unchanged apart from the URLs
-- [ ] 4.2 Create `attachments.py` with `run(target, client, now)` (collect, filter, skip, download; design D1 to D4, with D2 and D3 as settled in 1.4) and call it from `run_backup` after `archived.run`. Verify with run tests for every scenario of the spec requirements "Uploaded files of stored comments are downloaded", "Only uploaded files", "One file per comment" and "Stored files are not downloaded again", and that every produced path matches the spec requirement "Attachments layout"
-- [ ] 4.3 Handle failures as in design D6 and D7: refused files, size mismatch and unexpected host as warnings, persistent failures ending the run. Verify with run tests for every scenario of the spec requirements "Complete files only", "Refused files produce a warning", "Persistent failures end the run" and "Attachment on an unexpected host", including the exit status through the CLI
-- [ ] 4.4 Add the messages of design D9. Verify with a run test that reads the log of a run that downloads two files, skips one stored file and gets one 404
+- [x] 4.1 Extend `tests/fake_api.py` with the fake file transport of design D12, and move the `file_url` of the hand-written fixtures to `files.todoist.com` with invented paths. Add fixtures for a link attachment, an incomplete upload and a foreign host. Verify that the existing offline suite passes unchanged apart from the URLs
+- [x] 4.2 Create `attachments.py` with `run(target, client, now)` (collect, filter, skip, download; design D1 to D4, with D2 and D3 as settled in 1.4) and call it from `run_backup` after `archived.run`. Verify with run tests for every scenario of the spec requirements "Uploaded files of stored comments are downloaded", "Only uploaded files", "One file per comment" and "Stored files are not downloaded again", and that every produced path matches the spec requirement "Attachments layout"
+- [x] 4.3 Handle failures as in design D6 and D7: refused files, size mismatch and unexpected host as warnings, persistent failures ending the run. Verify with run tests for every scenario of the spec requirements "Complete files only", "Refused files produce a warning", "Persistent failures end the run" and "Attachment on an unexpected host", including the exit status through the CLI
+- [x] 4.4 Add the messages of design D9. Verify with a run test that reads the log of a run that downloads two files, skips one stored file and gets one 404
 
 ## 5. Format description and README
 
