@@ -15,6 +15,7 @@ kept up to date by every run.
 | `state.json` | The checkpoint and run metadata. See [State file](#state-file). |
 | `sync/` | The account's active data, as returned by the Todoist sync API. See [Active data](#active-data). |
 | `completed/` | Completed tasks, completion events and the comments of completed tasks. See [Completed tasks](#completed-tasks). |
+| `archived/` | A snapshot of each archived project, with its tasks, sections and comments. See [Archived projects](#archived-projects). |
 | `pending/` | A downloaded response that has not been applied yet. Normally empty. See [Pending response](#pending-response). |
 | `.lock` | Lock file that keeps two runs from working on the same backup. See [Lock file](#lock-file). |
 
@@ -70,6 +71,21 @@ incremental and return only what changed since the previous one; the files of al
 stay as they are. An empty array or object in an incremental sync means that nothing changed. A
 single value is replaced as a whole. If the server sends a full sync again, objects missing from it
 are kept unchanged, and the tool warns how many there were; they may have been deleted in Todoist.
+Objects that left the sync because they were completed or archived do not count as missing: tasks
+stored with `"checked": true`, projects and sections stored with `"is_archived": true`, objects
+whose `project_id` names such a project, and the comments of such tasks. The tool logs their number
+separately, without a warning.
+
+**Completed and archived objects.** A full sync contains no completed task, no archived project or
+section, and nothing inside an archived project. When a task is completed, or a project or section
+is archived, the next incremental sync returns it once more, with `"checked": true` or
+`"is_archived": true`, and its file keeps that payload. The sections, tasks and comments of an
+archived project are not returned again; their files keep the content they had before, and the
+project's current content is in its [snapshot](#archived-projects). Archiving
+a section completes its tasks. An archived section stays in `sync/sections/` as the sync reported
+it, although later full syncs no longer contain it. Sections archived before the first backup are
+not in the backup: the API offers no way to list them, and only the `section_id` of their tasks is
+left.
 
 **Deleted objects.** When an object is deleted in Todoist, the sync returns it with
 `"is_deleted": true`. The deletion payload usually has all its fields, but with their values
@@ -131,7 +147,9 @@ close as soon as they are stored. A closed month is never fetched again. As a co
 - A task that was completed, uncompleted and completed again in a later month is in both months'
   files. The entry with the newest `completed_at` is the task's current state.
 - Tasks in archived projects are not included: the API returns them only for a request filtered
-  by project.
+  by project. They are in the project's [snapshot](#archived-projects). When a project is
+  archived, its tasks drop out of the open months at their next fetch, but closed months keep
+  them; see [Copies of the same task](#copies-of-the-same-task).
 - Completions of recurring tasks are not included: such a task is never completed as a whole, it
   moves to its next date. Its completions are in the [completion events](#completion-events).
 
@@ -192,6 +210,117 @@ becomes `unavailable`, the months already stored are kept, the tool warns once, 
 request the endpoint again. The completions of recurring tasks before T0 are then missing from the
 backup; other completed tasks are still in the month files.
 
+## Archived projects
+
+`archived/` holds a snapshot of each archived project. The sync in `sync/` includes neither
+archived projects nor anything inside them. Each project has a directory of its own, named after
+the project's `id` by the rules of [File names](#file-names):
+
+| Path | Content | Source |
+|---|---|---|
+| `archived/<project id>/project.json` | The project as the list of archived projects returned it, for example `archived/6Xr2Pq7Wm4Kd9Hc3/project.json`. | `GET /api/v1/projects/archived` |
+| `archived/<project id>/full.json` | The project with its open tasks, its sections that are not archived, its sub-projects, collaborators and folder. | `GET /api/v1/projects/{id}/full` |
+| `archived/<project id>/completed.json` | The project's completed tasks. | `GET /api/v1/tasks/completed/by_completion_date`, filtered by project |
+| `archived/<project id>/project_comments.json` | The project's comments. | `GET /api/v1/comments`, filtered by project |
+| `archived/<project id>/comments/<task id>.json` | The comments of one task of the project, open or completed, for example `archived/6Xr2Pq7Wm4Kd9Hc3/comments/6Xt3Rk2Wq8Mv4Pz7.json`. | `GET /api/v1/comments`, filtered by task |
+
+**Contents.** `project.json` and `full.json` each hold the API's response unchanged, with every
+top-level key. `completed.json`, `project_comments.json` and the comment files are shaped like the
+files under `completed/` (see [Completed tasks](#completed-tasks)): one JSON object with the list
+of entries (`items` for tasks, `results` for comments) and every other top-level key of the
+response except `next_cursor`, the entries of all pages merged into one list and ordered by time
+and then by `id`. A project without completed tasks or comments has these files too, with an empty
+list. A task whose `note_count` is 0 has no comment file. A task whose comments the API does not
+find (HTTP 404), for example because the task was deleted, has a comment file with an empty list,
+`{"results": []}`, unless comments of it were stored earlier; those stay. `full.json` holds no
+comments, and its `sections` include no archived section.
+
+The completed tasks are fetched in windows of three calendar months, from the month of the
+project's `created_at` through the month of its `updated_at`, which archiving moves forward: a task
+of an archived project cannot be completed. If `updated_at` is missing, not a valid time, or after
+the current month, the windows run through the current month. If `created_at` is missing or not a
+valid time, the windows start at `first_month` of the completed tasks in `state.json`. Completions
+before the project's `created_at`, for example of tasks moved in from an older project, are not
+fetched.
+
+Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. The
+attached files themselves are not downloaded.
+
+**Sub-projects.** Every archived project has a snapshot of its own directly under `archived/`, also
+when it is a sub-project of another archived project; the `parent_id` in its `project.json` names
+its parent. The `subprojects` of `full.json` are as the API returned them. An archived project
+that appears there gets a snapshot as well, even if the list of archived projects does not contain
+it.
+
+**Checkpoint.** `project.json` is written after every other file of the snapshot. A directory
+without `project.json` holds an unfinished snapshot, left by a run that stopped while writing it;
+the next run fetches that snapshot again. A snapshot with a `project.json` is complete for the
+parts the plan allowed. `state.json` holds nothing for this part.
+
+**Fetched once.** Each run lists the archived projects and compares each project's listed payload
+with its stored `project.json`, byte for byte in the [JSON encoding](#json-encoding) of the backup:
+
+- If `project.json` is missing, the snapshot is fetched.
+- If they are equal, the snapshot is not fetched again. Changes made in Todoist to the content of
+  an archived project, such as a comment added to one of its tasks, are therefore not in the
+  backup.
+- If they differ, for example because the project was unarchived and archived again, the snapshot
+  is fetched again. `project.json`, `full.json` and `completed.json` are replaced, so a task that
+  was uncompleted or deleted in the meantime drops out of them. The comments of the tasks whose
+  `note_count` changed or whose comment file is missing, and the project's comments, are fetched
+  again and merged into the stored files: new comments are added, changed ones replace the stored
+  version (matched by `id`), and a comment once stored stays, even after it is deleted in Todoist.
+
+**Missing parts.** On a plan without completed tasks, a snapshot has no `completed.json`; on a plan
+without comments, it has no `project_comments.json` and no `comments/`. A later run on a plan that
+includes the part adds it to every stored snapshot that lacks it, without fetching the rest of the
+snapshot again. The comments part is complete when `project_comments.json` exists and every task
+in `full.json` and `completed.json` whose `note_count` is greater than 0 has a comment file. A
+snapshot fetched again or given its `completed.json` while comments were not allowed can therefore
+have tasks without a comment file next to a `project_comments.json`; a later run with comments
+allowed fetches the comments of those tasks, then the project's comments, and writes
+`project_comments.json` last. A task whose comments the API does not find gets its empty comment
+file then and is not requested again.
+
+**Snapshots are kept.** A snapshot stays unchanged when its project is unarchived or deleted in
+Todoist; the tool never removes a file under `archived/`. After the project is unarchived, the sync
+stores its active data under `sync/` again, so the same tasks can be in both places; see
+[Copies of the same task](#copies-of-the-same-task). A project deleted after it was listed and
+before its snapshot was fetched has no snapshot.
+
+## Copies of the same task
+
+The tool never removes a task from one place when it stores it in another, so the same task can be
+stored up to four times:
+
+| Copy | When it exists |
+|---|---|
+| `sync/items/<task id>.json` | The task was active while a backup ran. The file keeps the last payload the sync returned, also after the task was completed (`"checked": true`) or its project archived. |
+| `completed/<YYYY-MM>.json` | The task is completed, and its month was fetched while its project was not archived. |
+| `archived/<project id>/full.json` | The task is open, and its project is archived. |
+| `archived/<project id>/completed.json` | The task is completed, and its project is archived. |
+
+All copies share the task's `id` and have the same fields. The current copy is the one with the
+newest `updated_at`. If several copies have the same `updated_at`, a copy under `archived/` is
+current, then one under `completed/`, then one under `sync/`.
+
+The rule follows from how Todoist sets `updated_at`. Completing a task moves its `updated_at`
+forward, so a completed copy beats the open copy it replaced. Archiving or unarchiving the project
+does not change the `updated_at` of its tasks, so the copies from before and after archiving have
+the same value, and the order of places picks the snapshot, which was fetched last. A new comment
+does not change `updated_at` either, so the `note_count` of the current copy can be lower than the
+number of comments stored for the task. Deletions are recorded only under `sync/` (see
+[Active data](#active-data)).
+
+The completion records in `completed/activity/` and `completed/backfill/` record single
+completions, not the state of a task, and are not copies in this sense.
+
+**Comments of a task.** The comments of a completed task can be in `completed/comments/<task id>.json`,
+and the comments of a task of an archived project in `archived/<project id>/comments/<task id>.json`,
+so a completed task of a project archived after it was backed up can have both. The comments of
+the task are the union of both files. The copies of one comment share its `id`; if both files hold
+it, the copy under `archived/` is current, by the same order of places.
+
 ## JSON encoding
 
 Every `.json` file the tool writes is encoded the same way on every operating system:
@@ -204,13 +333,15 @@ Every `.json` file the tool writes is encoded the same way on every operating sy
 - object keys in the order the API returned them.
 
 Each object file holds exactly the JSON value the API returned for that object, with every field
-and nothing added, and so does each entry in a file under `completed/`. Only whitespace and the
-spelling of numbers can differ from the API's text.
+and nothing added, and so does each entry in a file under `completed/` or `archived/`, and each
+`project.json` and `full.json` as a whole. Only whitespace and the spelling of numbers can differ
+from the API's text.
 
 ## File names
 
 An object's file name is built from its key: usually its `id`, sometimes several fields (the
-`sync/` section names them). The comments of a completed task are named after the task's `id`. Each key component is encoded on its own:
+`sync/` section names them). The comment files of a task are named after the task's `id`, and the
+directory of an archived project after the project's `id`. Each key component is encoded on its own:
 
 - the characters `A`-`Z`, `a`-`z`, `0`-`9`, `_` and `-` are kept;
 - every other character is written as its UTF-8 bytes, each as `%XX` with uppercase hex digits.
@@ -228,7 +359,8 @@ characters long; the tool refuses to store a key whose encoded name would be lon
 
 On a case-insensitive file system (the default on Windows and macOS), two keys that differ only in
 letter case would share a file. The tool checks the key stored in a file before it replaces it, and
-fails instead of overwriting one object with another.
+fails instead of overwriting one object with another. Likewise, before it writes into the directory
+of an archived project, it checks the `id` stored in its `project.json` and `full.json`.
 
 ## State file
 
@@ -276,6 +408,9 @@ comments of completed tasks has come. Months are UTC months in the form `YYYY-MM
 
 Each field advances only after the files it covers are written. A backup without the `completed`
 object starts this part as on a first run.
+
+`state.json` holds no checkpoint for archived projects: each snapshot's `project.json` is its own
+checkpoint (see [Archived projects](#archived-projects)).
 
 Times are UTC in ISO 8601 format. The first run creates `state.json` without a sync token before
 it writes anything else, which marks the directory as a todoist-takeout backup. Fields that a later

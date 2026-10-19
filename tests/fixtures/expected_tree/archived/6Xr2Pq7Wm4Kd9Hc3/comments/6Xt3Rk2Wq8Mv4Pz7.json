@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "id": "6Xc7Gd3Ps6Uj9Xm4",
+      "posted_uid": "2671355",
+      "item_id": "6Xt3Rk2Wq8Mv4Pz7",
+      "content": "Grey or white?",
+      "file_attachment": null,
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2024-02-10T08:15:00.000000Z",
+      "reactions": {}
+    },
+    {
+      "id": "6Xc7Gd2Nr5Th8Wk3",
+      "posted_uid": "2671355",
+      "item_id": "6Xt3Rk2Wq8Mv4Pz7",
+      "content": "Sample from the shop",
+      "file_attachment": {
+        "resource_type": "file",
+        "file_name": "fliesen.jpg",
+        "file_size": 183204,
+        "file_type": "image/jpeg",
+        "file_url": "https://example.com/fliesen.jpg",
+        "upload_state": "completed"
+      },
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2024-02-11T09:30:00.000000Z",
+      "reactions": {}
+    }
+  ]
+}

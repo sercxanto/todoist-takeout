@@ -5,18 +5,18 @@
   "collaborators": [],
   "completed_info": [],
   "day_orders": {
-    "4xg79F91vP5BzZ6d": 0,
-    "5uo66I9ZVe3R3dXf": 0,
-    "1qv54R3wCSt9etm3": 0,
-    "1gy92d1n87CiN52r": 0,
-    "5ll58e4prQVOBVfv": 0,
-    "6gr63a1kdhbMXNxa": 0
+    "3qo34C68jV9YzW9u": 0,
+    "7ag31G4XOs0K2hFz": 0,
+    "2yz07S0dXAl5hda0": 0,
+    "9au12r7r85PwR68x": 0,
+    "9cs09w0uoTNYRUng": 0,
+    "7fk48y7lrkaGFEvj": 0
   },
   "filters": [
     {
       "color": "charcoal",
       "description": "",
-      "id": "9062657962",
+      "id": "5090686036",
       "is_deleted": false,
       "is_favorite": false,
       "is_frozen": false,
@@ -28,7 +28,7 @@
     {
       "color": "charcoal",
       "description": "",
-      "id": "7074214642",
+      "id": "4306974674",
       "is_deleted": false,
       "is_favorite": false,
       "is_frozen": false,
@@ -45,22 +45,33 @@
   "incomplete_project_ids": [],
   "items": [],
   "labels": [],
-  "live_notifications": [],
-  "live_notifications_last_read_id": "5",
+  "live_notifications": [
+    {
+      "created_at": "2000-01-01T00:00:00.000000Z",
+      "id": "9837375900",
+      "is_deleted": false,
+      "is_unread": true,
+      "karma_level": 0,
+      "notification_key": "<scrubbed>",
+      "notification_type": "karma_level",
+      "promo_img": "https://example.invalid/"
+    }
+  ],
+  "live_notifications_last_read_id": "9837375900",
   "locations": [],
   "notes": [],
   "project_notes": [],
   "project_view_options_defaults": [
     {
       "calendar_settings": null,
-      "creator_uid": 59685852,
+      "creator_uid": 87508419,
       "filtered_by": null,
       "grouped_by": null,
-      "project_id": "6gj6eIJYtgpMG4Rc",
+      "project_id": "8np5jCDRdurWX4Nh",
       "show_completed_tasks": false,
       "sort_order": "<scrubbed>",
       "sorted_by": null,
-      "updater_uid": 59685852,
+      "updater_uid": 87508419,
       "view_mode": "<scrubbed>"
     }
   ],
@@ -75,12 +86,12 @@
       "child_order": 0,
       "color": "charcoal",
       "created_at": "2000-01-01T00:00:00.000000Z",
-      "creator_uid": "59685852",
+      "creator_uid": "87508419",
       "default_order": 0,
       "default_order_key": null,
       "description": "",
       "icon": null,
-      "id": "6gj6eIJYtgpMG4Rc",
+      "id": "8np5jCDRdurWX4Nh",
       "inbox_project": true,
       "is_archived": false,
       "is_collapsed": false,
@@ -832,22 +843,22 @@
         "locale": "<scrubbed>",
         "templates": [
           {
-            "id": "axmxgji",
+            "id": "yvutjol",
             "name": "<scrubbed>",
             "template_type": "project"
           },
           {
-            "id": "izj-zrlcrw-vasfet",
+            "id": "obt-xjzfth-ikwmii",
             "name": "<scrubbed>",
             "template_type": "project"
           },
           {
-            "id": "lktoeagv-icydsxxk",
+            "id": "aydgbdch-pzrufuta",
             "name": "<scrubbed>",
             "template_type": "project"
           },
           {
-            "id": "xzbe-mtvfyxh",
+            "id": "lyer-ytxfrzo",
             "name": "<scrubbed>",
             "template_type": "setup"
           }
@@ -855,7 +866,7 @@
       },
       "is_deleted": false,
       "type": "templates",
-      "user_id": "59685852"
+      "user_id": "87508419"
     }
   ],
   "sync_status": {},
@@ -926,9 +937,9 @@
     "has_magic_number": false,
     "has_password": true,
     "has_started_a_trial": false,
-    "id": "59685852",
+    "id": "87508419",
     "image_id": null,
-    "inbox_project_id": "6gj6eIJYtgpMG4Rc",
+    "inbox_project_id": "8np5jCDRdurWX4Nh",
     "is_celebrations_enabled": true,
     "is_deleted": false,
     "is_onboarded": false,
@@ -989,42 +1000,42 @@
   "user_item_orders": [
     {
       "is_deleted": false,
-      "item_id": "4xg79F91vP5BzZ6d",
+      "item_id": "3qo34C68jV9YzW9u",
       "order_key": "<scrubbed>",
       "scope": "day",
       "scope_id": 5
     },
     {
       "is_deleted": false,
-      "item_id": "1gy92d1n87CiN52r",
+      "item_id": "9au12r7r85PwR68x",
       "order_key": "<scrubbed>",
       "scope": "day",
       "scope_id": 5
     },
     {
       "is_deleted": false,
-      "item_id": "5ll58e4prQVOBVfv",
+      "item_id": "9cs09w0uoTNYRUng",
       "order_key": "<scrubbed>",
       "scope": "day",
       "scope_id": 5
     },
     {
       "is_deleted": false,
-      "item_id": "1qv54R3wCSt9etm3",
+      "item_id": "2yz07S0dXAl5hda0",
       "order_key": "<scrubbed>",
       "scope": "day",
       "scope_id": 5
     },
     {
       "is_deleted": false,
-      "item_id": "5uo66I9ZVe3R3dXf",
+      "item_id": "7ag31G4XOs0K2hFz",
       "order_key": "<scrubbed>",
       "scope": "day",
       "scope_id": 5
     },
     {
       "is_deleted": false,
-      "item_id": "6gr63a1kdhbMXNxa",
+      "item_id": "7fk48y7lrkaGFEvj",
       "order_key": "<scrubbed>",
       "scope": "day",
       "scope_id": 5

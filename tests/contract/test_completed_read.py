@@ -56,7 +56,7 @@ def test_completed_endpoints_match_recorded_shapes(account, contract_support, re
         added += [f"{name}: {line}" for line in new]
         for line in removed:
             warnings.warn(f"{account} account, {name}: not in the response: {line}")
-    for name in sorted(expected.keys() - bodies.keys()):
+    for name in sorted(recorder.COMPLETED_ENDPOINTS.keys() - bodies.keys()):
         findings[name] = "not requested"
         warnings.warn(f"{account} account: no completed task with comments found; {name} not compared")
     write_findings(f"completed-read-{account}", findings, token)

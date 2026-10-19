@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from todoist_takeout import storage
+from todoist_takeout import storage, sync
 from todoist_takeout.errors import StorageError
 from todoist_takeout.resources import KNOWN, Classifier, object_key
 from todoist_takeout.sync import apply_response
@@ -279,6 +279,132 @@ def test_incremental_sync_does_not_count_missing_objects(tmp_path, sync_fixture,
         stats = apply(tmp_path, sync_fixture("incremental_edit"))
     assert stats.missing == 0
     assert caplog.records == []
+
+
+# Completed and archived objects in a full sync (add-archived-projects-backup, design D9).
+# "Token no longer accepted" is test_server_full_sync_keeps_missing_objects_and_warns above.
+
+ARCHIVED_PROJECT = "6X7fphhgwcXVGccJ"
+ACTIVE_PROJECT = "6Jf8VQXxpwv56VQ7"
+
+
+def incremental(**resources):
+    return {"sync_token": "INC-2", "full_sync": False, **resources}
+
+
+def server_full_sync(full, **omitted):
+    """The full sync fixture as a server-initiated full sync, without the objects with the given IDs."""
+    response = {**full, "sync_token": "FULL-2"}
+    for resource, ids in omitted.items():
+        response[resource] = [obj for obj in full[resource] if obj["id"] not in ids]
+    return response
+
+
+def completed_task(full, task_id, project_id):
+    return {**full["items"][0], "id": task_id, "project_id": project_id, "section_id": None,
+            "checked": True, "completed_at": "2026-10-01T09:00:00.000000Z"}
+
+
+def apply_and_log(tmp_path, response, caplog):
+    with caplog.at_level(logging.INFO, logger="todoist_takeout.sync"):
+        stats = apply(tmp_path, response)
+    warnings = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+    infos = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    return stats, warnings, infos
+
+
+def test_completed_tasks_do_not_count_as_missing(tmp_path, sync_fixture, caplog):
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    done = [completed_task(full, f"6X7rDone{n:08d}", ACTIVE_PROJECT) for n in range(40)]
+    apply(tmp_path, incremental(items=done))
+    age_all_files(tmp_path)
+    before = snapshot(tmp_path)
+
+    stats, warnings, infos = apply_and_log(tmp_path, server_full_sync(full), caplog)
+
+    assert stats.missing == 0 and warnings == []
+    assert infos == ["40 stored objects that were completed or archived were not in the full sync, as expected"]
+    assert snapshot(tmp_path) == before
+    assert set(mtimes(tmp_path).values()) == {OLD}
+
+
+def test_archived_project_and_its_objects_do_not_count_as_missing(tmp_path, sync_fixture, caplog):
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    project = {**full["projects"][1], "is_archived": True}
+    assert project["id"] == ARCHIVED_PROJECT
+    apply(tmp_path, incremental(projects=[project], items=[completed_task(full, "6X7rDoneInP1abcd", ARCHIVED_PROJECT)]))
+    age_all_files(tmp_path)
+    before = snapshot(tmp_path)
+    # The project, its section, its open task, its completed task, the open task's comment and the
+    # project comment.
+    response = server_full_sync(
+        full, projects={ARCHIVED_PROJECT}, sections={"6X7FxXvX84jHphx2"}, items={"6X7rM8997g3RQmvh"},
+        notes={"6X7rfFVQXwRmcvFp"}, project_notes={"6X7v4F2r7hH8cGWW"},
+    )
+
+    stats, warnings, infos = apply_and_log(tmp_path, response, caplog)
+
+    assert stats.missing == 0 and warnings == []
+    assert infos == ["6 stored objects that were completed or archived were not in the full sync, as expected"]
+    assert snapshot(tmp_path) == before
+
+
+def test_archived_section_does_not_count_as_missing(tmp_path, sync_fixture, caplog):
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    section = {**full["sections"][0], "is_archived": True, "archived_at": "2026-10-01T09:00:00.000000Z"}
+    apply(tmp_path, incremental(sections=[section]))
+    before = (tmp_path / "sync/sections/6X7FxXvX84jHphx2.json").read_bytes()
+
+    stats, warnings, _ = apply_and_log(tmp_path, server_full_sync(full, sections={section["id"]}), caplog)
+
+    assert stats.missing == 0 and warnings == []
+    assert (tmp_path / "sync/sections/6X7FxXvX84jHphx2.json").read_bytes() == before
+
+
+def test_comments_of_completed_tasks_do_not_count_as_missing(tmp_path, sync_fixture, caplog):
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    task = {**full["items"][0], "checked": True, "completed_at": "2026-10-01T09:00:00.000000Z"}
+    apply(tmp_path, incremental(items=[task]))
+    response = server_full_sync(full, items={task["id"]}, notes={"6X7rfFVQXwRmcvFp"})
+
+    stats, warnings, infos = apply_and_log(tmp_path, response, caplog)
+
+    assert stats.missing == 0 and warnings == []
+    assert infos == ["2 stored objects that were completed or archived were not in the full sync, as expected"]
+
+
+def test_only_live_open_objects_count_as_missing(tmp_path, sync_fixture, caplog):
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    apply(tmp_path, incremental(items=[completed_task(full, f"6X7rDone{n:08d}", ACTIVE_PROJECT) for n in range(10)]))
+    response = server_full_sync(full, items={"6X7rfFVPjhvv84XG", "6X7rfEVP8hvv25ZQ"})
+
+    stats, warnings, infos = apply_and_log(tmp_path, response, caplog)
+
+    assert stats.missing == 2
+    assert len(warnings) == 1 and warnings[0].startswith("2 stored objects were not in the full sync")
+    assert infos == ["10 stored objects that were completed or archived were not in the full sync, as expected"]
+
+
+def test_missing_count_keeps_only_the_fields_that_decide_it(tmp_path, sync_fixture):
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    apply(tmp_path, incremental(items=[completed_task(full, "6X7rDone00000001", ACTIVE_PROJECT)]))
+
+    stored = sync._stored_live_objects(tmp_path / "sync")
+
+    kept = {"id", "project_id", "item_id", "checked", "is_archived", "is_deleted"}
+    values = [value for values in stored.values() for value in values.values()]
+    assert len(values) == sum(len(full[name]) for name in stored) + 1
+    assert all(set(value) <= kept for value in values)
+    assert stored["items"]["6X7rDone00000001"] == {"id": "6X7rDone00000001", "project_id": ACTIVE_PROJECT,
+                                                   "checked": True, "is_deleted": False}
+    assert "item_id" in full["notes"][0]
+    assert set(stored["notes"]["6X7rfFVQXwRmcvFp"]) == kept & set(full["notes"][0])
 
 
 # --- 4.7 restored objects -----------------------------------------------------

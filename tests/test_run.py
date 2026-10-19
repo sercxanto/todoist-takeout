@@ -241,8 +241,8 @@ def test_plan_without_comments_warns_and_the_run_succeeds(tmp_path, caplog):
     assert requests == ["INC-1"]
     # The fixture's plan also has `reminders: false`, which does not warn (design D12).
     assert _plan_warnings(caplog) == [
-        "the Todoist plan 'free' does not include comments; task and project comments cannot be backed up "
-        "on this plan"
+        "the Todoist plan 'free' does not include comments; task and project comments (including those of "
+        "archived projects) cannot be backed up on this plan"
     ]
     assert state(tmp_path)["sync_token"] == "INC-5"
     assert state(tmp_path)["last_successful_run_utc"] is not None

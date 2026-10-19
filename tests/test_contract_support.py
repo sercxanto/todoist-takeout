@@ -101,7 +101,7 @@ def test_write_tests_skip_without_the_allow_flag(tmp_path):
     result = subprocess.run(
         [
             sys.executable, "-m", "pytest", "-m", "contract", "-q", "-rs", "-p", "no:cacheprovider",
-            "tests/contract/test_write.py", "tests/contract/test_probe_write.py",
+            "tests/contract/test_write.py", "tests/contract/test_archived_write.py",
         ],
         cwd=ROOT,
         env=env,

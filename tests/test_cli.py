@@ -127,8 +127,8 @@ def test_default_run_prints_info_lines_one_warning_and_the_summary(tmp_path, cap
     lines = stderr_lines(capsys)
     assert all(line.split(" ", 1)[0] in {"INFO", "WARNING"} for line in lines), lines
     assert [line for line in lines if line.startswith("WARNING ")] == [
-        "WARNING the Todoist plan 'free' does not include comments; task and project comments cannot be "
-        "backed up on this plan"
+        "WARNING the Todoist plan 'free' does not include comments; task and project comments (including those "
+        "of archived projects) cannot be backed up on this plan"
     ]
     assert "INFO requesting a full sync of the account" in lines
     assert lines[-1] == "INFO backup complete: 31 objects written, 0 unchanged, 0 marked deleted, 1 warning"
@@ -139,8 +139,8 @@ def test_quiet_run_prints_only_the_warning(tmp_path, capsys):
     cli = Cli(FakeApi(NO_COMMENTS))
     assert cli("backup", str(tmp_path), "--quiet") == 0
     assert stderr_lines(capsys) == [
-        "WARNING the Todoist plan 'free' does not include comments; task and project comments cannot be "
-        "backed up on this plan"
+        "WARNING the Todoist plan 'free' does not include comments; task and project comments (including those "
+        "of archived projects) cannot be backed up on this plan"
     ]
 
 

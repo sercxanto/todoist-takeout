@@ -6,7 +6,8 @@
     python scripts/record_fixtures.py shapes                   # regenerates shapes.json only
 
 Recording is read-only: it makes a full sync and one incremental sync, sends no commands, and
-records one page of each completed-tasks endpoint (see record_completed). All responses are
+records one page of each completed-tasks endpoint (see record_completed), and one page of the
+archived projects with the `/full` of one of them (see record_archived). All responses are
 scrubbed together before they are written to `tests/fixtures/recorded/<account>/`, so that nothing
 of the account is committed: strings become placeholders, IDs random pseudonyms and numbers zero
 (see Scrubber). Field names, booleans and enum-like values stay.
@@ -27,7 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from todoist_takeout import completed, resources, storage  # noqa: E402
+from todoist_takeout import archived, completed, resources, storage  # noqa: E402
 from todoist_takeout.api import Client, UrllibTransport  # noqa: E402
 
 FIXTURES = ROOT / "tests" / "fixtures"
@@ -39,17 +40,32 @@ HAND_WRITTEN = [FIXTURES / "sync" / "full_sync.json", FIXTURES / "sync" / "incre
 SYNC_FILES = ("full", "incremental")
 # The GET endpoints of the completed-tasks backup: recording name → path, and the hand-written
 # fixtures under tests/fixtures/completed/ that stand in for its shapes as long as nothing is recorded.
-ENDPOINTS = {
+COMPLETED_ENDPOINTS = {
     "by_completion_date": (completed.BY_COMPLETION_DATE, ["by_completion_date_1", "by_completion_date_2"]),
     "tasks_completed": (completed.TASKS_COMPLETED, ["tasks_completed"]),
     "activities": (completed.ACTIVITIES, ["activities_1", "activities_2"]),
     "comments": (completed.COMMENTS, ["comments"]),
+}
+# The same for the archived-projects backup, with hand-written fixtures under tests/fixtures/archived/.
+ARCHIVED_ENDPOINTS = {
+    "projects_archived": (archived.ARCHIVED_PROJECTS, ["list_1", "list_2"]),
+    "project_full": ("projects/{id}/full", ["full_parent", "full_child"]),
+}
+ENDPOINTS = {**COMPLETED_ENDPOINTS, **ARCHIVED_ENDPOINTS}
+HAND_WRITTEN_DIRECTORIES = {
+    **{name: FIXTURES / "completed" for name in COMPLETED_ENDPOINTS},
+    **{name: FIXTURES / "archived" for name in ARCHIVED_ENDPOINTS},
 }
 RECORDING_FILES = SYNC_FILES + tuple(ENDPOINTS)
 # Smaller than the tool's page sizes, to keep the recordings small; the shape is the same.
 RECORD_PAGE_LIMIT = 50
 # How many months before the current one record_completed searches for completed tasks.
 SEARCH_MONTHS = 12
+# How many archived projects record_archived tries for a `/full` with tasks and sections: the whole
+# recorded page, because few archived projects have sections.
+FULL_CANDIDATES = RECORD_PAGE_LIMIT
+# The lists of `/full` whose entries the shapes describe; record_archived prefers a project with these.
+FULL_LISTS = ("tasks", "sections", "subprojects", "collaborators", "collaborator_states")
 
 TOKEN_VARIABLES = {"read": "TODOIST_CONTRACT_TOKEN", "write": "TODOIST_CONTRACT_WRITE_TOKEN"}
 
@@ -340,11 +356,11 @@ def shape_sources() -> list[Path]:
 
 
 def endpoint_shape_sources() -> dict[str, list[Path]]:
-    """The recordings of each completed-tasks endpoint, or its hand-written fixtures."""
+    """The recordings of each GET endpoint, or its hand-written fixtures."""
     sources = {}
     for name, (_path, hand_written) in ENDPOINTS.items():
         recorded = sorted(RECORDED.glob(f"*/{name}.json"))
-        sources[name] = recorded or [FIXTURES / "completed" / f"{stem}.json" for stem in hand_written]
+        sources[name] = recorded or [HAND_WRITTEN_DIRECTORIES[name] / f"{stem}.json" for stem in hand_written]
     return sources
 
 
@@ -395,6 +411,17 @@ def compare_shapes(expected: dict, actual: dict) -> tuple[list[str], list[str]]:
     return added, removed
 
 
+def compare_endpoint_bodies(expected: dict, bodies: dict[str, bytes]) -> dict[str, tuple[list[str], list[str]]]:
+    """(added, removed) of each response in `bodies`, by recording name, against `expected`, the
+    `endpoints` of shapes.json. A missing `next_cursor` is not listed as removed: the last page of a
+    cursor walk has none, and one page may be the last."""
+    result = {}
+    for name, body in bodies.items():
+        added, removed = compare_shapes(expected[name], endpoint_shape_of(json.loads(body)))
+        result[name] = (added, [line for line in removed if line != f"key {completed.CURSOR!r}"])
+    return result
+
+
 def write_shapes() -> Path:
     SHAPES.write_bytes(storage.encode_json(generate_shapes()))
     return SHAPES
@@ -435,6 +462,7 @@ def record(account: str, now: datetime | None = None) -> list[Path]:
     incremental = client.sync(json.loads(full)["sync_token"])
     bodies = {"full": full, "incremental": incremental}
     bodies.update(record_completed(client, now or datetime.now(timezone.utc)))
+    bodies.update(record_archived(client))
     directory = RECORDED / account
     directory.mkdir(parents=True, exist_ok=True)
     return _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values()), token))))
@@ -481,6 +509,34 @@ def record_completed(client: Client, now: datetime) -> dict[str, bytes]:
     return bodies
 
 
+def record_archived(client: Client) -> dict[str, bytes]:
+    """The first page of archived projects, and the `/full` of one project on it. Read-only.
+
+    So that the shapes describe the fields of tasks and sections, the `/full` of up to
+    FULL_CANDIDATES listed projects is requested, stopping at the first with tasks and sections.
+    Without one, the project whose `/full` has the most non-empty lists is recorded, the earliest
+    on a tie. Without an archived project, `/full` is not recorded.
+    """
+    listed = client.get(archived.ARCHIVED_PROJECTS, {"limit": str(RECORD_PAGE_LIMIT)})
+    bodies = {"projects_archived": listed}
+    projects = json.loads(listed).get("results") or []
+    project_ids = [str(p["id"]) for p in projects if isinstance(p, dict) and "id" in p][:FULL_CANDIDATES]
+    best, best_score = None, -1
+    for project_id in project_ids:
+        body = client.get(archived.full_path(project_id), {})
+        full = json.loads(body)
+        score = sum(1 for key in FULL_LISTS if isinstance(full.get(key), list) and full[key])
+        if score > best_score:
+            best, best_score = body, score
+        if full.get("tasks") and full.get("sections"):
+            break
+    if best is not None:
+        bodies["project_full"] = best
+    else:
+        print("no archived project; projects/{id}/full not recorded", file=sys.stderr)
+    return bodies
+
+
 def _previous_month(month: str) -> str:
     return completed.month_of(completed.month_start(month) - timedelta(days=1))
 
@@ -519,7 +575,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
     record_parser = commands.add_parser(
-        "record", help="record a full and an incremental sync and the completed-tasks endpoints, then regenerate shapes"
+        "record", help="record a full and an incremental sync, the completed-tasks and the archived-projects endpoints, "
+        "then regenerate shapes"
     )
     record_parser.add_argument("--account", choices=sorted(TOKEN_VARIABLES), required=True)
     commands.add_parser("rescrub", help="apply the current scrubbing rules to the recordings, then regenerate shapes")
