@@ -11,14 +11,23 @@ from pathlib import Path
 
 import pytest
 
-from todoist_takeout import completed, storage, sync
+from todoist_takeout import archived, completed, storage, sync
 from todoist_takeout.api import Client
 from todoist_takeout.cli import main
 from todoist_takeout.errors import StorageError
 from todoist_takeout.lock import LOCK_FILE
 from todoist_takeout.resources import Classifier
 
-from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, TASKS_COMPLETED, FakeApi, completed_fixture
+from fake_api import (
+    ACTIVITIES,
+    ARCHIVED_PROJECTS,
+    BY_COMPLETION_DATE,
+    COMMENTS,
+    TASKS_COMPLETED,
+    FakeApi,
+    archived_fixture,
+    completed_fixture,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EXPECTED_TREE = FIXTURES / "expected_tree"
@@ -75,6 +84,22 @@ def completed_answers(api: FakeApi) -> FakeApi:
     return api.answer(ACTIVITIES, {}, {"results": [before_t0, at_t0], "next_cursor": None})
 
 
+def archived_answers(api: FakeApi) -> FakeApi:
+    """One archived project in the second of two list pages, with an archived sub-project that only its
+    /full names, completed tasks in two pages of one window, a commented task and a project comment."""
+    parent = archived_fixture("full_parent")
+    project_id = parent["project"]["id"]
+    api.cursor_pages(ARCHIVED_PROJECTS, {}, [{"results": [], "next_cursor": "YXJjaGl2ZWQ6Mg"},
+                                             {"results": [parent["project"]], "next_cursor": None}])
+    for full in (parent, archived_fixture("full_child")):
+        api.answer(archived.full_path(full["project"]["id"]), {}, full)
+    window = {"since": "2024-01-01T00:00:00.000000Z", "until": "2024-03-31T23:59:59.999999Z", "project_id": project_id}
+    api.cursor_pages(BY_COMPLETION_DATE, window, [archived_fixture("completed_1"), archived_fixture("completed_2")])
+    [commented] = [task for task in parent["tasks"] if task["note_count"]]
+    api.answer(COMMENTS, {"task_id": commented["id"]}, archived_fixture("comments_task"))
+    return api.answer(COMMENTS, {"project_id": project_id}, archived_fixture("comments_project"))
+
+
 def test_cli_backup_matches_the_expected_tree(tmp_path, monkeypatch):
     responses = {
         "*": (FIXTURES / "sync" / "full_sync.json").read_bytes(),
@@ -85,7 +110,7 @@ def test_cli_backup_matches_the_expected_tree(tmp_path, monkeypatch):
     target = tmp_path / "backup"
 
     def factory(token, max_rate_limit_wait):
-        return Client(completed_answers(FakeApi(responses)), sleep=lambda delay: None)
+        return Client(archived_answers(completed_answers(FakeApi(responses))), sleep=lambda delay: None)
 
     assert main(["backup", "--quiet", str(target)], client_factory=factory) == 0
     produced = files(target)

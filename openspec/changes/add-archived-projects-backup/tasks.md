@@ -42,10 +42,10 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 6. Whole runs
 
-- [ ] 6.1 Add crash and resume tests for this part: with the fault-injection hook at several counts during a first run with three archived projects, one with a sub-project, a rerun produces the tree of an uninterrupted run byte for byte and makes no `/full` request for a finished snapshot
-- [ ] 6.2 Add an idempotence test: two runs with unchanged fake responses leave every file under `archived/` with the same bytes and modification time
-- [ ] 6.3 Extend the end-to-end CLI test of `tests/test_cross_platform.py` and `tests/fixtures/expected_tree/` with an `archived/` snapshot. Verify that the produced tree matches byte for byte on Linux, and that the test runs in the CI matrix
-- [ ] 6.4 Update the project `README.md`: the backup scope with archived projects, the roadmap, and advice for the first run on an account with many archived projects. Verify that every link in the changed sections resolves
+- [x] 6.1 Add crash and resume tests for this part: with the fault-injection hook at several counts during a first run with three archived projects, one with a sub-project, a rerun produces the tree of an uninterrupted run byte for byte and makes no `/full` request for a finished snapshot
+- [x] 6.2 Add an idempotence test: two runs with unchanged fake responses leave every file under `archived/` with the same bytes and modification time
+- [x] 6.3 Extend the end-to-end CLI test of `tests/test_cross_platform.py` and `tests/fixtures/expected_tree/` with an `archived/` snapshot. Verify that the produced tree matches byte for byte on Linux, and that the test runs in the CI matrix
+- [x] 6.4 Update the project `README.md`: the backup scope with archived projects, the roadmap, and advice for the first run on an account with many archived projects. Verify that every link in the changed sections resolves
 
 ## 7. Fixture recording, contract tests and probe removal
 

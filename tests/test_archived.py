@@ -765,3 +765,104 @@ def test_info_line_is_logged_when_the_run_fails(tmp_path, caplog):
         "archived projects: 2 listed, 1 snapshots fetched (1 new, 0 again), 0 parts filled in; "
         "2 comment files written"
     ]
+
+
+# --- 6.1 crash and resume -----------------------------------------------------------------------
+
+GARDEN = {**TRIP, "id": "6Xr2Pq5Ht8Jw2Ga4", "name": "Garden", "created_at": "2026-04-12T08:00:00.000000Z"}
+WEEDS = completed_task("6Xt9Gg0000000001", GARDEN["id"], "2026-05-10T07:30:00.000000Z", note_count=1)
+
+
+def three_projects():
+    """PARENT, TRIP and GARDEN listed, and CHILD in the subprojects of PARENT. GARDEN has a completed
+    task with a comment, so that its snapshot, like PARENT's, starts with a comment file."""
+    api = listing(renovation(), [PARENT], [TRIP, GARDEN])
+    api.answer(archived.full_path(GARDEN["id"]), {}, full_response(GARDEN))
+    api.cursor_pages(BY_COMPLETION_DATE, window_params(GARDEN["id"], windows(GARDEN)[0]), [{"items": [WEEDS]}])
+    remark = comment("6Xc9Gg0000000001", WEEDS["id"], "2026-05-09T18:00:00.000000Z")
+    api.answer(COMMENTS, {"task_id": WEEDS["id"]}, {"results": [remark], "next_cursor": None})
+    return api
+
+
+def tree(target):
+    return {p.relative_to(target).as_posix(): p.read_bytes() for p in target.rglob("*") if p.is_file()}
+
+
+# Writes of an uninterrupted first run with three_projects(): 53 for the sync and the completed-tasks
+# part, then this part in the order of design D3: PARENT (comments of TILES, project_comments.json,
+# completed.json, full.json, project.json), TRIP (the last four), GARDEN (like PARENT), CHILD (like
+# TRIP), and finally state.json.
+ARCHIVED_START = 53
+FIRST_RUN_WRITES = 72
+
+
+@pytest.fixture(scope="module")
+def first_run_tree(tmp_path_factory):
+    target = tmp_path_factory.mktemp("reference")
+    run(target, three_projects())
+    return tree(target)
+
+
+def crash(target, fault_after):
+    storage.set_fault_after(fault_after)
+    with pytest.raises(storage.InjectedFault):
+        run(target, three_projects())
+    storage.set_fault_after(None)
+
+
+def finished(target):
+    """The IDs of the projects whose snapshot is finished."""
+    root = target / "archived"
+    return {json.loads(p.read_bytes())["id"] for p in root.glob(f"*/{archived.PROJECT_FILE}")} if root.exists() else set()
+
+
+def test_crash_points_cover_this_part_of_the_first_run(tmp_path, first_run_tree, monkeypatch):
+    started = []
+    real_run = archived.run
+
+    def counting_run(*args, **kwargs):
+        started.append(storage._fault_after)
+        return real_run(*args, **kwargs)
+
+    monkeypatch.setattr(archived, "run", counting_run)
+    storage.set_fault_after(FIRST_RUN_WRITES)
+    run(tmp_path / "beyond", three_projects())
+    assert storage._fault_after == 0  # armed, never reached: the run makes exactly FIRST_RUN_WRITES writes
+    assert started == [FIRST_RUN_WRITES - ARCHIVED_START]
+    monkeypatch.undo()
+
+    crash(tmp_path / "first", ARCHIVED_START)
+    # The first write of this part failed and left only its temporary file.
+    assert [p.name.endswith(".tmp") for p in (tmp_path / "first" / "archived").rglob("*") if p.is_file()] == [True]
+    crash(tmp_path / "last", FIRST_RUN_WRITES - 1)
+    assert finished(tmp_path / "last") == {p["id"] for p in (PARENT, TRIP, GARDEN, CHILD)}
+    assert {f"archived/{p['id']}/project.json" for p in (PARENT, TRIP, GARDEN, CHILD)} <= first_run_tree.keys()
+    assert f"archived/{GARDEN['id']}/comments/{WEEDS['id']}.json" in first_run_tree
+
+
+@pytest.mark.parametrize("fault_after", range(ARCHIVED_START, FIRST_RUN_WRITES))
+def test_resume_after_a_crash_in_this_part_gives_the_uninterrupted_result(tmp_path, first_run_tree, fault_after):
+    crash(tmp_path, fault_after)
+    done = finished(tmp_path)
+
+    api = run(tmp_path, three_projects())
+
+    assert tree(tmp_path) == first_run_tree
+    fetched = {path for path, _ in archived_requests(api) if path.endswith("/full")}
+    assert fetched == {archived.full_path(p["id"]) for p in (PARENT, TRIP, GARDEN, CHILD) if p["id"] not in done}
+
+
+# --- 6.2 idempotence ----------------------------------------------------------------------------
+
+
+def test_repeat_run_leaves_every_snapshot_file_unchanged(tmp_path):
+    run(tmp_path, three_projects())
+    paths = [p for p in (tmp_path / "archived").rglob("*") if p.is_file()]
+    before = age_files(tmp_path)
+
+    api = run(tmp_path, three_projects(), now=LATER)
+
+    assert age_files(tmp_path) == before
+    assert [p for p in paths if p.stat().st_mtime_ns != OLD] == []
+    assert len(paths) == 18  # the snapshots of four projects, two of them with a comment file
+    assert [path for path, _ in archived_requests(api)] == [ARCHIVED_PROJECTS, ARCHIVED_PROJECTS]

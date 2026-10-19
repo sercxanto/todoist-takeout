@@ -2,7 +2,7 @@
 
 A command-line tool that keeps a complete, long-term readable local backup of a [Todoist](https://www.todoist.com) account.
 
-> **Status:** early. Backing up active data (projects, sections, labels, tasks, comments and the other resources of the sync API) and completed tasks, with every completion of recurring tasks and the comments of completed tasks, works. Archived projects are not backed up yet; see the [Roadmap](#roadmap).
+> **Status:** early. Backing up active data (projects, sections, labels, tasks, comments and the other resources of the sync API), completed tasks, with every completion of recurring tasks and the comments of completed tasks, and archived projects works. Attachment files are not downloaded yet; see the [Roadmap](#roadmap).
 
 ## Why
 
@@ -49,10 +49,13 @@ The backup contains a `README.md` that describes its format; the same descriptio
 - **Completed tasks** under `completed/`, one file per month (UTC). A month is fetched again on every run until 7 days after it ended, then it is frozen: later changes to its tasks, and completions backdated into it, are not captured.
 - **One event per completion**, including every completion of a recurring task, which the completed tasks do not show. Completions from the first run on come from the activity log; earlier ones are fetched once, on the first runs.
 - **Comments of completed tasks**, with the metadata of their attachments. Attachment files are not downloaded yet.
+- **Archived projects** under `archived/`, one directory per project with its open and completed tasks, its sections, its archived sub-projects, and the comments of the project and of its tasks. A project is fetched once, when it first shows up as archived; later changes to its content are not captured, unless it is unarchived and archived again. A snapshot stays in the backup after the project is unarchived or deleted.
 
-Not yet included: archived projects, and the completed tasks inside them. The summary line counts the objects under `sync/`; separate `INFO` lines report the completed tasks.
+Not included: sections that were archived before the first backup, because the API cannot list them. The summary line counts the objects under `sync/`; separate `INFO` lines report the completed tasks and the archived projects.
 
-**The first run on a large account** makes a few requests per month since the account was created, and one per completed task that has comments. It can reach the API's rate limit, and stops with exit status 1 once waiting would exceed `--max-rate-limit-wait`. Simply run it again, as often as needed: each run continues where the previous one stopped. Or allow a longer wait for the first run, for example `--max-rate-limit-wait 3600`.
+**The same task can be stored more than once,** for example in `sync/items/`, in a month file under `completed/` and in the snapshot of its archived project. All copies share the task's `id`. The current copy is the one with the newest `updated_at`; on equal values, the copy under `archived/` is current, then the one under `completed/`, then the one under `sync/`. The [format description](src/todoist_takeout/storage_format.md#copies-of-the-same-task) lists every place.
+
+**The first run on a large account** makes a few requests per month since the account was created, and one per completed task that has comments. Each archived project adds one request for the project, one per three months since it was created, one per task with comments and one for the project's comments, so an account with 50 archived projects needs a few hundred more; later runs fetch only newly archived projects. The first run can therefore reach the API's rate limit, and stops with exit status 1 once waiting would exceed `--max-rate-limit-wait`. Simply run it again, as often as needed: each run continues where the previous one stopped, and does not fetch the archived projects it already stored. Or allow a longer wait for the first run, for example `--max-rate-limit-wait 3600`.
 
 **On the Free plan,** the activity log keeps only 7 days. Run the backup at least weekly; otherwise the completions of recurring tasks in the gap may be lost, and the tool warns about it.
 
@@ -177,14 +180,15 @@ These will be written up in more detail in the design documents of the correspon
 
 - **Raw payloads are the source of truth.** API responses are stored unchanged as JSON, so fields the tool does not know about are preserved. A queryable SQLite database may be derived from them later.
 - **The backup holds the current state, with tombstones.** Objects deleted in Todoist stay in the backup and are marked as deleted. Older versions are not kept, because a file-based backup of the backup directory provides history.
-- **Layout:** one file per active object at `sync/<type>/<id>.json`, and one file per month for completed tasks at `completed/<YYYY-MM>.json`, with month boundaries in UTC. The current month is included.
+- **Layout:** one file per active object at `sync/<type>/<id>.json`, one file per month for completed tasks at `completed/<YYYY-MM>.json`, with month boundaries in UTC, and one directory per archived project at `archived/<project id>/`. The current month is included.
 - **Completed tasks are frozen.** A month of completed tasks is fetched again until 7 days after it ended; changes made later to its tasks are not captured.
+- **Archived projects are snapshots.** An archived project is fetched once, and again only when its listed payload changes, for example after it was unarchived and archived again. Nothing is removed from `sync/` once a snapshot holds it.
 
 ## Roadmap
 
 1. **Sync active data** *(implemented)*: a full sync, then incremental syncs, with checkpointing and tombstones. The format is described in [storage_format.md](src/todoist_takeout/storage_format.md). The behaviour is specified in [openspec/specs/](openspec/specs/); the planning is archived in [openspec/changes/archive/2026-10-18-add-active-data-sync/](openspec/changes/archive/2026-10-18-add-active-data-sync/).
 2. **Back up completed tasks** *(implemented)*: month files for completed tasks, written incrementally, with every completion of recurring tasks and the comments of completed tasks. The behaviour is specified in [openspec/specs/completed-tasks-backup/](openspec/specs/completed-tasks-backup/); the planning is archived in [openspec/changes/archive/2026-10-18-add-completed-tasks-backup/](openspec/changes/archive/2026-10-18-add-completed-tasks-backup/).
-3. **Back up archived projects** with their sections, tasks and comments, which the sync endpoint does not return. The API questions are answered; specs and design are next. See [openspec/changes/add-archived-projects-backup/](openspec/changes/add-archived-projects-backup/).
+3. **Back up archived projects** *(implemented)*: a snapshot per archived project with its sections, open and completed tasks, sub-projects and comments, which the sync endpoint does not return. The behaviour is specified and the planning described in [openspec/changes/add-archived-projects-backup/](openspec/changes/add-archived-projects-backup/).
 4. **Download attachment files.**
 5. **Derive a SQLite database** from the raw JSON, for queries and migration.
 6. **Download Todoist's own backups** (`/api/v1/backups`) as an additional safety net. This is an idea, not yet evaluated.
