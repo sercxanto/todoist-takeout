@@ -20,8 +20,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 2. Storage primitives
 
-- [ ] 2.1 Add `attachment_file_name` to `storage.py` with the steps of design D8. Verify with unit tests for every scenario of the spec requirements "Attachment file names" and "Attachment file name length", plus `CONIN$`, `COM¹`, `con .txt`, a name of only dots, and an extension longer than 16 characters, and a test that creates every produced name in a temporary directory
-- [ ] 2.2 Add `write_stream_atomic` to `storage.py` with the size check and the fault-injection point of design D7. Verify with unit tests: chunks arrive in order, a size mismatch leaves no file and no temp file, `expected_size=None` skips the check, an exception from the chunk iterator leaves no file, and an injected fault leaves only a temp file that `remove_temp_files` removes
+- [x] 2.1 Add `attachment_file_name` to `storage.py` with the steps of design D8. Verify with unit tests for every scenario of the spec requirements "Attachment file names" and "Attachment file name length", plus `CONIN$`, `COM¹`, `con .txt`, a name of only dots, and an extension longer than 16 characters, and a test that creates every produced name in a temporary directory
+- [x] 2.2 Add `write_stream_atomic` to `storage.py` with the size check and the fault-injection point of design D7. Verify with unit tests: chunks arrive in order, a size mismatch leaves no file and no temp file, `expected_size=None` skips the check, an exception from the chunk iterator leaves no file, and an injected fault leaves only a temp file that `remove_temp_files` removes
 
 ## 3. File transport and client
 

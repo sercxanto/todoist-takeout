@@ -66,3 +66,32 @@ class AuthError(ApiError):
 
 class PlanRestricted(ApiError):
     """The request needs a feature that the user's plan does not include."""
+
+
+class AttachmentSkipped(RunError):
+    """An attachment file was not stored for a reason that a warning reports, without ending the run."""
+
+
+class AttachmentRefused(AttachmentSkipped):
+    """The file host refused an attachment file: a 4xx other than 429, or a redirect that is not followed."""
+
+    def __init__(self, message: str, *, http_status: int | None = None):
+        super().__init__(message)
+        self.http_status = http_status
+
+
+class UnexpectedHost(AttachmentSkipped):
+    """An attachment file's URL is not HTTPS on a Todoist host, so it is not requested."""
+
+    def __init__(self, message: str, *, host: str | None):
+        super().__init__(message)
+        self.host = host
+
+
+class SizeMismatch(AttachmentSkipped):
+    """A downloaded file's length differs from the size the payload states. Nothing was stored."""
+
+    def __init__(self, message: str, *, expected: int, actual: int):
+        super().__init__(message)
+        self.expected = expected
+        self.actual = actual
