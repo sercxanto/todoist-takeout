@@ -70,6 +70,20 @@ incremental and return only what changed since the previous one; the files of al
 stay as they are. An empty array or object in an incremental sync means that nothing changed. A
 single value is replaced as a whole. If the server sends a full sync again, objects missing from it
 are kept unchanged, and the tool warns how many there were; they may have been deleted in Todoist.
+Objects that left the sync because they were completed or archived do not count as missing: tasks
+stored with `"checked": true`, projects and sections stored with `"is_archived": true`, objects
+whose `project_id` names such a project, and the comments of such tasks. The tool logs their number
+separately, without a warning.
+
+**Completed and archived objects.** A full sync contains no completed task, no archived project or
+section, and nothing inside an archived project. When a task is completed, or a project or section
+is archived, the next incremental sync returns it once more, with `"checked": true` or
+`"is_archived": true`, and its file keeps that payload. The sections, tasks and comments of an
+archived project are not returned again; their files keep the content they had before. Archiving
+a section completes its tasks. An archived section stays in `sync/sections/` as the sync reported
+it, although later full syncs no longer contain it. Sections archived before the first backup are
+not in the backup: the API offers no way to list them, and only the `section_id` of their tasks is
+left.
 
 **Deleted objects.** When an object is deleted in Todoist, the sync returns it with
 `"is_deleted": true`. The deletion payload usually has all its fields, but with their values

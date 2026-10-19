@@ -19,8 +19,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 2. Missing-object count of a full sync
 
-- [ ] 2.1 Extend `_stored_live_keys` in `sync.py` with the exclusions of design D9 (archived projects, objects whose `project_id` names one, checked items, archived sections, notes of excluded items), keep the warning for the rest, and log the excluded count at INFO. Verify with apply tests for every scenario of the modified requirement "Server-initiated full sync": "Token no longer accepted", "Completed tasks", "Archived project" (six objects), "Archived section" and "Mixed"
-- [ ] 2.2 Document in `storage_format.md` that objects which left the sync because they were completed or archived do not count as missing after a full sync, and that archived sections stay as the sync reported them, while sections archived before the first backup are lost apart from the `section_id` of their tasks. Verify that `tests/test_storage_format.py` passes
+- [x] 2.1 Extend `_stored_live_keys` in `sync.py` with the exclusions of design D9 (archived projects, objects whose `project_id` names one, checked items, archived sections, notes of excluded items), keep the warning for the rest, and log the excluded count at INFO. Verify with apply tests for every scenario of the modified requirement "Server-initiated full sync": "Token no longer accepted", "Completed tasks", "Archived project" (six objects), "Archived section" and "Mixed"
+- [x] 2.2 Document in `storage_format.md` that objects which left the sync because they were completed or archived do not count as missing after a full sync, and that archived sections stay as the sync reported them, while sections archived before the first backup are lost apart from the `section_id` of their tasks. Verify that `tests/test_storage_format.py` passes
 
 ## 3. Fixtures and snapshot fetch
 
