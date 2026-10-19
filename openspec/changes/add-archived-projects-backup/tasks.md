@@ -14,8 +14,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 ## 1. Last probe and the format rule for copies
 
 - [x] 1.1 Add a write probe to the probe spike (`tests/contract/probes.py`, `tests/contract/test_probe_write.py`) on the Free account that records booleans only, never values: whether a task's `updated_at` changes when it is completed, when a comment is added, and when its project is archived and unarchived; whether the list of archived projects contains an archived sub-project of an archived parent; and whether `subprojects` of `/full` holds a grandchild. Verify offline that `tests/test_contract_probes.py` passes and that the probe's output holds no ID, timestamp or content
-- [ ] 1.2 With the user, run the probe of 1.1 against the Free account, and record the results under "API findings" in `proposal.md`. Verify that the findings file stays untracked (`git status` shows nothing under `tests/contract/findings/`) and that `proposal.md` holds no live ID or content
-- [ ] 1.3 Settle the rule for picking the current copy of a task (design D11) from the result of 1.2, and update D11 and the design's Open Questions to match. Verify that design.md no longer calls the rule proposed
+- [x] 1.2 With the user, run the probe of 1.1 against the Free account, and record the results under "API findings" in `proposal.md`. Verify that the findings file stays untracked (`git status` shows nothing under `tests/contract/findings/`) and that `proposal.md` holds no live ID or content
+- [x] 1.3 Settle the rule for picking the current copy of a task (design D11) from the result of 1.2, and update D11 and the design's Open Questions to match. Verify that design.md no longer calls the rule proposed
 
 ## 2. Missing-object count of a full sync
 

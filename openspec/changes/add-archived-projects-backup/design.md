@@ -87,7 +87,7 @@ For each listed project, the tool encodes the listed payload with `encode_json` 
 
 Byte equality is the same rule `write_bytes_atomic` uses. It needs no knowledge of which fields change when. The INFO log names the number of projects fetched again, so that frequent refetches would be noticed (see Risks).
 
-*Alternative: compare `updated_at` only.* Rejected for now. Whether archiving bumps `updated_at` is unknown (proposal, task fields finding). Missing a re-archive would lose data, while an extra refetch costs only requests.
+*Alternative: compare `updated_at` only.* Rejected for now. Probe W8 shows that a project's `updated_at` moves forward on archiving and on unarchiving, but not which other changes move it. Missing a re-archive would lose data, while an extra refetch costs only requests.
 
 *Alternative: take the signal from the sync, which reports `is_archived` changes.* Rejected as the only rule. The sync sees an unarchive only if a run happens while the project is active, and it never sees projects archived before the first backup.
 
@@ -153,7 +153,9 @@ Errors other than plan restrictions and the 404s named in D5 and D6 behave as in
 | `archived/<project id>/full.json` | open task of an archived project |
 | `archived/<project id>/completed.json` | completed task of an archived project |
 
-All copies share the task's `id`. The proposed rule is: the copy with the newest `updated_at` is current, and on equal values `archived/` beats `completed/`, which beats `sync/`. Tasks 1.1 to 1.3 check with a write probe whether `updated_at` changes on completion and archiving, and settle the rule. The README states the rule that the probe supports. The same table covers comments in `completed/comments/` and `archived/<id>/comments/`.
+All copies share the task's `id`. The rule is: the copy with the newest `updated_at` is current, and on equal values `archived/` beats `completed/`, which beats `sync/`. Probe W8 (proposal, API findings) supports it: completing a task moves `updated_at` forward, so a completed copy beats the open copy it replaced. Archiving and unarchiving the project leave `updated_at` unchanged, so the copies from before and after archiving tie, and the source order picks the snapshot, which was fetched last. A new comment does not change `updated_at` either; the format description therefore says that `note_count` of the chosen copy can be older than the comments stored for the task. The README states the rule.
+
+Comments are stored in `completed/comments/` and `archived/<id>/comments/`. A comment's copies share its `id`; the union of both files is the task's comments, and on the same `id` the copy in `archived/` beats the one in `completed/`, by the same source order.
 
 The section on archived sections states that sections archived before the first backup are not in the backup, apart from the `section_id` of their tasks.
 
@@ -186,7 +188,7 @@ One INFO line per run: archived projects listed, snapshots fetched (new and agai
 - [The first run on an account with many archived projects exceeds the rate-limit budget] → It exits with status 1, and the next run continues with the first project without `project.json`. The README advises a larger `--max-rate-limit-wait` for the first run.
 - [The missing-object rule hides a real deletion of a completed task or of an object of an archived project] → Accepted. Deletions normally arrive as `is_deleted` in an incremental sync. The rule only removes warnings that are wrong today.
 - [The same task or comment is stored up to four times] → Documented with a rule for picking the current copy (D11). A condensed view deduplicates by `id`.
-- [`updated_at` does not change on completion or archiving] → The rule falls back to the source order. Only the README's wording depends on the probe.
+- [A task is changed without a new `updated_at`, for example by a new comment, and its copies tie] → The source order picks the copy fetched last. Probe W8 found that comments and archiving do not move `updated_at`; the format description says so (D11).
 
 ## Migration Plan
 
@@ -194,5 +196,7 @@ None. Format version 1 is extended in place (D11). To roll back, delete `archive
 
 ## Open Questions
 
-- Whether `updated_at` changes on completion, comments, archiving and unarchiving. This changes only the README's rule for picking the current copy (D11), not the code.
-- Whether `subprojects` holds direct children only or all descendants. D8 handles both.
+None. Answered by probe W8 (proposal, API findings):
+
+- `updated_at` of a task moves forward on completion, and not on a new comment, on archiving or on unarchiving. D11 settles the rule for picking the current copy on that basis.
+- The list of archived projects holds archived sub-projects at every depth, and `subprojects` of an archived parent's `/full` holds none of them. D8 handles this: the list alone yields every snapshot, and the queue only guards against a sub-project that the list leaves out.

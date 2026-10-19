@@ -1,6 +1,6 @@
 # Proposal
 
-> Status: the API questions are answered by contract probes (2026-10-18, see API findings). The design questions are settled in `design.md` (2026-10-19, see Open Questions); the behaviour of `updated_at` is checked by a last probe (tasks 1.1 to 1.3). Split off from `add-completed-tasks-backup` (2026-10-18), because archived projects are snapshots per project rather than a time series.
+> Status: the API questions are answered by contract probes (2026-10-18 and 2026-10-19, see API findings). The design questions are settled in `design.md` (2026-10-19, see Open Questions), including the rule for picking the current copy of a task, which the last probe decided (tasks 1.1 to 1.3). Split off from `add-completed-tasks-backup` (2026-10-18), because archived projects are snapshots per project rather than a time series.
 
 ## Why
 
@@ -36,7 +36,7 @@ The sync endpoint returns neither archived projects nor the sections, tasks and 
 
 ## API findings
 
-From contract probes against a Pro and a Free account (2026-10-18, `tests/contract/test_probe_*.py`). The findings files are not committed, so the results are recorded here.
+From contract probes against a Pro and a Free account (2026-10-18, `tests/contract/test_probe_*.py`), and a last write probe W8 against the Free account (2026-10-19, `test_updated_at_and_subprojects`, booleans only). The findings files are not committed, so the results are recorded here.
 
 - **`projects/archived`:** `{results, next_cursor}` with cursor pagination. The project payloads have the same schema as in the sync, with `is_archived: true`. `projects/archived/count` matches the list. Archived projects are not in the sync.
 - **`projects/{id}/full`:** top-level keys `project`, `tasks`, `sections`, `subprojects`, `collaborators`, `collaborator_states`, `folder`, `comments_count`. `tasks` holds only open tasks, `sections` only sections that are not archived; there are no comments.
@@ -44,7 +44,9 @@ From contract probes against a Pro and a Free account (2026-10-18, `tests/contra
 - **Comments:** `GET comments?task_id=…` works for open and completed tasks of an archived project, and `?project_id=…` for project comments.
 - **Archiving a project:** the next incremental sync returns only the project, with `is_archived: true` and `is_deleted: false`; its sections, tasks and comments are not in it and stay live and unchanged in `sync/`. The next full sync omits the project and all of its content, so the missing-object warning of `add-active-data-sync` (design D8) counts them (6 objects in the probe).
 - **Completed tasks in the sync:** after a task is completed, the next incremental sync returns it with `checked: true` and `completed_at` set; the next full sync omits it. Its sync payload equals its `by_completion_date` entry, with no field and no value differing. The missing-object warning therefore counts every completed task stored in `sync/items/`.
-- **Task fields across sources:** sync `items`, `by_completion_date` entries and the `tasks` of `/full` have the same 28 fields, none more or fewer, including `updated_at` (a string). Sections from `/full` have `updated_at` and `archived_at`. Entries of the deprecated `tasks/completed` have no `updated_at` of their own; the fields of their `item_object` are not recorded. Whether `updated_at` changes when a task is completed or commented, or when its project is archived or unarchived, is unknown: the probes scrub timestamps. That decides whether "newest `updated_at` wins" can tell which of several stored copies of a task is current.
+- **Task fields across sources:** sync `items`, `by_completion_date` entries and the `tasks` of `/full` have the same 28 fields, none more or fewer, including `updated_at` (a string). Sections from `/full` have `updated_at` and `archived_at`. Entries of the deprecated `tasks/completed` have no `updated_at` of their own; the fields of their `item_object` are not recorded.
+- **`updated_at` of a task (W8):** completing a task moves its `updated_at` forward, in the incremental sync and in `by_completion_date` alike. Adding a comment does not change it. Archiving the task's project does not change it, neither for an open task in `/full` nor for a completed task in `by_completion_date`, and unarchiving does not change it either. The project's own `updated_at` moves forward on archiving and again on unarchiving.
+- **Archived sub-projects (W8):** archiving a parent with a child and a grandchild puts all three into the list of archived projects, each with `is_archived: true`. The `subprojects` of the archived parent's `/full` hold neither the archived child nor the grandchild, and those of the child's `/full` do not hold the grandchild. Unarchiving the parent leaves the child and the grandchild archived.
 - **Archiving a section:** completes the section's tasks (`checked: true`, `completed_at` set), so they appear in `by_completion_date`. The section appears once in the incremental sync with `is_archived: true` and `archived_at`, and afterwards neither in a full sync nor in `/full`.
 
 ## Open Questions
@@ -57,8 +59,5 @@ Resolved in `design.md`:
 - **Detecting newly archived projects:** the listed payload is compared byte for byte with the stored `project.json`; a missing file means a new or unfinished snapshot, different bytes mean the project is fetched again, for example after it was unarchived and archived again (D4, D5). `project.json` is written last and serves as the checkpoint (D3).
 - **Missing-object count:** excluded are projects and sections stored with `is_archived: true`, tasks stored with `checked: true`, objects whose `project_id` names an archived project, and comments of excluded tasks. The warning counts the rest; the excluded count is logged at INFO (D9).
 - **Archived sub-projects:** every archived entry of `subprojects` is backed up with its own snapshot, whether the list of archived projects contains it or not (D8).
-
-Still open, without effect on the code:
-
-- Whether `updated_at` changes when a task is completed or commented, or when its project is archived or unarchived. It decides only the format description's rule for picking the current copy of a task (design D11, tasks 1.1 to 1.3).
-- Whether `subprojects` holds direct children only or all descendants. Design D8 handles both.
+- **Current copy of a task:** the copy with the newest `updated_at`; on equal values `archived/` beats `completed/`, which beats `sync/` (D11, from probe W8).
+- **Sub-projects in `/full`:** answered by probe W8: the list of archived projects holds archived sub-projects at every depth, and `subprojects` of an archived parent holds none of them. Design D8 handles this.
