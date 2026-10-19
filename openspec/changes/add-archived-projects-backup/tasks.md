@@ -54,6 +54,14 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 - [x] 7.3 Add a write contract test, Free account only and behind the existing guard: create a project with a sub-project, a section, an open task, a completed task and comments, archive the parent, run the tool into a temporary backup, force a full sync, and assert both snapshots, the comment files and no missing-object warning. Run it with the user. Verify that it passes and cleans up the projects it created
 - [x] 7.4 Remove the probe spike (`tests/contract/probes.py`, `tests/contract/test_probe_*.py`, `tests/test_contract_probes.py`) now that its findings are in the proposals. Verify that the offline suite and `pytest --collect-only tests/contract` pass, and that no remaining file imports `probes`
 
+## 8. Review findings
+
+- [x] 8.1 Add a failing run test for the stale comments marker (a refetch without comments and a `completed.json` fill-in without comments, each followed by a run with comments), then implement the per-task rule of design D6 with a `_stored_tasks(directory)` helper and the empty comment file on 404. Verify with run tests for "Comments allowed again after a refetch without them" and "Comments of a task gone", and that a repeat run of a complete snapshot requests only the list
+- [x] 8.2 End the windows at the month of the project's `updated_at` (design D7). Verify with run tests for "Project created three years ago" (7 windows), "Archive date unknown" (13 windows) and an `updated_at` after the current month
+- [x] 8.3 Make `_stored_live_keys` keep only the fields of design D9. Verify that the apply tests of "Server-initiated full sync" pass unchanged, and with a unit test that the kept values hold only those fields
+- [x] 8.4 Rename `_tasks` in `archived.py` to `_list_of`. Verify that the offline suite passes
+- [x] 8.5 Document in `storage_format.md` the empty comment file after a 404, the per-task fill-in rule and the end of the windows. Verify that `tests/test_storage_format.py`, the crash tests and the idempotence test pass
+
 ## Workflow follow-up
 
 - Archive the change once the review is done, and check that the main specs gain `archived-projects-backup` and the modified requirements of `backup-storage` and `active-data-sync`.

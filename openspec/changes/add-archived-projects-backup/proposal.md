@@ -10,7 +10,7 @@ The sync endpoint returns neither archived projects nor the sections, tasks and 
 
 - The tool lists archived projects through `GET /api/v1/projects/archived` and backs up, for each one:
   - the project and its open tasks, sections and sub-projects, from `GET /api/v1/projects/{id}/full`;
-  - its completed tasks, from `GET /api/v1/tasks/completed/by_completion_date` with `project_id`, in windows of up to 3 months over the project's lifetime;
+  - its completed tasks, from `GET /api/v1/tasks/completed/by_completion_date` with `project_id`, in windows of up to 3 months from its creation until it was archived;
   - the comments of its tasks (for tasks with `note_count > 0`) and of the project itself, from `GET /api/v1/comments`, with attachment metadata as in the payload and no attachment files.
 - An archived project is fetched once; changes made later to its content are deliberately not captured, as for completed tasks.
 - A project that is archived after it was backed up keeps its stored data; its tasks do not silently disappear from the backup.
@@ -32,7 +32,7 @@ The sync endpoint returns neither archived projects nor the sections, tasks and 
 ## Impact
 
 - Builds on the CLI, API access, storage and checkpoint handling of `add-active-data-sync` (archived), and on `add-completed-tasks-backup` for GET requests and pagination, fetching completed tasks and comments, and the comment files of completed tasks.
-- Requests per archived project: one for `/full`, one per 3-month window of its lifetime for completed tasks, and one per task with comments plus one for project comments. An account with 56 archived projects needs a few hundred requests on the first run; later runs fetch only newly archived projects.
+- Requests per archived project: one for `/full`, one per 3-month window from its creation until it was archived for completed tasks, and one per task with comments plus one for project comments. An account with 56 archived projects needs a few hundred requests on the first run; later runs fetch only newly archived projects.
 
 ## API findings
 

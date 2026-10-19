@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from todoist_takeout import storage
+from todoist_takeout import storage, sync
 from todoist_takeout.errors import StorageError
 from todoist_takeout.resources import KNOWN, Classifier, object_key
 from todoist_takeout.sync import apply_response
@@ -388,6 +388,23 @@ def test_only_live_open_objects_count_as_missing(tmp_path, sync_fixture, caplog)
     assert stats.missing == 2
     assert len(warnings) == 1 and warnings[0].startswith("2 stored objects were not in the full sync")
     assert infos == ["10 stored objects that were completed or archived were not in the full sync, as expected"]
+
+
+def test_missing_count_keeps_only_the_fields_that_decide_it(tmp_path, sync_fixture):
+    full = sync_fixture("full_sync")
+    apply(tmp_path, full)
+    apply(tmp_path, incremental(items=[completed_task(full, "6X7rDone00000001", ACTIVE_PROJECT)]))
+
+    stored = sync._stored_live_objects(tmp_path / "sync")
+
+    kept = {"id", "project_id", "item_id", "checked", "is_archived", "is_deleted"}
+    values = [value for values in stored.values() for value in values.values()]
+    assert len(values) == sum(len(full[name]) for name in stored) + 1
+    assert all(set(value) <= kept for value in values)
+    assert stored["items"]["6X7rDone00000001"] == {"id": "6X7rDone00000001", "project_id": ACTIVE_PROJECT,
+                                                   "checked": True, "is_deleted": False}
+    assert "item_id" in full["notes"][0]
+    assert set(stored["notes"]["6X7rfFVQXwRmcvFp"]) == kept & set(full["notes"][0])
 
 
 # --- 4.7 restored objects -----------------------------------------------------

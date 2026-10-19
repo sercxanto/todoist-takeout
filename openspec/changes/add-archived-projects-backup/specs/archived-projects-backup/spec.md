@@ -40,12 +40,20 @@ The snapshot of an archived project SHALL hold the project's payload as listed, 
 - **WHEN** an archived project has one project comment
 - **THEN** the snapshot holds that comment
 
+#### Scenario: Comments of a task gone
+- **WHEN** the comment request of a task with `note_count: 2` answers 404
+- **THEN** the snapshot holds an empty comment file for it, and later runs make no comment request for it
+
 ### Requirement: Completed tasks over the project's lifetime
-The tool SHALL fetch an archived project's completed tasks from `GET /api/v1/tasks/completed/by_completion_date` filtered by the project's `id`, in consecutive windows of at most 3 months from the month of the project's `created_at` through the current month, following every page.
+The tool SHALL fetch an archived project's completed tasks from `GET /api/v1/tasks/completed/by_completion_date` filtered by the project's `id`, in consecutive windows of at most 3 months from the month of the project's `created_at` through the month of the project's `updated_at`, or through the current month if that is earlier or `updated_at` is not parseable, following every page.
 
 #### Scenario: Project created three years ago
-- **WHEN** an archived project was created in October 2023 and the run happens in October 2026
-- **THEN** the tool requests 13 windows, the first starting on 2023-10-01 and the last ending after the current month
+- **WHEN** an archived project was created in October 2023, its `updated_at` is in June 2025, and the run happens in October 2026
+- **THEN** the tool requests 7 windows, the first starting on 2023-10-01 and the last ending on 2025-06-30
+
+#### Scenario: Archive date unknown
+- **WHEN** an archived project was created in October 2023, its payload has no parseable `updated_at`, and the run happens in October 2026
+- **THEN** the tool requests 13 windows, the last ending after the current month
 
 #### Scenario: Creation date unknown
 - **WHEN** an archived project's payload has no parseable `created_at`
@@ -122,6 +130,10 @@ When the plan excludes completed tasks or comments, the tool SHALL store the sna
 #### Scenario: Plan upgraded
 - **WHEN** snapshots were stored without completed tasks, and a later run finds `completed_tasks: true`
 - **THEN** that run fetches the completed tasks of each stored snapshot that lacks them, and does not fetch the rest of those snapshots again
+
+#### Scenario: Comments allowed again after a refetch without them
+- **WHEN** a snapshot with `project_comments.json` was fetched again while the plan excluded comments, and a later run finds `comments: true`
+- **THEN** that run fetches the comments of the snapshot's tasks that have `note_count` > 0 and no comment file
 
 #### Scenario: List restricted
 - **WHEN** the request for the list of archived projects is rejected as restricted by the plan

@@ -216,11 +216,15 @@ def _fetch_months(target: Path, client: Client, state: dict, moment: datetime, *
 class _CommentStore:
     """Fetches the comments of tasks and stores them in `directory`, one file per task (design D8)."""
 
-    def __init__(self, directory: Path, client: Client, *, enabled: bool, owner: str = "completed tasks"):
+    def __init__(self, directory: Path, client: Client, *, enabled: bool, owner: str = "completed tasks",
+                 empty_when_gone: bool = False):
         self.directory = directory
         self.client = client
         self.enabled = enabled
         self.owner = owner  # whose comments these are, for the plan warning
+        # Whether a task whose comments are not found gets a file with an empty list, so that a
+        # missing file means "not fetched yet" (archived design D6).
+        self.empty_when_gone = empty_when_gone
         self.written = 0
 
     def update(self, stored: dict | None, tasks: list, *, fetch_missing: bool = False) -> None:
@@ -248,6 +252,12 @@ class _CommentStore:
             if not self.enabled:
                 return
 
+    def missing(self, task) -> bool:
+        """Whether a task has comments (`note_count` positive) and no comment file."""
+        task_id = _task_id(task)
+        count = task.get("note_count") if isinstance(task, dict) else None
+        return task_id is not None and _is_int(count) and count > 0 and not self.path(task_id).exists()
+
     def _fetch(self, task_id: str) -> None:
         try:
             pages = fetch_pages(self.client, COMMENTS, {"task_id": task_id}, COMMENTS_PAGE_LIMIT, "results")
@@ -263,7 +273,9 @@ class _CommentStore:
             if exc.http_status != 404:
                 raise
             log.debug("the comments of a task were not found (HTTP 404); the task may have been deleted")
-            return
+            if not self.empty_when_gone:
+                return
+            pages = []
         path = self.path(task_id)
         stored = read_stored(path, "results")
         if stored is not None:

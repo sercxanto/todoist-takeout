@@ -146,10 +146,11 @@ class _Backup:
             return None
         items = self._completed_items(project_id, project)
         if self.comments:
-            stored_tasks = [*_tasks(_read_object(directory / FULL_FILE), "tasks"),
-                            *_tasks(completed.read_stored(directory / COMPLETED_FILE, "items"), "items")]
-            fetched_tasks = [*_tasks(full, "tasks"), *_tasks(items, "items")]
-            self._task_comments(directory, {"items": stored_tasks} if stored_tasks else None, fetched_tasks)
+            stored_tasks = _stored_tasks(directory)
+            fetched_tasks = [*_list_of(full, "tasks"), *_list_of(items, "items")]
+            store = self._comment_store(directory)
+            store.update({"items": stored_tasks} if stored_tasks else None, fetched_tasks, fetch_missing=True)
+            self._count_comments(store)
             self._project_comments(project_id, directory)
         if items is not None:
             storage.write_bytes_atomic(directory / COMPLETED_FILE, storage.encode_json(items))
@@ -165,19 +166,23 @@ class _Backup:
         if self.completed_tasks and not (directory / COMPLETED_FILE).exists():
             items = self._completed_items(project_id, project)
             if items is not None:
-                if self.comments:
-                    tasks = _tasks(items, "items")
-                    self._task_comments(directory, {"items": tasks}, tasks)
+                # Its tasks' comments are left to the comments part below, which finds their files missing.
                 storage.write_bytes_atomic(directory / COMPLETED_FILE, storage.encode_json(items))
                 self.filled += 1
-        if self.comments and not (directory / PROJECT_COMMENTS_FILE).exists():
-            tasks = [*_tasks(_read_object(directory / FULL_FILE), "tasks"),
-                     *_tasks(completed.read_stored(directory / COMPLETED_FILE, "items"), "items")]
-            # Compared with themselves, only the tasks whose comment file is missing are fetched.
-            self._task_comments(directory, {"items": tasks}, tasks)
-            # The marker of the comments part, written last (design D6).
-            if self._project_comments(project_id, directory):
-                self.filled += 1
+        if not self.comments:
+            return
+        # The comments part is complete when the project's comments and a file for each task with
+        # comments are stored, since parts can be added to a snapshot while comments are not allowed.
+        store = self._comment_store(directory)
+        tasks = _stored_tasks(directory)
+        if (directory / PROJECT_COMMENTS_FILE).exists() and not any(store.missing(task) for task in tasks):
+            return
+        # Compared with themselves, only the tasks whose comment file is missing are fetched.
+        store.update({"items": tasks}, tasks, fetch_missing=True)
+        self._count_comments(store)
+        # Written last, so that a run ending early fetches the project's comments again.
+        if self._project_comments(project_id, directory):
+            self.filled += 1
 
     def _full(self, project_id: str) -> dict | None:
         path = full_path(project_id)
@@ -213,9 +218,12 @@ class _Backup:
             return None
         return completed.merge_pages(pages, "items", "completed_at")
 
-    def _task_comments(self, directory: Path, stored: dict | None, tasks: list) -> None:
-        store = completed._CommentStore(directory / COMMENTS_DIR, self.client, enabled=True, owner=OWNER)
-        store.update(stored, tasks, fetch_missing=True)
+    def _comment_store(self, directory: Path) -> "completed._CommentStore":
+        return completed._CommentStore(directory / COMMENTS_DIR, self.client, enabled=True, owner=OWNER,
+                                       empty_when_gone=True)
+
+    def _count_comments(self, store: "completed._CommentStore") -> None:
+        """Take over the plan flag and the count of written files from a comment store."""
         self.comments = store.enabled
         self.comment_files += store.written
 
@@ -242,17 +250,27 @@ class _Backup:
     # --- Windows over the project's lifetime (design D7) --------------------------------------
 
     def _windows(self, project: dict) -> Iterator[tuple[str, str]]:
-        """Three-month windows from the project's first month until one contains the current month."""
+        """Three-month windows from the project's first month until one contains its last month."""
         month = self._first_month(project)
-        current = completed.month_of(self.moment)
+        end = self._last_month(project)
         while True:
             last = month
             for _ in range(WINDOW_MONTHS - 1):
                 last = completed.next_month(last)
             yield completed.month_window(month)[0], completed.month_window(last)[1]
-            if last >= current:
+            if last >= end:
                 return
             month = completed.next_month(last)
+
+    def _last_month(self, project: dict) -> str:
+        """The month of the project's `updated_at`, which archiving moves forward, or the current month
+        if that is earlier or `updated_at` is unknown. No task of an archived project can be completed."""
+        current = completed.month_of(self.moment)
+        try:
+            updated = completed.month_of(completed.parse_time(project.get("updated_at")))
+        except ValueError:
+            return current
+        return min(updated, current)
 
     def _first_month(self, project: dict) -> str:
         """The month of the project's `created_at`, else the account's first month of completed tasks."""
@@ -298,7 +316,7 @@ def _read_object(path: Path) -> dict | None:
 def _archived_subprojects(full: dict | None) -> list[tuple[str, dict]]:
     """The entries of `subprojects` that are archived, with their IDs. The others are in the sync (design D8)."""
     found = []
-    for sub in _tasks(full, "subprojects"):
+    for sub in _list_of(full, "subprojects"):
         sub_id = _object_id(sub)
         if sub_id is not None and sub.get("is_archived") is True:
             found.append((sub_id, sub))
@@ -309,6 +327,13 @@ def _object_id(value) -> str | None:
     return completed._id_text(value.get("id")) if isinstance(value, dict) else None
 
 
-def _tasks(response: dict | None, key: str) -> list:
+def _stored_tasks(directory: Path) -> list:
+    """The open and completed tasks stored in a snapshot."""
+    return [*_list_of(_read_object(directory / FULL_FILE), "tasks"),
+            *_list_of(completed.read_stored(directory / COMPLETED_FILE, "items"), "items")]
+
+
+def _list_of(response: dict | None, key: str) -> list:
+    """The list in `key` of a response, or an empty list if it has none."""
     tasks = response.get(key) if response is not None else None
     return tasks if isinstance(tasks, list) else []

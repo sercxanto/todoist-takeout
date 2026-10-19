@@ -337,6 +337,10 @@ def _parse_stored(path: Path, data: bytes):
         raise StorageError(f"{path} is not a valid JSON file: {exc}") from exc
 
 
+# The fields of a stored object that decide whether a full sync leaves it out (design D9).
+_LEFT_OUT_FIELDS = ("id", "project_id", "item_id", "checked", "is_archived", "is_deleted")
+
+
 def _stored_live_keys(sync_dir: Path) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
     """Return the stems of the stored objects that are not marked deleted, per resource directory.
 
@@ -345,24 +349,7 @@ def _stored_live_keys(sync_dir: Path) -> tuple[dict[str, set[str]], dict[str, se
     `is_archived: true`, items with `checked: true`, objects whose `project_id` names an archived
     project, and notes of the items left out.
     """
-    stored: dict[str, dict[str, object]] = {}
-    if not sync_dir.is_dir():
-        return {}, {}
-    for directory in sorted(p for p in sync_dir.iterdir() if p.is_dir()):
-        names = set(_listdir(directory))
-        values = {}
-        for name in names:
-            if not name.endswith(JSON_SUFFIX) or name.endswith(DELETED_SUFFIX):
-                continue
-            stem = name[: -len(JSON_SUFFIX)]
-            if f"{stem}{DELETED_SUFFIX}" in names:
-                continue
-            value = _parse_stored(directory / name, storage.read_bytes(directory / name) or b"null")
-            if _is_deleted(value):
-                continue
-            values[stem] = value
-        stored[directory.name] = values
-
+    stored = _stored_live_objects(sync_dir)
     archived = {_id(v, "id") for v in stored.get(PROJECTS, {}).values() if _flag(v, "is_archived")} - {None}
     left_out_items = {
         _id(v, "id") for v in stored.get(ITEMS, {}).values() if _left_out(ITEMS, v, archived, set())
@@ -375,6 +362,29 @@ def _stored_live_keys(sync_dir: Path) -> tuple[dict[str, set[str]], dict[str, se
             excluded = _left_out(resource, value, archived, left_out_items)
             (left_out if excluded else live)[resource].add(stem)
     return live, left_out
+
+
+def _stored_live_objects(sync_dir: Path) -> dict[str, dict[str, dict]]:
+    """The stored objects that are not marked deleted, per resource directory and stem, each with
+    only the fields of `_LEFT_OUT_FIELDS`, so that a large backup is not held in memory."""
+    stored: dict[str, dict[str, dict]] = {}
+    if not sync_dir.is_dir():
+        return {}
+    for directory in sorted(p for p in sync_dir.iterdir() if p.is_dir()):
+        names = set(_listdir(directory))
+        values = {}
+        for name in names:
+            if not name.endswith(JSON_SUFFIX) or name.endswith(DELETED_SUFFIX):
+                continue
+            stem = name[: -len(JSON_SUFFIX)]
+            if f"{stem}{DELETED_SUFFIX}" in names:
+                continue
+            value = _parse_stored(directory / name, storage.read_bytes(directory / name) or b"null")
+            if _is_deleted(value):
+                continue
+            values[stem] = {k: value[k] for k in _LEFT_OUT_FIELDS if k in value} if isinstance(value, dict) else {}
+        stored[directory.name] = values
+    return stored
 
 
 def _left_out(resource: str, value, archived: set[str], left_out_items: set[str]) -> bool:

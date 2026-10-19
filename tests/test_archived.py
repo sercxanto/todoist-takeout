@@ -96,8 +96,8 @@ CHILD = archived_fixture("full_child")["project"]
 TRIP = archived_fixture("list_2")["results"][0]
 TILES = "6Xt3Rk2Wq8Mv4Pz7"  # the task of PARENT with two comments
 
-# The windows of PARENT, created in October 2023, at NOW (design D7).
-PARENT_WINDOWS = 13
+# The windows of PARENT, created in October 2023 and last updated in June 2026 (design D7).
+PARENT_WINDOWS = 11
 # The account's first month of completed tasks: the sync fixtures' user joined in August 2026.
 ACCOUNT_FIRST_MONTH = "2026-08"
 
@@ -238,7 +238,7 @@ def test_without_archived_projects_only_the_list_is_requested(tmp_path, monkeypa
 
 
 def test_snapshot_holds_the_open_tasks_and_sections_as_full_returned_them_and_the_completed_tasks(tmp_path):
-    project = {**TRIP, "created_at": "2026-04-20T00:00:00.000000Z"}
+    project = {**TRIP, "created_at": "2026-04-20T00:00:00.000000Z", "updated_at": "2026-10-01T09:00:00.000000Z"}
     full = {**archived_fixture("full_parent"), "project": project, "subprojects": []}
     done = [completed_task(f"6Xt9Aa{n:010d}", project["id"], f"2026-0{5 + n % 5}-1{n % 10}T08:00:00.000000Z")
             for n in range(18)]
@@ -291,7 +291,7 @@ def test_project_comments_are_stored(tmp_path):
 
 def test_windows_cover_three_months_each_from_the_creation_month_through_the_current_one():
     found = windows({"created_at": "2023-10-05T09:00:00.000000Z"})
-    assert len(found) == PARENT_WINDOWS
+    assert len(found) == 13
     assert found[0] == ("2023-10-01T00:00:00.000000Z", "2023-12-31T23:59:59.999999Z")
     assert found[-1] == ("2026-10-01T00:00:00.000000Z", "2026-12-31T23:59:59.999999Z")
     for (since, until), (next_since, _) in zip(found, found[1:]):
@@ -304,18 +304,37 @@ def test_a_window_ending_in_the_current_month_is_the_last():
         ("2026-08-01T00:00:00.000000Z", "2026-10-31T23:59:59.999999Z")]
 
 
-def test_completed_tasks_are_requested_in_thirteen_windows(tmp_path):
+def test_completed_tasks_are_requested_in_windows_through_the_last_update(tmp_path):
     api = run(tmp_path)
     requested = [p for p in api.requested(BY_COMPLETION_DATE) if p.get("project_id") == PARENT["id"]]
     firsts = [p for p in requested if "cursor" not in p]
     assert len(firsts) == PARENT_WINDOWS
     assert firsts[0]["since"] == "2023-10-01T00:00:00.000000Z"
-    assert firsts[-1]["until"] == "2026-12-31T23:59:59.999999Z"
+    assert firsts[-1]["until"] == "2026-06-30T23:59:59.999999Z"
     assert len(requested) == PARENT_WINDOWS + 1  # the second window has two pages
     stored = snapshot_file(tmp_path, PARENT["id"], "completed.json")
     assert list(stored) == ["items"]
     assert [t["completed_at"] for t in stored["items"]] == sorted(t["completed_at"] for t in stored["items"])
     assert len(stored["items"]) == 3
+
+
+@pytest.mark.parametrize("updated_at, count, until", [
+    pytest.param("2025-06-14T10:00:00.000000Z", 7, "2025-06-30T23:59:59.999999Z", id="three years ago"),
+    pytest.param(None, 13, "2026-12-31T23:59:59.999999Z", id="archive date unknown"),
+    pytest.param("not a time", 13, "2026-12-31T23:59:59.999999Z", id="archive date unparseable"),
+    pytest.param("2027-03-01T00:00:00.000000Z", 13, "2026-12-31T23:59:59.999999Z", id="after the current month"),
+])
+def test_windows_end_at_the_month_of_the_projects_last_update(tmp_path, updated_at, count, until):
+    project = {**TRIP, "created_at": "2023-10-05T09:00:00.000000Z", "updated_at": updated_at}
+    api = listing(FakeApi(account()), [project])
+    api.answer(archived.full_path(project["id"]), {}, full_response(project))
+
+    run(tmp_path, api)
+
+    firsts = [p for p in api.requested(BY_COMPLETION_DATE) if p.get("project_id") == project["id"]]
+    assert len(firsts) == count
+    assert firsts[0]["since"] == "2023-10-01T00:00:00.000000Z"
+    assert firsts[-1]["until"] == until
 
 
 @pytest.mark.parametrize("created_at", [None, "", "last spring"])
@@ -486,7 +505,7 @@ def test_unarchived_and_archived_again_is_fetched_again(tmp_path):
     listing(api, [parent], [TRIP])
     api.answer(archived.full_path(PARENT["id"]), {}, full)
     later = completed_task("6Xt9Dd0000000001", PARENT["id"], "2026-10-18T17:00:00.000000Z")
-    last = window_params(PARENT["id"], windows(PARENT, LATER)[-1])
+    last = window_params(PARENT["id"], windows(parent, LATER)[-1])
     api.cursor_pages(BY_COMPLETION_DATE, last, [{"items": [later]}])
 
     run(tmp_path, api, now=LATER)
@@ -577,7 +596,9 @@ def test_plan_upgraded_fills_in_the_completed_tasks_only(tmp_path):
     assert snapshot_file(tmp_path, PARENT["id"], f"comments/{done['id']}.json") == {"results": [remark]}
     # The rest of the snapshots is not fetched again.
     assert [path for path, _ in archived_requests(api) if path.endswith("/full")] == []
-    assert api.requested(COMMENTS) == [{"task_id": done["id"], "limit": "100"}]
+    # The new task's comments complete the comments part again, with the project's comments last (design D6).
+    assert api.requested(COMMENTS) == [{"task_id": done["id"], "limit": "100"},
+                                       {"project_id": PARENT["id"], "limit": "100"}]
     assert sorted(rewritten(tmp_path)) == sorted([
         *(f"archived/{p['id']}/completed.json" for p in (PARENT, TRIP, CHILD)),
         f"archived/{PARENT['id']}/comments/{done['id']}.json",
@@ -600,17 +621,86 @@ def test_plan_without_comments_then_with_comments_fills_in_the_comments(tmp_path
     assert [p for p in api.requested(BY_COMPLETION_DATE) if "project_id" in p] == []
 
 
-def test_task_comments_not_found_are_not_requested_again(tmp_path):
+def test_task_comments_not_found_get_an_empty_file_and_are_not_requested_again(tmp_path):
     api = renovation()
     api.answer(COMMENTS, {"task_id": TILES}, archived_fixture("error_404"), status=404)
     run(tmp_path, api)
-    assert not (archived.snapshot_dir(tmp_path, PARENT["id"]) / "comments").exists()
+    assert snapshot_file(tmp_path, PARENT["id"], f"comments/{TILES}.json") == {"results": []}
     assert (archived.snapshot_dir(tmp_path, PARENT["id"]) / "project_comments.json").is_file()
 
     api = renovation()
     api.answer(COMMENTS, {"task_id": TILES}, archived_fixture("error_404"), status=404)
     run(tmp_path, api, now=LATER)
     assert api.requested(COMMENTS) == []
+
+
+def test_task_comments_not_found_on_a_refetch_keep_the_stored_ones(tmp_path):
+    run(tmp_path)
+    kept = snapshot_file(tmp_path, PARENT["id"], f"comments/{TILES}.json")
+    parent = rearchived(PARENT)
+    full = {**archived_fixture("full_parent"), "project": parent}
+    full["tasks"] = [{**t, "note_count": 3} if t["id"] == TILES else t for t in full["tasks"]]
+    api = listing(renovation(), [parent], [TRIP])
+    api.answer(archived.full_path(PARENT["id"]), {}, full)
+    api.answer(COMMENTS, {"task_id": TILES}, archived_fixture("error_404"), status=404)
+
+    run(tmp_path, api, now=LATER)
+
+    assert {"task_id": TILES, "limit": "100"} in api.requested(COMMENTS)
+    assert snapshot_file(tmp_path, PARENT["id"], f"comments/{TILES}.json") == kept
+
+
+HALL_TASK = {**archived_fixture("full_parent")["tasks"][2], "id": "6Xt3Rk5Zt3Qy7Sc2", "content": "Paint the hall",
+             "note_count": 1}
+HALL_COMMENT = comment("6Xc9Hh0000000001", HALL_TASK["id"], "2026-10-18T16:00:00.000000Z")
+
+
+def test_comments_allowed_again_after_a_refetch_without_them_are_fetched(tmp_path):
+    run(tmp_path)
+    set_plan(tmp_path, comments=False)
+    parent = rearchived(PARENT)
+    full = {**archived_fixture("full_parent"), "project": parent}
+    full["tasks"] = [*full["tasks"], HALL_TASK]
+
+    def refetched():
+        api = listing(renovation(), [parent], [TRIP])
+        api.answer(archived.full_path(PARENT["id"]), {}, full)
+        api.answer(COMMENTS, {"task_id": HALL_TASK["id"]}, {"results": [HALL_COMMENT], "next_cursor": None})
+        return api
+
+    api = run(tmp_path, refetched(), now=LATER)
+    assert full_requests(api) == [archived.full_path(PARENT["id"])]
+    assert api.requested(COMMENTS) == []
+
+    set_plan(tmp_path, comments=True)
+    api = run(tmp_path, refetched(), now=LATER + timedelta(days=1))
+
+    assert snapshot_file(tmp_path, PARENT["id"], f"comments/{HALL_TASK['id']}.json") == {"results": [HALL_COMMENT]}
+    assert [p for p in api.requested(COMMENTS) if "task_id" in p] == [{"task_id": HALL_TASK["id"], "limit": "100"}]
+    assert [p["project_id"] for p in api.requested(COMMENTS) if "project_id" in p] == [PARENT["id"]]
+    assert full_requests(api) == []
+
+
+def test_comments_of_completed_tasks_filled_in_without_comments_are_fetched_later(tmp_path):
+    run(tmp_path, renovation(plan={"completed_tasks": False}))
+    set_plan(tmp_path, completed_tasks=True, comments=False)
+    done = completed_task("6Xt9Hh0000000001", PARENT["id"], "2024-02-20T10:00:00.000000Z", note_count=1)
+    api = renovation()
+    api.cursor_pages(BY_COMPLETION_DATE, window_params(PARENT["id"], windows(PARENT)[1]), [{"items": [done]}])
+    api = run(tmp_path, api, now=LATER)
+    assert snapshot_file(tmp_path, PARENT["id"], "completed.json") == {"items": [done]}
+    assert api.requested(COMMENTS) == []
+
+    set_plan(tmp_path, comments=True)
+    remark = comment("6Xc9Hh0000000002", done["id"], "2024-02-20T09:00:00.000000Z")
+    api = renovation()
+    api.answer(COMMENTS, {"task_id": done["id"]}, {"results": [remark], "next_cursor": None})
+    api = run(tmp_path, api, now=LATER + timedelta(days=1))
+
+    assert snapshot_file(tmp_path, PARENT["id"], f"comments/{done['id']}.json") == {"results": [remark]}
+    assert [p for p in api.requested(COMMENTS) if "task_id" in p] == [{"task_id": done["id"], "limit": "100"}]
+    assert [p for p in api.requested(BY_COMPLETION_DATE) if "project_id" in p] == []
+    assert full_requests(api) == []
 
 
 def test_list_restricted_by_the_plan_warns_and_the_run_succeeds(tmp_path, monkeypatch, capsys):

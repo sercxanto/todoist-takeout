@@ -104,18 +104,24 @@ A `PlanRestricted` on step 2 or 3 makes that part count as not allowed for the r
 
 ### D6: Filling in missing parts
 
-The presence of a file says whether a part was stored:
+The files say whether a part is stored:
 
-- `completed.json` missing and completed tasks allowed: fetch the windows, write `completed.json`. If comments are allowed, fetch the comments of its tasks whose comment file is missing first.
-- `project_comments.json` missing and comments allowed: fetch the comments of every task in `full.json` and `completed.json` with `note_count` > 0 whose comment file is missing, then the project comments, and write `project_comments.json` last.
+- `completed.json` missing and completed tasks allowed: fetch the windows and write `completed.json`.
+- Comments allowed: the comments part is complete when `project_comments.json` exists and every task in `full.json` and `completed.json` with `note_count` > 0 has a comment file. Otherwise the tool fetches the comments of the tasks without a file, then the project comments, and writes `project_comments.json` last.
 
-`project_comments.json` is therefore the marker for the comments part. A task whose comment request answers 404 is skipped, and it is not retried on every run, because the marker is written anyway. A stored snapshot costs two file-existence checks per run when nothing is missing.
+A task whose comment request answers 404 gets a file with an empty list, `{"results": []}`, so that it is not requested again on every run; `_CommentStore` gains a parameter for this, which `completed/comments/` does not use. A stored snapshot costs a file-existence check per part and per task with comments, and reading `completed.json`, each run.
+
+*Alternative: `project_comments.json` as the only marker.* Rejected after review: a refetch or a fill-in of `completed.json` while comments are not allowed adds tasks without comment files, the marker stays, and their comments are never fetched.
+
+*Alternative: remove the marker when tasks are added without comments.* Rejected: `project_comments.json` holds comments, and comments are never removed.
 
 ### D7: Windows over the project's lifetime
 
-Windows are three calendar months long, starting at the month of the project's `created_at`: `since` = the first day of month *m* at `00:00:00.000000Z`, `until` = the last day of month *m*+2 at `23:59:59.999999Z`. They continue until a window contains the current month. That is at most 92 days, within the 93 the probes accepted. The month helpers of `completed.py` compute them.
+Windows are three calendar months long, starting at the month of the project's `created_at`: `since` = the first day of month *m* at `00:00:00.000000Z`, `until` = the last day of month *m*+2 at `23:59:59.999999Z`. They continue until a window contains the month of the project's `updated_at`, or the current month if that is earlier. Probe W8 showed that `updated_at` moves forward on archiving and on unarchiving, and a task of an archived project cannot be completed, so later windows are always empty. Without a parseable `updated_at`, the windows continue until the current month. A window is at most 92 days, within the 93 the probes accepted. The month helpers of `completed.py` compute them.
 
 If `created_at` is missing or unparseable, the windows start at `completed.first_month` from `state.json`. If that is missing too, they start at the month of `user.joined_at`, or at 2007-01 (completed D3).
+
+*Alternative: windows through the current month.* Rejected after review: a project archived ten years ago costs about 40 empty requests on each fetch.
 
 *Alternative: start at the account's first month for every project.* Rejected. It would make 56 projects × about 40 windows on a ten-year-old account, against a few hundred requests in total.
 
@@ -131,6 +137,8 @@ This rule gives the right result whether the list of archived projects contains 
 
 1. Collect `A`, the IDs of stored projects with `is_archived: true`.
 2. Leave out projects in `A`; items with `checked: true` or a `project_id` in `A`; sections with `is_archived: true` or a `project_id` in `A`; any other collection object with a `project_id` in `A` (project notes, collaborator states, …); notes whose `item_id` names a left-out item.
+
+Per stored object it keeps only `id`, `project_id`, `item_id`, `checked`, `is_archived` and `is_deleted`, not the payload, so that a full sync on a large account does not hold the stored tree in memory.
 
 The warning counts the rest, as before. The number of left-out objects that the response did not contain is logged at INFO. `ApplyStats.missing` keeps its meaning, the count behind the warning.
 
@@ -185,6 +193,7 @@ One INFO line per run: archived projects listed, snapshots fetched (new and agai
 - [The listed payload of an archived project changes without a re-archive, for example `child_order` when a sibling is archived] → Each such project is fetched again, which costs about as many requests as its first fetch. The INFO line counts refetches. If they turn out to be frequent, D4 can be narrowed to selected fields in a later change, once the probe shows which fields move.
 - [A project is unarchived, changed and archived again between two runs, and its listed payload ends up byte-identical] → The changes are missed. This is accepted: it needs an unchanged `updated_at` as well, and the sync usually catches the interim state.
 - [Completions before the project's `created_at`, for example of tasks moved in from another project] → Not fetched. The probes found none, and fetching from the account's first month would multiply the requests.
+- [A completion recorded after the project's `updated_at`] → Not fetched. Completing a task needs the project active, and re-archiving moves `updated_at` forward again (D7).
 - [The first run on an account with many archived projects exceeds the rate-limit budget] → It exits with status 1, and the next run continues with the first project without `project.json`. The README advises a larger `--max-rate-limit-wait` for the first run.
 - [The missing-object rule hides a real deletion of a completed task or of an object of an archived project] → Accepted. Deletions normally arrive as `is_deleted` in an incremental sync. The rule only removes warnings that are wrong today.
 - [The same task or comment is stored up to four times] → Documented with a rule for picking the current copy (D11). A condensed view deduplicates by `id`.

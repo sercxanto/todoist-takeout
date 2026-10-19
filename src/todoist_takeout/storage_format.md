@@ -230,13 +230,18 @@ files under `completed/` (see [Completed tasks](#completed-tasks)): one JSON obj
 of entries (`items` for tasks, `results` for comments) and every other top-level key of the
 response except `next_cursor`, the entries of all pages merged into one list and ordered by time
 and then by `id`. A project without completed tasks or comments has these files too, with an empty
-list. A task whose `note_count` is 0 has no comment file. `full.json` holds no comments, and its
-`sections` include no archived section.
+list. A task whose `note_count` is 0 has no comment file. A task whose comments the API does not
+find (HTTP 404), for example because the task was deleted, has a comment file with an empty list,
+`{"results": []}`, unless comments of it were stored earlier; those stay. `full.json` holds no
+comments, and its `sections` include no archived section.
 
 The completed tasks are fetched in windows of three calendar months, from the month of the
-project's `created_at` through the current month. If `created_at` is missing or not a valid time,
-the windows start at `first_month` of the completed tasks in `state.json`. Completions before the
-project's `created_at`, for example of tasks moved in from an older project, are not fetched.
+project's `created_at` through the month of its `updated_at`, which archiving moves forward: a task
+of an archived project cannot be completed. If `updated_at` is missing, not a valid time, or after
+the current month, the windows run through the current month. If `created_at` is missing or not a
+valid time, the windows start at `first_month` of the completed tasks in `state.json`. Completions
+before the project's `created_at`, for example of tasks moved in from an older project, are not
+fetched.
 
 Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. The
 attached files themselves are not downloaded.
@@ -269,9 +274,13 @@ with its stored `project.json`, byte for byte in the [JSON encoding](#json-encod
 **Missing parts.** On a plan without completed tasks, a snapshot has no `completed.json`; on a plan
 without comments, it has no `project_comments.json` and no `comments/`. A later run on a plan that
 includes the part adds it to every stored snapshot that lacks it, without fetching the rest of the
-snapshot again. `project_comments.json` is written after the comment files of the tasks and marks
-the comments part as stored. A task whose comments the API does not find (HTTP 404) has no comment
-file and is not requested again.
+snapshot again. The comments part is complete when `project_comments.json` exists and every task
+in `full.json` and `completed.json` whose `note_count` is greater than 0 has a comment file. A
+snapshot fetched again or given its `completed.json` while comments were not allowed can therefore
+have tasks without a comment file next to a `project_comments.json`; a later run with comments
+allowed fetches the comments of those tasks, then the project's comments, and writes
+`project_comments.json` last. A task whose comments the API does not find gets its empty comment
+file then and is not requested again.
 
 **Snapshots are kept.** A snapshot stays unchanged when its project is unarchived or deleted in
 Todoist; the tool never removes a file under `archived/`. After the project is unarchived, the sync
