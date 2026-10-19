@@ -35,7 +35,8 @@ OWNER = "archived projects"
 
 
 def run(target: Path, client: Client, state: dict, now: Callable[[], datetime]) -> None:
-    """Store a snapshot of each archived project that has none yet."""
+    """Store a snapshot of each archived project that is new or changed, and fill in the parts that an
+    earlier plan left out of the stored ones."""
     target = Path(target)
     limits = sync.current_plan_limits(target)
     _Backup(
@@ -68,41 +69,69 @@ class _Backup:
         self.moment = moment
         self.completed_tasks = completed_tasks
         self.comments = comments
+        # For the INFO line of the run (design D13).
+        self.new = 0
+        self.again = 0
+        self.filled = 0
+        self.comment_files = 0
 
     def run(self) -> None:
         try:
-            listed = self._list()
+            queue = self._list()
         except PlanRestricted:
             log.warning("the Todoist plan does not allow listing archived projects; they cannot be backed up on "
                         "this plan")
             return
-        handled = set()
+        listed = len(queue)
+        handled = {project_id for project_id, _ in queue}
+        # The progress is logged also when the run fails, for example on the rate limit (design D13).
         try:
-            for project_id, project in listed:
-                if project_id in handled:
-                    continue
-                handled.add(project_id)
-                self._back_up(project_id, project)
+            for project_id, project in queue:  # grows while it is walked (design D8)
+                full = self._back_up(project_id, project)
+                for sub_id, sub in _archived_subprojects(full):
+                    if sub_id not in handled:
+                        handled.add(sub_id)
+                        queue.append((sub_id, sub))
         except PlanRestricted:
             log.warning("the Todoist plan does not allow fetching archived projects; they cannot be backed up on "
                         "this plan")
+        finally:
+            log.info(
+                "archived projects: %d listed, %d snapshots fetched (%d new, %d again), %d parts filled in; "
+                "%d comment files written",
+                listed,
+                self.new + self.again,
+                self.new,
+                self.again,
+                self.filled,
+                self.comment_files,
+            )
 
     def _list(self) -> list[tuple[str, dict]]:
-        """The listed archived projects with their IDs, in list order."""
-        listed = []
+        """The listed archived projects with their IDs, in list order, each once."""
+        listed = {}
         for page in completed.fetch_pages(self.client, ARCHIVED_PROJECTS, {}, LIST_PAGE_LIMIT, "results"):
             for project in page["results"]:
                 project_id = _object_id(project)
                 if project_id is None:
                     raise ApiError(f"GET /{ARCHIVED_PROJECTS} returned a project without an id", http_status=200)
-                listed.append((project_id, project))
-        return listed
+                listed.setdefault(project_id, project)
+        return list(listed.items())
 
-    def _back_up(self, project_id: str, project: dict) -> None:
+    def _back_up(self, project_id: str, project: dict) -> dict | None:
+        """Bring the snapshot of a project up to date (design D4). Return its `/full` response, if any."""
         directory = snapshot_dir(self.target, project_id)
-        if (directory / PROJECT_FILE).exists():
-            return
-        self._fetch(project_id, project, directory)
+        stored = storage.read_bytes(directory / PROJECT_FILE)
+        if stored is None or stored != storage.encode_json(project):
+            full = self._fetch(project_id, project, directory)
+            if full is not None:
+                if stored is None:
+                    self.new += 1
+                else:
+                    self.again += 1
+            return full
+        self._fill(project_id, project, directory)
+        return _read_object(directory / FULL_FILE)
 
     # --- Fetching a snapshot (design D5) ---------------------------------------------------------
 
@@ -128,6 +157,27 @@ class _Backup:
         # The checkpoint: it must not reach the disk before the files written above.
         storage.write_bytes_atomic(directory / PROJECT_FILE, storage.encode_json(project), full_sync=True)
         return full
+
+    # --- Filling in missing parts (design D6) --------------------------------------------------
+
+    def _fill(self, project_id: str, project: dict, directory: Path) -> None:
+        """Add the parts that an earlier plan left out of a stored snapshot. The files tell which are missing."""
+        if self.completed_tasks and not (directory / COMPLETED_FILE).exists():
+            items = self._completed_items(project_id, project)
+            if items is not None:
+                if self.comments:
+                    tasks = _tasks(items, "items")
+                    self._task_comments(directory, {"items": tasks}, tasks)
+                storage.write_bytes_atomic(directory / COMPLETED_FILE, storage.encode_json(items))
+                self.filled += 1
+        if self.comments and not (directory / PROJECT_COMMENTS_FILE).exists():
+            tasks = [*_tasks(_read_object(directory / FULL_FILE), "tasks"),
+                     *_tasks(completed.read_stored(directory / COMPLETED_FILE, "items"), "items")]
+            # Compared with themselves, only the tasks whose comment file is missing are fetched.
+            self._task_comments(directory, {"items": tasks}, tasks)
+            # The marker of the comments part, written last (design D6).
+            if self._project_comments(project_id, directory):
+                self.filled += 1
 
     def _full(self, project_id: str) -> dict | None:
         path = full_path(project_id)
@@ -167,10 +217,12 @@ class _Backup:
         store = completed._CommentStore(directory / COMMENTS_DIR, self.client, enabled=True, owner=OWNER)
         store.update(stored, tasks, fetch_missing=True)
         self.comments = store.enabled
+        self.comment_files += store.written
 
-    def _project_comments(self, project_id: str, directory: Path) -> None:
+    def _project_comments(self, project_id: str, directory: Path) -> bool:
+        """Fetch the project's comments and merge them into its file. Return whether the file is stored."""
         if not self.comments:
-            return
+            return False
         try:
             pages = completed.fetch_pages(self.client, completed.COMMENTS, {"project_id": project_id},
                                 completed.COMMENTS_PAGE_LIMIT, "results")
@@ -178,12 +230,14 @@ class _Backup:
             log.warning("the Todoist plan does not allow fetching comments; the comments of %s cannot be backed up "
                         "on this plan", OWNER)
             self.comments = False
-            return
+            return False
         path = directory / PROJECT_COMMENTS_FILE
         stored = completed.read_stored(path, "results")
         pages = [stored, *pages] if stored is not None else pages
         merged = completed.merge_pages(pages, "results", "posted_at", by_id=True)
-        storage.write_bytes_atomic(path, storage.encode_json(merged))
+        if storage.write_bytes_atomic(path, storage.encode_json(merged)):
+            self.comment_files += 1
+        return True
 
     # --- Windows over the project's lifetime (design D7) --------------------------------------
 
@@ -239,6 +293,16 @@ def _read_object(path: Path) -> dict | None:
     if not isinstance(value, dict):
         raise StorageError(f"{path} is not a JSON object")
     return value
+
+
+def _archived_subprojects(full: dict | None) -> list[tuple[str, dict]]:
+    """The entries of `subprojects` that are archived, with their IDs. The others are in the sync (design D8)."""
+    found = []
+    for sub in _tasks(full, "subprojects"):
+        sub_id = _object_id(sub)
+        if sub_id is not None and sub.get("is_archived") is True:
+            found.append((sub_id, sub))
+    return found
 
 
 def _object_id(value) -> str | None:

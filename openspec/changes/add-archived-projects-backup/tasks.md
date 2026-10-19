@@ -30,10 +30,10 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 4. Detection, refetch, fill-in and sub-projects
 
-- [ ] 4.1 Implement the detection table of design D4 and the refetch of D5, in which `full.json` and `completed.json` are replaced and comment files are merged. Verify with run tests for "Repeat run" (only the list requested, no file rewritten), "Unarchived and archived again", and "Comment deleted before the project was archived again"
-- [ ] 4.2 Implement the fill-in of design D6 for `completed.json` and `project_comments.json`, and the plan handling of D5 and D10. Verify with run tests for every scenario of the spec requirement "Plan limits for archived projects", for a plan without comments followed by one with comments, and for a 404 on a task's comments that is not retried in the next run
-- [ ] 4.3 Implement the sub-project queue of design D8. Verify with run tests for "Sub-project only in its parent" and "Sub-project listed too", and a unit test in which two projects name each other as sub-projects and each is fetched once
-- [ ] 4.4 Add the INFO line of design D13. Verify with a run test that reads the log of a run that fetches two new snapshots, refetches one and fills in one
+- [x] 4.1 Implement the detection table of design D4 and the refetch of D5, in which `full.json` and `completed.json` are replaced and comment files are merged. Verify with run tests for "Repeat run" (only the list requested, no file rewritten), "Unarchived and archived again", and "Comment deleted before the project was archived again"
+- [x] 4.2 Implement the fill-in of design D6 for `completed.json` and `project_comments.json`, and the plan handling of D5 and D10. Verify with run tests for every scenario of the spec requirement "Plan limits for archived projects", for a plan without comments followed by one with comments, and for a 404 on a task's comments that is not retried in the next run
+- [x] 4.3 Implement the sub-project queue of design D8. Verify with run tests for "Sub-project only in its parent" and "Sub-project listed too", and a unit test in which two projects name each other as sub-projects and each is fetched once
+- [x] 4.4 Add the INFO line of design D13. Verify with a run test that reads the log of a run that fetches two new snapshots, refetches one and fills in one
 
 ## 5. Format description
 
