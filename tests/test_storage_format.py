@@ -5,12 +5,21 @@ from importlib import resources
 
 import pytest
 
-from todoist_takeout import completed, storage
+from todoist_takeout import archived, completed, storage
 from todoist_takeout.api import Client
 from todoist_takeout.resources import COLLECTION, KNOWN, ONE_OF, SINGLE, Classifier
 from todoist_takeout.sync import apply_response, run_backup
 
-from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, TASKS_COMPLETED, FakeApi, completed_fixture
+from fake_api import (
+    ACTIVITIES,
+    ARCHIVED_PROJECTS,
+    BY_COMPLETION_DATE,
+    COMMENTS,
+    TASKS_COMPLETED,
+    FakeApi,
+    archived_fixture,
+    completed_fixture,
+)
 
 
 def _format_description() -> str:
@@ -42,7 +51,7 @@ def test_documented_names_match_the_encoding():
     assert f"at most {storage.MAX_NAME_LENGTH}" in text
 
 
-# --- the documented `sync/` and `completed/` layout ------------------------------
+# --- the documented `sync/`, `completed/` and `archived/` layout ------------------
 
 
 def _documented_paths(prefix):
@@ -70,7 +79,27 @@ def _produced_completed_tree(tmp_path, sync_fixture):
     run_backup(tmp_path, Client(api), now=lambda: datetime(2026, 10, 18, 12, tzinfo=timezone.utc))
 
 
-LAYOUTS = {"sync": (_produced_sync_tree, 8), "completed": (_produced_completed_tree, 8)}
+def _produced_archived_tree(tmp_path, sync_fixture):
+    """Two listed archived projects and the sub-project of one, with a commented task and a project comment."""
+    responses = {"*": json.dumps(sync_fixture("full_sync")).encode(), "FULL-1": b'{"sync_token": "INC-1"}'}
+    api = FakeApi(responses)
+    api.cursor_pages(ARCHIVED_PROJECTS, {}, [archived_fixture("list_1"), archived_fixture("list_2")])
+    for name in ("full_parent", "full_child"):
+        full = archived_fixture(name)
+        api.answer(archived.full_path(full["project"]["id"]), {}, full)
+    trip = archived_fixture("list_2")["results"][0]
+    api.answer(archived.full_path(trip["id"]), {}, {**archived_fixture("full_child"), "project": trip, "tasks": []})
+    [commented] = [t for t in archived_fixture("full_parent")["tasks"] if t["note_count"]]
+    api.answer(COMMENTS, {"task_id": commented["id"]}, archived_fixture("comments_task"))
+    api.answer(COMMENTS, {"project_id": commented["project_id"]}, archived_fixture("comments_project"))
+    run_backup(tmp_path, Client(api), now=lambda: datetime(2026, 10, 18, 12, tzinfo=timezone.utc))
+
+
+LAYOUTS = {
+    "sync": (_produced_sync_tree, 8),
+    "completed": (_produced_completed_tree, 8),
+    "archived": (_produced_archived_tree, 7),
+}
 
 
 @pytest.fixture(params=sorted(LAYOUTS))
@@ -123,3 +152,17 @@ def test_description_warns_about_large_event_ids():
     text = " ".join(_format_description().split())
     assert "The `id` of an event is an integer larger than 64 bits" in text
     assert "JavaScript (`JSON.parse`) and an SQLite `INTEGER` column" in text
+
+
+def test_description_names_every_copy_of_a_task_and_the_rule_for_the_current_one():
+    [section] = re.findall(r"^## Copies of the same task$(.*?)^## ", _format_description(), re.M | re.S)
+    text = " ".join(section.split())
+    for place in ["`sync/items/<task id>.json`", "`completed/<YYYY-MM>.json`", "`archived/<project id>/full.json`",
+                  "`archived/<project id>/completed.json`"]:
+        assert f"| {place} |" in section, place
+    for place in ["`completed/comments/<task id>.json`", "`archived/<project id>/comments/<task id>.json`"]:
+        assert place in text, place
+    assert "All copies share the task's `id`" in text
+    assert ("The current copy is the one with the newest `updated_at`. If several copies have the same "
+            "`updated_at`, a copy under `archived/` is current, then one under `completed/`, then one under "
+            "`sync/`.") in text

@@ -37,8 +37,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 5. Format description
 
-- [ ] 5.1 Document `archived/` in `storage_format.md`: the layout, the response-shaped contents, `project.json` as the checkpoint, the refetch rule, the fill-in rule, snapshots kept after unarchiving or deletion, and comments merged and never removed. Verify that the path-pattern tests of `tests/test_storage_format.py`, extended to `archived/`, find every produced path documented and every documented pattern produced
-- [ ] 5.2 Add the section "Copies of the same task" to `storage_format.md` (design D11) with the table of places and the rule settled in 1.3, including the comments in `completed/comments/` and `archived/<project id>/comments/`. Verify with a test that the description names all four task locations and both comment locations
+- [x] 5.1 Document `archived/` in `storage_format.md`: the layout, the response-shaped contents, `project.json` as the checkpoint, the refetch rule, the fill-in rule, snapshots kept after unarchiving or deletion, and comments merged and never removed. Verify that the path-pattern tests of `tests/test_storage_format.py`, extended to `archived/`, find every produced path documented and every documented pattern produced
+- [x] 5.2 Add the section "Copies of the same task" to `storage_format.md` (design D11) with the table of places and the rule settled in 1.3, including the comments in `completed/comments/` and `archived/<project id>/comments/`. Verify with a test that the description names all four task locations and both comment locations
 
 ## 6. Whole runs
 
