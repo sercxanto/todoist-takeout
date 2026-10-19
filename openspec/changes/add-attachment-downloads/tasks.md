@@ -25,9 +25,9 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 3. File transport and client
 
-- [ ] 3.1 Add the host check of design D5 to `api.py`. Verify with unit tests: `todoist.com`, `files.todoist.com` and `FILES.Todoist.COM` are allowed; `http://files.todoist.com`, `todoist.com.example.net`, `evil-todoist.com`, `user@files.todoist.com` and port 8443 are rejected
-- [ ] 3.2 Add the streaming `download` method to `UrllibTransport` with the manual redirect loop of D5 (at most 5 hops, https only, no token after the first request) and the `Accept-Encoding: identity` and gzip handling of D6. Verify with tests against a local HTTPS test server or a stubbed opener for every scenario of the spec requirement "Token only to Todoist hosts", including that no logged line holds the token or a query string
-- [ ] 3.3 Extract the retry loop of `Client.request` and add `Client.download` with the status table of design D6. Verify that every existing test of `tests/test_api.py` passes unchanged, and with new tests for 429 on a file request (wait counted toward the cap), 5xx retried, a network error during the body retried from the start, and 401, 403, 404 and 410 raising `AttachmentRefused` and not the invalid-token error
+- [x] 3.1 Add the host check of design D5 to `api.py`. Verify with unit tests: `todoist.com`, `files.todoist.com` and `FILES.Todoist.COM` are allowed; `http://files.todoist.com`, `todoist.com.example.net`, `evil-todoist.com`, `user@files.todoist.com` and port 8443 are rejected
+- [x] 3.2 Add the streaming `download` method to `UrllibTransport` with the manual redirect loop of D5 (at most 5 hops, https only, no token after the first request) and the `Accept-Encoding: identity` and gzip handling of D6. Verify with tests against a local HTTPS test server or a stubbed opener for every scenario of the spec requirement "Token only to Todoist hosts", including that no logged line holds the token or a query string
+- [x] 3.3 Extract the retry loop of `Client.request` and add `Client.download` with the status table of design D6. Verify that every existing test of `tests/test_api.py` passes unchanged, and with new tests for 429 on a file request (wait counted toward the cap), 5xx retried, a network error during the body retried from the start, and 401, 403, 404 and 410 raising `AttachmentRefused` and not the invalid-token error
 
 ## 4. Download step
 
