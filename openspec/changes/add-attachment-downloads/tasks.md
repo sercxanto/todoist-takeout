@@ -13,10 +13,10 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 1. Probes and the open API questions
 
-- [ ] 1.1 Write the probes R8 (read-only) and W9 (writes, Free account only, behind the existing write guard) of design D11 in `tests/contract/probes.py` and `tests/contract/test_probe_attachments.py`, including the upload through `POST /api/v1/uploads` and the cleanup. Verify offline, with a test against the fake transport, that the probe's findings hold only booleans, types, statuses and host names, and no ID, URL path, query string, file name or file content
-- [ ] 1.2 With the user, run R8 against the Pro account. Verify that the findings file stays untracked (`git status` shows nothing under `tests/contract/findings/`) and that no downloaded file is left outside the temporary directory
-- [ ] 1.3 With the user, run W9 against the Free account. Verify that the findings file stays untracked and that the probe removed every project, task and comment it created
-- [ ] 1.4 Record the results of 1.2 and 1.3 under "API findings" in `proposal.md`, answer its Open Questions, and settle design D2 (stored or fresh `file_url`), D3 (the set of link types) and the redirect detail of D5. Verify that `proposal.md` holds no live ID, URL or content, and that design.md no longer calls these points open
+- [x] 1.1 Write the probes R8 (read-only) and W9 (writes, Free account only, behind the existing write guard) of design D11 in `tests/contract/probes.py` and `tests/contract/test_probe_attachments.py`, including the upload through `POST /api/v1/uploads` and the cleanup. Verify offline, with a test against the fake transport, that the probe's findings hold only booleans, types, statuses and host names, and no ID, URL path, query string, file name or file content
+- [x] 1.2 With the user, run R8 against the Pro account. Verify that the findings file stays untracked (`git status` shows nothing under `tests/contract/findings/`) and that no downloaded file is left outside the temporary directory
+- [x] 1.3 With the user, run W9 against the Free account. Verify that the findings file stays untracked and that the probe removed every project, task and comment it created
+- [x] 1.4 Record the results of 1.2 and 1.3 under "API findings" in `proposal.md`, answer its Open Questions, and settle design D2 (stored or fresh `file_url`), D3 (the set of link types) and the redirect detail of D5. Verify that `proposal.md` holds no live ID, URL or content, and that design.md no longer calls these points open
 
 ## 2. Storage primitives
 

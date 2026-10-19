@@ -1,6 +1,6 @@
 # Proposal
 
-> Status: the scope and the design questions were settled with the user in an explore session (2026-10-19). The API questions are open until the probes of tasks 1.1 to 1.3 have run; see Open Questions. Design D2 (where the download URL comes from) depends on their answer.
+> Status: the scope and the design questions were settled with the user in an explore session (2026-10-19). The API questions were answered by the probes R8 and W9 on 2026-10-19; see API findings. None of them changed a spec.
 
 ## Why
 
@@ -41,14 +41,27 @@ The backup keeps the metadata of every comment's `file_attachment`, but not the 
 - Requests: one per uploaded file not yet stored. The first run on an account with many attachments transfers all of them; later runs only new ones. Disk use grows by the size of the account's files.
 - No new runtime dependency.
 
+## API findings
+
+From probe R8 (read-only, Pro account) and W9 (writes, Free account), 2026-10-19. The findings files are not committed; this section is their record.
+
+- **Where files are referenced.** Only comments' `file_attachment` refers to uploaded files. Other fields of the sync whose names contain `url`, `file` or `image` are avatars (`image_id` of `user` and `collaborators`) and `user.websocket_url`. The Pro account held no uploaded file in its active comments, in the comments of its recent completed tasks or in those of the archived projects read, so all file facts come from W9.
+- **Shape of an upload.** `POST /api/v1/uploads` returns `file_name`, `file_size`, `file_type`, `file_url`, `image`, `image_width`, `image_height`, `resource_type` and `upload_state`; `note_add` takes that object as `file_attachment`. A text file has `resource_type: file`, a PNG `resource_type: image`, with a thumbnail URL in `image` and, once the comment exists, `tn_l`, `tn_m` and `tn_s` arrays. Both have `upload_state: completed`. `file_size` equals the uploaded length.
+- **Shape of a link.** `resource_type: url`, with `url` and `title`, no `file_url` and no `file_size`; `upload_state` is `completed` here too.
+- **`file_url`.** On `files.todoist.com`, over HTTPS, without a query string. The comment's `file_url` differs from the one the upload returned, but is the same in the sync, in `GET /comments`, after a full sync and after the project is archived. Nothing in it marks a signature or an expiry. Whether a years-old URL still works could not be checked: the Pro account has no uploaded file.
+- **Token and redirects.** With the token, `files.todoist.com` answers 302 to a CloudFront host (`*.cloudfront.net`, outside `todoist.com`) with a signed query string, which serves the file with 200 and needs no token. Without the token, `files.todoist.com` redirects three times to `app.todoist.com` and ends with a 200 HTML login page, not with an error status.
+- **Bytes.** With `Accept-Encoding: identity` the file host sends `Content-Length` equal to `file_size` and no `Content-Encoding`; the bytes match `file_size`. With `Accept-Encoding: gzip` it compresses a text file, and the decoded bytes match.
+- **Deleted comments.** After `note_delete`, the sync returns the comment with `is_deleted: true` and `file_attachment: null`, and its `file_url` answers 403 even with the token. The same holds once the upload is deleted.
+- **Rate limits.** Neither the file host nor CloudFront sent a rate-limit header.
+
 ## Open Questions
 
-To be answered by the probes (tasks 1.1 to 1.3), read-only on the Pro account and with writes on the Free account, which allows uploads up to 5 MB:
+Answered by the probes (tasks 1.1 to 1.3); see API findings.
 
-- Which values of `resource_type` mark uploaded files (for example `file`, `image`, `audio`, `video`), and which marks a link; which other fields the object has (thumbnails, `upload_state`).
-- Whether `file_url` needs the token, whether it redirects, and to which host.
-- Whether `file_url` is stable or signed with an expiry. If it expires, the URL of a frozen copy (a closed month, an archived snapshot) cannot be used, and design D2 must fetch a fresh one.
-- Whether the downloaded bytes match `file_size`, and whether the file host sends gzip.
-- Whether the file of a deleted comment can still be downloaded.
-- Which rate-limit headers the file host sends.
-- Whether fields other than `file_attachment`, outside comments, refer to uploaded files.
+- Which values of `resource_type` mark uploaded files, and which marks a link: `file` and `image` were observed for uploads, `url` for a link. Uploads also carry `image`, `image_width`, `image_height`, `tn_l`, `tn_m`, `tn_s` and `upload_state`.
+- Whether `file_url` needs the token, whether it redirects, and to which host: it needs the token, and redirects once to a CloudFront host, which needs none.
+- Whether `file_url` is stable or signed with an expiry: stable as far as could be observed; the signature is in the redirect, made fresh for each request. Design D2 keeps the stored URL.
+- Whether the downloaded bytes match `file_size`, and whether the file host sends gzip: they match; gzip only when asked for.
+- Whether the file of a deleted comment can still be downloaded: no, it answers 403. A synced deleted comment has `file_attachment: null`.
+- Which rate-limit headers the file host sends: none.
+- Whether fields other than `file_attachment`, outside comments, refer to uploaded files: no.

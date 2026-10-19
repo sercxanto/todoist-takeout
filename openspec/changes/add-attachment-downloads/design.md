@@ -8,7 +8,7 @@ This change builds on three archived changes, cited as "sync D<n>" (`2026-10-18-
 - `storage.py`: `write_bytes_atomic` (temp file `.<name>.<hex>.tmp`, fsync, replace, directory fsync, the fault-injection hook), `remove_temp_files` over the whole target, `encode_component`, `MAX_NAME_LENGTH = 200`, `FORMAT_VERSION = 1`.
 - `sync.py`: `run_backup` runs the sync rounds, `completed.run`, `archived.run`, then the plan warnings, all under the target lock.
 - Comments are stored as one object per file in `sync/notes/` and `sync/project_notes/`, and as response-shaped files (`{"results": [...]}`) in `completed/comments/<task id>.json`, `archived/<project id>/comments/<task id>.json` and `archived/<project id>/project_comments.json`.
-- The hand-written fixtures carry one `file_attachment` (`resource_type: file`, `file_url` on `example.com`). The recorded fixtures of both accounts hold no attachment at all, so the real shape is unknown (proposal, Open Questions).
+- The hand-written fixtures carry one `file_attachment` (`resource_type: file`, `file_url` on `example.com`). The recorded fixtures of both accounts hold no attachment at all; the real shape comes from the probes R8 and W9 (proposal, API findings).
 - The plan limits of the Free account allow uploads (`uploads: true`, `upload_limit_mb: 5`), so the write probe can upload there.
 
 ## Goals / Non-Goals
@@ -55,11 +55,13 @@ Collecting from the whole backup rather than from the comments a run has just wr
 
 A comment can be stored in up to two places, for example a completed task of an archived project. The entries are grouped by comment `id`; the copy used is the first one found in the order `sync/`, `completed/comments/`, `archived/`. `sync/` comes first because every incremental sync updates it; the other two are frozen sooner.
 
-This decision assumes that `file_url` is stable. Task 1.4 settles it from the probes: if the URL expires, the download step fetches the comment once with `GET /api/v1/comments/{id}` before downloading and uses the fresh `file_url`, which adds one request per file not yet stored and changes no spec. That alternative is not the default because it doubles the requests for every new file.
+The stored `file_url` is used as it is. The probes found it stable: it carries no query string and no expiry, it is the same in every copy of a comment and after the project is archived, and the signed, short-lived URL is only the one the file host redirects to, made fresh for each request (proposal, API findings).
+
+*Alternative:* fetching the comment once with `GET /api/v1/comments/{id}` before downloading, and using the fresh `file_url`. Not chosen: it doubles the requests for every new file and the probes gave no reason for it. Should old URLs turn out to fail, this is the fallback; it changes no spec.
 
 ### D3: Which attachments are uploaded files
 
-An entry is downloaded when its `file_attachment` is an object, has a `file_url`, has `upload_state` equal to `completed` (or no `upload_state` at all), and has a `resource_type` that is not a link type. The link types are a fixed set in the code, filled from the probes (task 1.4); the expected value is `url`.
+An entry is downloaded when its `file_attachment` is an object, has a `file_url`, has `upload_state` equal to `completed` (or no `upload_state` at all), and has a `resource_type` that is not a link type. The link types are a fixed set in the code: `{"url"}`, the only one the probes saw. Uploads had `resource_type` `file` or `image`. A link attachment has no `file_url` either, so it is skipped twice over.
 
 A deny list of link types, rather than an allow list of upload types, keeps an upload type that Todoist adds later from being skipped silently. An unknown link type still cannot leak the token: its URL points to a foreign host, which D5 skips with a warning, so it becomes visible and can be added to the set.
 
@@ -90,7 +92,7 @@ file_url
 
 The host check compares the lower-cased host from `urllib.parse.urlsplit`, never a substring of the URL, so `todoist.com.example.net` and `evil-todoist.com` are rejected. A URL with user info (`user@host`) or an explicit port other than 443 is rejected as well.
 
-Redirects are followed by hand, through the same `_NoRedirect` opener: urllib's own redirect handler copies the request headers, including `Authorization`, to the new URL. Every hop after the first goes without the token, also when it points back to a Todoist host. The probes show whether any hop needs it (task 1.4); if one does, D5 changes so that the token goes again to Todoist hosts only.
+Redirects are followed by hand, through the same `_NoRedirect` opener: urllib's own redirect handler copies the request headers, including `Authorization`, to the new URL. Every hop after the first goes without the token, also when it points back to a Todoist host. The probes confirmed that none needs it: `files.todoist.com` answers 302 to a CloudFront host outside `todoist.com`, with a signed query string, which serves the file without the token. A real download takes one redirect, well inside the limit of 5.
 
 Only the host and path are logged, never the query string, because a signed URL carries its credential there.
 
@@ -176,7 +178,9 @@ The findings files hold booleans, types, statuses and host names, never an ID, U
 
 - [The first run on an account with many attachments transfers gigabytes and can take hours] → Each file is stored as soon as it is complete, so a cancelled or failed run loses at most one file; the README advises the first run.
 - [A permanently refused file warns on every run, which shows up in a cron mail every night] → Accepted with the user (Variant 1). The warning names the comment, so the user can find and delete the comment or the attachment.
-- [`file_url` expires and frozen copies hold stale URLs] → Probe W9 checks this; D2 has the fallback that fetches the comment fresh.
+- [`file_url` expires and frozen copies hold stale URLs] → The probes saw no sign of it, but could not check a years-old URL, as the read account has no uploaded file. A stale URL would show up as a refused-file warning; D2 names the fallback that fetches the comment fresh.
+- [A request that reaches the file host without access is redirected to the login page on `app.todoist.com`, which answers 200 with HTML] → Seen in the probes without the token, which the tool always sends to `files.todoist.com`. Should it happen, the length check of D7 rejects the page, since every upload the probes saw has a `file_size`; the warning then reports a size mismatch rather than the refusal.
+- [A comment deleted in Todoist before its file is stored] → Its file answers 403. The sync's tombstone has `file_attachment: null`, so a copy in `sync/` causes no request, but a frozen copy in `completed/` or `archived/` keeps the attachment and warns on every run, as accepted above.
 - [Todoist moves files to a host outside `todoist.com`] → The files are skipped with a warning naming the host, so the change becomes visible; widening the host list is a one-line change with its own review.
 - [An unknown upload type is downloaded that the user does not consider an attachment] → Only types on a Todoist host are fetched, so at worst a Todoist-hosted preview is stored once.
 - [Disk use grows by the size of all files] → Inherent to the goal. Files are stored once per comment, never per copy.
@@ -188,4 +192,4 @@ None beyond the first run: it downloads the files of every comment already in th
 
 ## Open Questions
 
-None that change the specs. Tasks 1.1 to 1.4 answer the API questions listed in the proposal and settle D2 (where the URL comes from), D3 (the link types) and the redirect detail of D5.
+None. The probes answered the API questions of the proposal (API findings), which settled D2 (the stored `file_url`), D3 (the link type `url`) and the redirect detail of D5 (no hop after the first needs the token).
