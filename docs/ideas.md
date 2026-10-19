@@ -39,3 +39,18 @@ Status: `roh` · `geklärt` · `als Change angelegt` · `verworfen`
 - Status: roh
 - Offen: Versionierung, Tagging, Build und Veröffentlichung (PyPI?),
   Zusammenspiel mit Changelog und Lizenz.
+
+## Linter / Formatter laufen lassen
+
+- Status: roh
+- Linter und Formatter definieren und laufen lassen
+
+## Code-Coverage messen
+
+- Status: roh
+- Code-Coverage sollte gemessen werden
+
+## Doppelte CI-Jobs vermeiden
+
+- Status: roh
+- Beim Anlegen eines PR werden die Jobs zweimal ausgeführt: Für den Push und für den PR
