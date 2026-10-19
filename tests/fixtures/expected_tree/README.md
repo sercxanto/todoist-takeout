@@ -4,7 +4,8 @@ Format version: 1
 
 This directory is a backup of a [Todoist](https://www.todoist.com) account, written by
 todoist-takeout. Every file is plain JSON or
-Markdown, so you can read the backup without the tool. This file describes the format and is
+Markdown, except the files attached to comments, which are stored as they were uploaded, so you
+can read the backup without the tool. This file describes the format and is
 kept up to date by every run.
 
 ## Directory layout
@@ -16,6 +17,7 @@ kept up to date by every run.
 | `sync/` | The account's active data, as returned by the Todoist sync API. See [Active data](#active-data). |
 | `completed/` | Completed tasks, completion events and the comments of completed tasks. See [Completed tasks](#completed-tasks). |
 | `archived/` | A snapshot of each archived project, with its tasks, sections and comments. See [Archived projects](#archived-projects). |
+| `attachments/` | The files uploaded to comments, one directory per comment. See [Attachment files](#attachment-files). |
 | `pending/` | A downloaded response that has not been applied yet. Normally empty. See [Pending response](#pending-response). |
 | `.lock` | Lock file that keeps two runs from working on the same backup. See [Lock file](#lock-file). |
 
@@ -106,8 +108,8 @@ backup stores as deleted, the returned payload is written to `<key>.json`, and t
 `<key>.deleted.json` is removed, so that the object counts as live again. This is the only case in
 which the tool removes a file under `sync/`.
 
-Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. The
-attached files themselves are not downloaded.
+Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. Their
+uploaded files are under `attachments/`; see [Attachment files](#attachment-files).
 
 ## Completed tasks
 
@@ -159,7 +161,8 @@ close as soon as they are stored. A closed month is never fetched again. As a co
 its `note_count` differs from the one stored in the month's file: new comments are added, and
 changed ones replace the stored version (matched by `id`). A comment once stored stays in the file,
 even after it is deleted in Todoist. Comments keep their attachment metadata (`file_attachment`)
-exactly as the API returned it; the attached files are not downloaded. On a plan without comments,
+exactly as the API returned it; their uploaded files are under `attachments/` (see
+[Attachment files](#attachment-files)). On a plan without comments,
 no comments of completed tasks are stored.
 
 ### Completion events
@@ -243,8 +246,9 @@ valid time, the windows start at `first_month` of the completed tasks in `state.
 before the project's `created_at`, for example of tasks moved in from an older project, are not
 fetched.
 
-Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. The
-attached files themselves are not downloaded.
+Comments keep their attachment metadata (`file_attachment`) exactly as the API returned it. Their
+uploaded files are not part of the snapshot; they are under `attachments/`, see
+[Attachment files](#attachment-files).
 
 **Sub-projects.** Every archived project has a snapshot of its own directly under `archived/`, also
 when it is a sub-project of another archived project; the `parent_id` in its `project.json` names
@@ -319,7 +323,57 @@ completions, not the state of a task, and are not copies in this sense.
 and the comments of a task of an archived project in `archived/<project id>/comments/<task id>.json`,
 so a completed task of a project archived after it was backed up can have both. The comments of
 the task are the union of both files. The copies of one comment share its `id`; if both files hold
-it, the copy under `archived/` is current, by the same order of places.
+it, the copy under `archived/` is current, by the same order of places. The file attached to a
+comment is stored once, under `attachments/`, however many copies of the comment there are.
+
+## Attachment files
+
+`attachments/` holds the files that people uploaded to comments: the comments of active tasks and
+projects under `sync/`, of completed tasks under `completed/comments/`, and of archived projects
+under `archived/`, including comments deleted in Todoist since they were stored.
+
+| Path | Content |
+|---|---|
+| `attachments/<comment id>/<file name>` | The uploaded file of one comment, for example `attachments/6X7rfFVQXwRmcvFp/list.pdf`. |
+
+**Finding the file of a comment.** The file attached to a stored comment is the only file in
+`attachments/<comment id>/`, where `<comment id>` is the comment's `id`, named by the rules of
+[File names](#file-names). Every copy of a comment leads to the same directory. The file holds the
+bytes the file host served, after transfer decoding, and its original name is the comment's
+`file_attachment.file_name`.
+
+**Which files are downloaded.** A comment's file is downloaded when its `file_attachment` has a
+`file_url`, an `upload_state` of `completed` (or none), and a `resource_type` other than `url`.
+Attachments with `resource_type` `url` are links to other websites and are not downloaded. The
+file is requested only when its `file_url` uses HTTPS on `todoist.com` or one of its subdomains.
+
+**Missing files.** A missing `attachments/<comment id>/` directory, or one that holds no file
+other than a temporary file, means that the comment's file is not downloaded. Apart from a link,
+the run that met the comment warned about the reason: the file host refused the file (for example
+because the comment was deleted in Todoist), the download had another length than the comment's
+`file_attachment.file_size`, the `file_url` is not on a Todoist host, or the upload was not
+complete. Each run tries again for every such file, and a run that stopped early downloads the
+rest next time.
+
+**Downloaded once.** A file is written only when its download is complete, and only if its length
+equals `file_size` when the comment states one. Once a comment's directory holds a file, the file
+is never downloaded again, even if the comment changes in Todoist, and whatever the name of the
+stored file.
+
+**File names.** The name of the file is the comment's `file_attachment.file_name`, changed only as
+far as needed to be valid and visible on Windows, macOS and Linux:
+
+- it is normalized to Unicode NFC;
+- control characters and the characters `<`, `>`, `:`, `"`, `/`, `\`, `|`, `?` and `*` are
+  replaced by `_`, so `Rechnung: März/April.pdf` is stored as `Rechnung_ März_April.pdf`;
+- trailing spaces and dots are removed, so `bericht.pdf.` is stored as `bericht.pdf`;
+- a leading dot is replaced by `_`, so `.env` is stored as `_env`;
+- a name whose part before the first dot is a reserved Windows device name (`CON`, `PRN`, `AUX`,
+  `NUL`, `COM0`-`COM9`, `LPT0`-`LPT9`, `COM¹`-`COM³`, `LPT¹`-`LPT³`, `CONIN$`, `CONOUT$`, in any
+  letter case) gets `_` in front, so `con.txt` is stored as `_con.txt`;
+- a name longer than 100 characters or 200 bytes in UTF-8 is shortened before its extension
+  (the part from the last dot, if it has at most 16 characters), without splitting a character;
+- an empty or missing name, or one that is empty after these rules, becomes `attachment`.
 
 ## JSON encoding
 
@@ -341,7 +395,8 @@ from the API's text.
 
 An object's file name is built from its key: usually its `id`, sometimes several fields (the
 `sync/` section names them). The comment files of a task are named after the task's `id`, and the
-directory of an archived project after the project's `id`. Each key component is encoded on its own:
+directory of an archived project after the project's `id`, and the directory of a comment's
+attachment file after the comment's `id`. Each key component is encoded on its own:
 
 - the characters `A`-`Z`, `a`-`z`, `0`-`9`, `_` and `-` are kept;
 - every other character is written as its UTF-8 bytes, each as `%XX` with uppercase hex digits.
@@ -360,7 +415,9 @@ characters long; the tool refuses to store a key whose encoded name would be lon
 On a case-insensitive file system (the default on Windows and macOS), two keys that differ only in
 letter case would share a file. The tool checks the key stored in a file before it replaces it, and
 fails instead of overwriting one object with another. Likewise, before it writes into the directory
-of an archived project, it checks the `id` stored in its `project.json` and `full.json`.
+of an archived project, it checks the `id` stored in its `project.json` and `full.json`, and it
+stores no attachment file in a directory under `attachments/` that another comment's ID already
+took.
 
 ## State file
 

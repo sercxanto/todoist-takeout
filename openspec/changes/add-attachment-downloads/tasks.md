@@ -38,8 +38,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 5. Format description and README
 
-- [ ] 5.1 Add the section "Attachment files" to `storage_format.md` (design D10) and change the comment sections of `sync/`, `completed/` and `archived/`, which say that files are not downloaded. Verify that the path-pattern tests of `tests/test_storage_format.py`, extended to `attachments/`, find every produced path documented and every documented pattern produced, and that the description covers the scenario "File of a comment" of the modified requirement "Documented format"
-- [ ] 5.2 Update the project `README.md`: the status line, the backup scope with attachments, roadmap item 4 as implemented, and advice for the first run on an account with many attachments (time, disk space, rerunning). Verify that every link in the changed sections resolves
+- [x] 5.1 Add the section "Attachment files" to `storage_format.md` (design D10) and change the comment sections of `sync/`, `completed/` and `archived/`, which say that files are not downloaded. Verify that the path-pattern tests of `tests/test_storage_format.py`, extended to `attachments/`, find every produced path documented and every documented pattern produced, and that the description covers the scenario "File of a comment" of the modified requirement "Documented format"
+- [x] 5.2 Update the project `README.md`: the status line, the backup scope with attachments, roadmap item 4 as implemented, and advice for the first run on an account with many attachments (time, disk space, rerunning). Verify that every link in the changed sections resolves
 
 ## 6. Whole runs
 
