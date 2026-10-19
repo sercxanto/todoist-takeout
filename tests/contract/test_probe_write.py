@@ -1,14 +1,23 @@
-"""Write probes W1-W7 of add-completed-tasks-backup and add-archived-projects-backup.
+"""Write probes W1-W8 of add-completed-tasks-backup and add-archived-projects-backup.
 
 A spike, not a regression test. It runs only against the dedicated write account, behind the same
-guard as the write contract test, and creates temporary projects that it deletes at the end. It
-records in `findings/probe-write.json` how completing, uncompleting and archiving show up in the
-completed-tasks endpoints, the archived-projects endpoints and the sync. API payloads are scrubbed;
-time comparisons are made before scrubbing and recorded as booleans or seconds. The test fails only
-when a probe crashes or the cleanup fails.
+guard as the write contract test, and creates temporary projects that it deletes at the end.
+
+W1-W7 record in `findings/probe-write.json` how completing, uncompleting and archiving show up in
+the completed-tasks endpoints, the archived-projects endpoints and the sync. API payloads are
+scrubbed; time comparisons are made before scrubbing and recorded as booleans or seconds.
+
+W8 records in `findings/probe-updated-at.json`, as booleans only, whether a task's `updated_at`
+changes on completion, on a new comment and when its project is archived and unarchived, and how
+archived sub-projects appear in the list of archived projects and in `subprojects` of `/full`.
+Run it alone with `-k updated_at`.
+
+Each test fails only when a probe crashes, the cleanup fails or, for W8, a recorded value is not a
+boolean.
 """
 
 import json
+import time
 from datetime import datetime, timedelta, timezone
 
 from todoist_takeout.resources import Classifier
@@ -21,6 +30,9 @@ SKEW = timedelta(minutes=10)
 BACKDATED_DAYS = (3, 30)
 # W6: candidate names of the completion date argument of item_complete.
 COMPLETION_DATE_ARGS = ("completed_at", "date_completed")
+# W8: seconds between a change and the step before it, so that a changed `updated_at` cannot
+# coincide with the old one.
+PAUSE = 1.5
 
 
 def test_completed_and_archived_behaviour(write_client, contract_support, probes, recorder, tmp_path, write_findings):
@@ -328,3 +340,129 @@ def test_completed_and_archived_behaviour(write_client, contract_support, probes
 
 def _last_rejection(commands) -> str:
     return json.dumps(commands.rejected[-1].as_finding()) if commands.rejected else "no rejection recorded"
+
+
+def test_updated_at_and_subprojects(write_client, contract_support, probes, write_findings):
+    """W8: when `updated_at` of a task changes, and where archived sub-projects are listed."""
+    token, client = write_client
+    api = probes.Api.for_token(token)
+    commands = contract_support.Commands(client)
+    sections = probes.Sections()
+    started = datetime.now(timezone.utc)
+    findings: dict = {}
+    projects: list = []
+
+    def add(command, args, what):
+        return probes.require(commands.add(command, args), f"{what} ({_last_rejection(commands)})")
+
+    def new_project(name, parent=None):
+        args = {"name": f"{PREFIX}: {name}"}
+        if parent is not None:
+            args["parent_id"] = parent
+        project = add("project_add", args, "cannot create a project")
+        projects.append(project)
+        return project
+
+    def synced(resource, object_id):
+        """The payload of an active object, from a full sync of its resource only."""
+        response = json.loads(client.post("sync", {"sync_token": "*", "resource_types": json.dumps([resource])}))
+        return probes.find(response.get(resource), object_id)
+
+    def completion(task_id, **filters):
+        """The task's entry in by_completion_date, polled until it appears."""
+
+        def fetch():
+            since, until = probes.utc(started - SKEW), probes.utc(datetime.now(timezone.utc))
+            return probes.entries_for(probes.by_completion_date(api, since, until, **filters).items, task_id)
+
+        found, _, _ = probes.poll(fetch, bool, timeout=60.0)
+        return found[0] if found else None
+
+    def listed_archived():
+        return probes.walk_cursor(api, probes.ARCHIVED_PROJECTS, {}, items_key="results", limit=50).items
+
+    try:
+        parent = new_project("updated_at parent")
+        child = new_project("updated_at child", parent)
+        grandchild = new_project("updated_at grandchild", child)
+        open_task = add("item_add", {"content": f"{PREFIX}: open", "project_id": parent}, "cannot create a task")
+        done_task = add("item_add", {"content": f"{PREFIX}: done", "project_id": parent}, "cannot create a task")
+        commented = add("item_add", {"content": f"{PREFIX}: commented", "project_id": parent}, "cannot create a task")
+        observer = contract_support.Observer(client)
+        state: dict = {}
+
+        with sections.run(findings, "W8_completion") as entry:
+            before = probes.require(synced("items", done_task), "task not in the sync")
+            time.sleep(PAUSE)
+            entry["complete_accepted"] = bool(commands.run("item_complete", {"id": done_task}))
+            in_sync = probes.find(observer.changes().get("items"), done_task)
+            state["done_by_date"] = completion(done_task)
+            entry["incremental_sync"] = probes.time_change(before, in_sync)
+            entry["by_completion_date"] = probes.time_change(before, state["done_by_date"])
+
+        with sections.run(findings, "W8_comment") as entry:
+            before = probes.require(synced("items", commented), "task not in the sync")
+            time.sleep(PAUSE)
+            note = commands.add("note_add", {"content": f"{PREFIX}: comment", "item_id": commented})
+            entry["comment_created"] = note is not None
+            entry["sync"] = probes.time_change(before, synced("items", commented))
+
+        with sections.run(findings, "W8_archive") as entry:
+            task_before = probes.require(synced("items", open_task), "task not in the sync")
+            project_before = probes.require(synced("projects", parent), "project not in the sync")
+            time.sleep(PAUSE)
+            entry["archive_accepted"] = bool(commands.run("project_archive", {"id": parent}))
+            observer.changes()
+            full = api.get(f"projects/{parent}/full")
+            state["task_archived"] = probes.find(full.get("tasks"), open_task)
+            listed = listed_archived()
+            state["project_archived"] = probes.find(listed, parent)
+            entry["open_task_in_full"] = probes.time_change(task_before, state["task_archived"])
+            entry["completed_task_in_by_completion_date"] = probes.time_change(
+                state.get("done_by_date"), completion(done_task, project_id=parent))
+            entry["project_in_archived_list"] = probes.time_change(project_before, state["project_archived"])
+            entry["project_in_full"] = probes.time_change(project_before, full.get("project"))
+
+            subprojects = full.get("subprojects") or []
+            entry["archived_list"] = {
+                name: probes.describe(probes.find(listed, project_id), "is_archived")
+                for name, project_id in (("parent", parent), ("child", child), ("grandchild", grandchild))
+            }
+            entry["parent_full_subprojects"] = {
+                "child": probes.describe(probes.find(subprojects, child), "is_archived"),
+                "grandchild": probes.describe(probes.find(subprojects, grandchild), "is_archived"),
+            }
+            child_full = probes.attempt(lambda: api.get(f"projects/{child}/full"))
+            entry["child_full_subprojects"] = (
+                {"grandchild": probes.describe(probes.find(child_full["value"].get("subprojects"), grandchild),
+                                               "is_archived")}
+                if child_full["ok"] else child_full
+            )
+
+        with sections.run(findings, "W8_unarchive") as entry:
+            time.sleep(PAUSE)
+            entry["unarchive_accepted"] = bool(commands.run("project_unarchive", {"id": parent}))
+            observer.changes()
+            task_after = synced("items", open_task)
+            entry["open_task_vs_archived"] = probes.time_change(state.get("task_archived"), task_after)
+            entry["project_vs_archived"] = probes.time_change(state.get("project_archived"), synced("projects", parent))
+            entry["children_active_again"] = {
+                "child": probes.describe(synced("projects", child), "is_archived"),
+                "grandchild": probes.describe(synced("projects", grandchild), "is_archived"),
+            }
+    finally:
+        cleanup = []
+        for project_id in reversed(projects):
+            if commands.run("project_delete", {"id": project_id}):
+                continue
+            commands.run("project_unarchive", {"id": project_id})
+            if not commands.run("project_delete", {"id": project_id}):
+                cleanup.append(project_id)
+        findings["rejected_commands"] = [rejected.as_finding() for rejected in commands.rejected]
+        findings["cleanup_failed"] = bool(cleanup)
+        findings, removed = probes.booleans_only(findings)
+        write_findings("probe-updated-at", findings, token)
+
+    assert not cleanup, f"delete these projects of the test account by hand: {cleanup}"
+    assert not sections.crashed, f"probes that crashed (see findings/probe-updated-at.json): {sections.crashed}"
+    assert not removed, f"values that are not booleans were left out of the findings: {removed}"

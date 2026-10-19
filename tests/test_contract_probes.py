@@ -165,3 +165,40 @@ def test_activity_filter_chooses_nothing_without_completions(probes):
 
 def test_day_is_the_utc_date(probes):
     assert probes.day(datetime(2026, 10, 18, 23, 30, tzinfo=timezone.utc)) == "2026-10-18"
+
+
+def test_time_change_compares_without_returning_values(probes):
+    before = {"id": "T1", "updated_at": "2026-10-19T08:00:00.000000Z"}
+    later = {"id": "T1", "updated_at": "2026-10-19T08:00:01.500000Z"}
+    assert probes.time_change(before, later) == {"compared": True, "changed": True, "later": True}
+    assert probes.time_change(later, before) == {"compared": True, "changed": True, "later": False}
+    assert probes.time_change(before, dict(before)) == {"compared": True, "changed": False, "later": False}
+    assert probes.time_change(before, None) == {"compared": False}
+    assert probes.time_change({"id": "T1"}, later) == {"compared": False}
+
+
+def test_booleans_only_removes_ids_timestamps_and_content(probes):
+    findings = {
+        "W8_archive": {
+            "archive_accepted": True,
+            "open_task_in_full": {"compared": True, "changed": False, "later": False},
+            "archived_list": {"child": {"present": True, "is_archived": "<string>"}, "grandchild": {"present": False}},
+            "project_id": "6X7fphhgwcXVGccJ",
+            "updated_at": "2026-10-19T08:00:00.000000Z",
+            "seen": [True, None, "content"],
+            "count": 3,
+        },
+        "rejected_commands": [{"command": "project_archive", "error": {"error": "Invalid argument"}}],
+        "W8_comment": {"crashed": "ProbeError: cannot continue: task not in the sync"},
+    }
+    copy, removed = probes.booleans_only(findings)
+    assert removed == [
+        "W8_archive.archived_list.child.is_archived", "W8_archive.project_id", "W8_archive.updated_at",
+        "W8_archive.seen[2]", "W8_archive.count",
+    ]
+    assert copy["W8_archive"]["open_task_in_full"] == findings["W8_archive"]["open_task_in_full"]
+    assert copy["W8_archive"]["seen"] == [True, None, "<removed>"]
+    assert copy["rejected_commands"] == findings["rejected_commands"]
+    assert copy["W8_comment"] == findings["W8_comment"]
+    leaves = json.dumps({k: v for k, v in copy.items() if k not in probes.TEXT_KEYS})
+    assert "6X7f" not in leaves and "2026" not in leaves and "content" not in leaves

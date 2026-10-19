@@ -1,7 +1,7 @@
 """Helpers for the API probes of add-completed-tasks-backup and add-archived-projects-backup.
 
-The probes are a spike: they answer the open questions in those changes' proposals (probes R1-R7
-and W1-W7) and write what they observe to `tests/contract/findings/`. Nothing here is used by the
+The probes are a spike: they answer the open questions in those changes' proposals (probes R1-R7,
+W1-W7 and W8) and write what they observe to `tests/contract/findings/`. Nothing here is used by the
 tool. Whatever proves worth keeping becomes a regular contract test in the tasks of those changes.
 
 The offline test `tests/test_contract_probes.py` checks these helpers.
@@ -348,6 +348,46 @@ def find(objects, object_id):
         if isinstance(obj, dict) and str(obj.get("id")) == str(object_id):
             return obj
     return None
+
+
+def time_change(before, after, name: str = "updated_at") -> dict:
+    """Whether a timestamp field of two payloads differs, and whether it moved forward. Booleans only."""
+    first, second = (obj.get(name) if isinstance(obj, dict) else None for obj in (before, after))
+    if first is None or second is None:
+        return {"compared": False}
+    earlier, later = parse_time(first), parse_time(second)
+    return {"compared": True, "changed": first != second,
+            "later": earlier is not None and later is not None and later > earlier}
+
+
+# Keys whose values are the API's error answers or the probe's own messages, which hold no account data.
+TEXT_KEYS = ("api_error", "crashed", "rejected_commands")
+
+
+def booleans_only(findings, path: str = "") -> tuple[object, list[str]]:
+    """A copy of `findings` in which every leaf that is not a boolean or null is replaced by `<removed>`.
+
+    Return the copy and the paths of the removed leaves. Values under `TEXT_KEYS` are kept as they are.
+    """
+    if isinstance(findings, dict):
+        copy, removed = {}, []
+        for key, value in findings.items():
+            if key in TEXT_KEYS:
+                copy[key] = value
+                continue
+            copy[key], found = booleans_only(value, f"{path}.{key}" if path else str(key))
+            removed += found
+        return copy, removed
+    if isinstance(findings, list):
+        copy, removed = [], []
+        for index, value in enumerate(findings):
+            item, found = booleans_only(value, f"{path}[{index}]")
+            copy.append(item)
+            removed += found
+        return copy, removed
+    if findings is None or isinstance(findings, bool):
+        return findings, []
+    return "<removed>", [path]
 
 
 # --- Running probes ------------------------------------------------------------
