@@ -14,8 +14,10 @@ import gzip
 import io
 import json
 import urllib.error
+from datetime import datetime
 from pathlib import Path
 
+from todoist_takeout import archived, completed
 from todoist_takeout.api import UrllibTransport
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -65,7 +67,38 @@ FIXTURE_FILES = {
     "https://files.todoist.com/fake/sync/6X7rfFVQXwRmcvFp/list.pdf": file_body("list.pdf", 10520),
     "https://files.todoist.com/fake/completed/6X8Hc2Jf4mQpRw9V/preise.pdf": file_body("preise.pdf", 20480),
     "https://files.todoist.com/fake/archived/6Xc7Gd2Nr5Th8Wk3/fliesen.jpg": file_body("fliesen.jpg", 183204),
+    "https://files.todoist.com/fake/archived/6Xc8Hf2Qt7Vk3Yn5/budget.xlsx": file_body("budget.xlsx", 8732),
 }
+
+
+def completed_answers(api: "FakeApi", now: datetime) -> "FakeApi":
+    """Completed tasks of 2026-09 in two pages with the comments of one task, the backfill of
+    2026-09, and an event before and one at T0 (`now`). The other months are empty."""
+    since, until = completed.month_window("2026-09")
+    september = {"since": since, "until": until}
+    pages = [completed_fixture("by_completion_date_1"), completed_fixture("by_completion_date_2")]
+    api.cursor_pages(BY_COMPLETION_DATE, september, pages)
+    api.answer(COMMENTS, {"task_id": "6X8Gq4CfVh9xPm2R"}, completed_fixture("comments"))
+    api.answer(TASKS_COMPLETED, september, completed_fixture("tasks_completed"))
+    before_t0 = completed_fixture("activities_2")["results"][0]
+    at_t0 = {**completed_fixture("activities_1")["results"][0], "event_date": completed.precise_timestamp(now)}
+    return api.answer(ACTIVITIES, {}, {"results": [before_t0, at_t0], "next_cursor": None})
+
+
+def archived_answers(api: "FakeApi") -> "FakeApi":
+    """One archived project in the second of two list pages, with an archived sub-project that only its
+    /full names, completed tasks in two pages of one window, a commented task and a project comment."""
+    parent = archived_fixture("full_parent")
+    project_id = parent["project"]["id"]
+    api.cursor_pages(ARCHIVED_PROJECTS, {}, [{"results": [], "next_cursor": "YXJjaGl2ZWQ6Mg"},
+                                             {"results": [parent["project"]], "next_cursor": None}])
+    for full in (parent, archived_fixture("full_child")):
+        api.answer(archived.full_path(full["project"]["id"]), {}, full)
+    window = {"since": "2024-01-01T00:00:00.000000Z", "until": "2024-03-31T23:59:59.999999Z", "project_id": project_id}
+    api.cursor_pages(BY_COMPLETION_DATE, window, [archived_fixture("completed_1"), archived_fixture("completed_2")])
+    [commented] = [task for task in parent["tasks"] if task["note_count"]]
+    api.answer(COMMENTS, {"task_id": commented["id"]}, archived_fixture("comments_task"))
+    return api.answer(COMMENTS, {"project_id": project_id}, archived_fixture("comments_project"))
 
 
 def empty_page(path: str) -> bytes:

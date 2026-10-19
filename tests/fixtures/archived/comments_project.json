@@ -5,7 +5,14 @@
       "posted_uid": "2671355",
       "project_id": "6Xr2Pq7Wm4Kd9Hc3",
       "content": "Budget: see the spreadsheet",
-      "file_attachment": null,
+      "file_attachment": {
+        "resource_type": "file",
+        "file_name": "Budget: Bad & WC?.xlsx",
+        "file_size": 8732,
+        "file_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "file_url": "https://files.todoist.com/fake/archived/6Xc8Hf2Qt7Vk3Yn5/budget.xlsx",
+        "upload_state": "completed"
+      },
       "uids_to_notify": [],
       "is_deleted": false,
       "posted_at": "2023-10-05T09:10:00.000000Z",

@@ -43,9 +43,9 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 6. Whole runs
 
-- [ ] 6.1 Add crash and resume tests: with the fault-injection hook at several counts during a first run with three attachments, one of them in a comment stored twice, a rerun produces the tree of an uninterrupted run byte for byte and requests no file that is already stored
-- [ ] 6.2 Add an idempotence test: two runs with unchanged fake responses make no file request in the second run and leave every file under `attachments/` with the same bytes and modification time
-- [ ] 6.3 Extend `tests/fixtures/expected_tree/` with `attachments/`, including a file whose name needs cleaning. Verify that the end-to-end CLI test of `tests/test_cross_platform.py` matches the tree byte for byte, and that it runs in the CI matrix on Linux, macOS and Windows
+- [x] 6.1 Add crash and resume tests: with the fault-injection hook at several counts during a first run with three attachments, one of them in a comment stored twice, a rerun produces the tree of an uninterrupted run byte for byte and requests no file that is already stored
+- [x] 6.2 Add an idempotence test: two runs with unchanged fake responses make no file request in the second run and leave every file under `attachments/` with the same bytes and modification time
+- [x] 6.3 Extend `tests/fixtures/expected_tree/` with `attachments/`, including a file whose name needs cleaning. Verify that the end-to-end CLI test of `tests/test_cross_platform.py` matches the tree byte for byte, and that it runs in the CI matrix on Linux, macOS and Windows
 
 ## 7. Contract tests and probe removal
 

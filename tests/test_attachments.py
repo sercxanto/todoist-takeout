@@ -13,7 +13,16 @@ from todoist_takeout.api import Client
 from todoist_takeout.cli import main
 from todoist_takeout.errors import NetworkError, RateLimitExhausted, StorageError
 
-from fake_api import FILE_TOKEN, FIXTURE_FILES, FakeApi, attachment_fixture, file_body
+from fake_api import (
+    FILE_TOKEN,
+    FIXTURE_FILES,
+    FakeApi,
+    archived_answers,
+    attachment_fixture,
+    completed_answers,
+    completed_fixture,
+    file_body,
+)
 
 NOW = datetime(2026, 10, 19, 12, 0, tzinfo=timezone.utc)
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
@@ -649,6 +658,90 @@ def test_summary_is_logged_when_the_run_fails(tmp_path, caplog):
     with caplog.at_level(logging.INFO, logger="todoist_takeout.attachments"), pytest.raises(NetworkError):
         download(tmp_path, api)
     assert caplog.records[-1].getMessage() == "downloaded 1 attachment files (0.0 MB); 0 could not be downloaded"
+
+
+# --- 6.1 Crash and resume ----------------------------------------------------------------------
+
+
+def whole_account() -> FakeApi:
+    """The account of the sync, completed and archived fixtures, with four uploaded files. The comment
+    with a file of the completed task is stored twice: in `completed/comments/`, and in the sync, which
+    holds it from before its task was completed."""
+    [priced] = [c for c in completed_fixture("comments")["results"] if c["file_attachment"]]
+    return archived_answers(completed_answers(FakeApi(with_notes(priced)), NOW))
+
+
+def stored_urls(target: Path) -> list[str]:
+    """The URLs of the files that are stored, in the order of `attachments.collect`."""
+    root = target / "attachments"
+    names = set(os.listdir(root)) if root.is_dir() else set()
+    return [a.url for a in attachments.collect(target)
+            if attachments._holds_file(root, names, storage.encode_key(a.comment_id))]
+
+
+@pytest.fixture(scope="module")
+def whole_run(tmp_path_factory):
+    """The tree of an uninterrupted first run of `whole_account`, and the number of its writes."""
+    target = tmp_path_factory.mktemp("reference")
+    storage.set_fault_after(10_000)
+    try:
+        api = run_backup(target, whole_account())
+        writes = 10_000 - storage._fault_after
+    finally:
+        storage.set_fault_after(None)
+    # Each file is requested once, although one comment is stored twice.
+    copies = [c["id"] for c in attachments._stored_comments(target) if isinstance(c, dict) and c.get("file_attachment")]
+    assert len(copies) == 5 and len(set(copies)) == 4
+    assert api.file_requests == stored_urls(target) == [a.url for a in attachments.collect(target)]
+    assert len(api.file_requests) == 4
+    assert len({path.split("/")[0] for path in files_under(target)}) == 4
+    return snapshot(target), writes
+
+
+def snapshot(target: Path) -> dict[str, bytes]:
+    return {p.relative_to(target).as_posix(): p.read_bytes() for p in sorted(target.rglob("*")) if p.is_file()}
+
+
+# The writes of a first run end with the four attachment files and state.json. A crash after
+# `writes - n` writes hits, for n = 6 to 1: the last write before the downloads, each of the four
+# files, and state.json.
+@pytest.mark.parametrize("before_end", range(6, 0, -1))
+def test_resume_after_a_crash_during_the_downloads_gives_the_uninterrupted_result(tmp_path, whole_run, before_end):
+    reference, writes = whole_run
+    storage.set_fault_after(writes - before_end)
+    try:
+        with pytest.raises(storage.InjectedFault):
+            run_backup(tmp_path, whole_account())
+    finally:
+        storage.set_fault_after(None)
+    stored = stored_urls(tmp_path)
+    assert len(stored) == min(4, max(0, 5 - before_end))
+
+    api = run_backup(tmp_path, whole_account())
+
+    assert snapshot(tmp_path) == reference
+    assert set(api.file_requests).isdisjoint(stored)
+    assert api.file_requests == [u for u in stored_urls(tmp_path) if u not in stored]
+
+
+# --- 6.2 Idempotence ----------------------------------------------------------------------------
+
+OLD = 1_000_000_000
+
+
+def test_repeat_run_requests_no_file_and_leaves_every_attachment_unchanged(tmp_path):
+    run_backup(tmp_path, whole_account())
+    paths = [p for p in (tmp_path / "attachments").rglob("*") if p.is_file()]
+    for path in paths:
+        os.utime(path, ns=(OLD, OLD))
+    before = files_under(tmp_path)
+
+    api = run_backup(tmp_path, whole_account())
+
+    assert api.file_requests == [] and api.file_hops == []
+    assert files_under(tmp_path) == before
+    assert len(before) == 4
+    assert [p for p in (tmp_path / "attachments").rglob("*") if p.is_file() and p.stat().st_mtime_ns != OLD] == []
 
 
 def test_log_lines_hold_neither_the_token_nor_a_query_string(tmp_path, caplog):
