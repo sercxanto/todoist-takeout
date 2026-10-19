@@ -2,18 +2,20 @@
 
 It answers sync requests by their sync token and GET requests by path and parameters, and records
 every request. GET endpoints that a test does not configure return an empty page, so that tests of
-the sync keep working while the completed-tasks backup runs after it.
+the sync keep working while the completed-tasks and archived-projects backups run after it.
 """
 
 import json
 from pathlib import Path
 
 COMPLETED_FIXTURES = Path(__file__).parent / "fixtures" / "completed"
+ARCHIVED_FIXTURES = Path(__file__).parent / "fixtures" / "archived"
 
 BY_COMPLETION_DATE = "tasks/completed/by_completion_date"
 TASKS_COMPLETED = "tasks/completed"
 ACTIVITIES = "activities"
 COMMENTS = "comments"
+ARCHIVED_PROJECTS = "projects/archived"
 
 # What each GET endpoint returns when it has nothing, in the shape of its real responses.
 EMPTY_PAGES = {
@@ -21,11 +23,16 @@ EMPTY_PAGES = {
     TASKS_COMPLETED: {"items": [], "projects": {}, "sections": {}},
     ACTIVITIES: {"results": [], "next_cursor": None},
     COMMENTS: {"results": [], "next_cursor": None},
+    ARCHIVED_PROJECTS: {"results": [], "next_cursor": None},
 }
 
 
 def completed_fixture(name: str) -> dict:
     return json.loads((COMPLETED_FIXTURES / f"{name}.json").read_bytes())
+
+
+def archived_fixture(name: str) -> dict:
+    return json.loads((ARCHIVED_FIXTURES / f"{name}.json").read_bytes())
 
 
 def empty_page(path: str) -> bytes:

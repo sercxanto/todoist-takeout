@@ -14,6 +14,7 @@ from todoist_takeout.sync import run_backup
 
 from fake_api import (
     ACTIVITIES,
+    ARCHIVED_PROJECTS,
     BY_COMPLETION_DATE,
     COMMENTS,
     COMPLETED_FIXTURES,
@@ -97,8 +98,8 @@ def test_fake_api_answers_by_path_and_parameters_and_records_requests():
 
 
 def test_fake_api_refuses_unknown_endpoints():
-    with pytest.raises(AssertionError, match="projects/archived"):
-        FakeApi().send("GET", "projects/archived", {})
+    with pytest.raises(AssertionError, match="projects/archived/count"):
+        FakeApi().send("GET", "projects/archived/count", {})
 
 
 # --- group 4: completed-task months and their comments ----------------------------------------
@@ -221,9 +222,9 @@ def test_plan_without_completed_tasks_warns_once_and_makes_no_request(tmp_path, 
     assert status == 0
     assert capsys.readouterr().err.splitlines() == [
         "WARNING the Todoist plan 'free' does not include completed_tasks; completed tasks, completion events and "
-        "their comments cannot be backed up on this plan"
+        "their comments (including those of archived projects) cannot be backed up on this plan"
     ]
-    assert api.get_requests == []
+    assert [path for path, _ in api.get_requests] == [ARCHIVED_PROJECTS]  # the list is all this part asks for
     assert progress(tmp_path) is None
     assert not (tmp_path / "completed").exists()
     assert (tmp_path / "sync" / "items" / "6X7rM8997g3RQmvh.json").is_file()

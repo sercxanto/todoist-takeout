@@ -175,7 +175,7 @@ def _fetch_months(target: Path, client: Client, state: dict, moment: datetime, *
     closed = _checked_month(progress["tasks_closed_through"], "tasks_closed_through")
     month = next_month(closed) if closed else _checked_month(progress["first_month"], "first_month")
     current = month_of(moment)
-    comment_store = _CommentStore(target, client, enabled=comments)
+    comment_store = _CommentStore(target / COMPLETED_DIR / COMMENTS_DIR, client, enabled=comments)
     fetched = []
     closing = True
     # The progress is logged also when the run fails, for example on the rate limit (design D13).
@@ -214,16 +214,21 @@ def _fetch_months(target: Path, client: Client, state: dict, moment: datetime, *
 
 
 class _CommentStore:
-    """Fetches and stores the comments of completed tasks (design D8)."""
+    """Fetches the comments of tasks and stores them in `directory`, one file per task (design D8)."""
 
-    def __init__(self, target: Path, client: Client, *, enabled: bool):
-        self.directory = target / COMPLETED_DIR / COMMENTS_DIR
+    def __init__(self, directory: Path, client: Client, *, enabled: bool, owner: str = "completed tasks"):
+        self.directory = directory
         self.client = client
         self.enabled = enabled
+        self.owner = owner  # whose comments these are, for the plan warning
         self.written = 0
 
-    def update(self, stored: dict | None, tasks: list) -> None:
-        """Fetch the comments of each task whose `note_count` is positive and differs from the stored one."""
+    def update(self, stored: dict | None, tasks: list, *, fetch_missing: bool = False) -> None:
+        """Fetch the comments of each task whose `note_count` is positive and differs from the stored one.
+
+        With `fetch_missing`, a task whose comment file is missing is fetched even if its `note_count`
+        is unchanged.
+        """
         if not self.enabled:
             return
         stored_counts = {}
@@ -237,7 +242,8 @@ class _CommentStore:
             if task_id is None or not _is_int(count) or count <= 0:
                 continue
             if task_id in stored_counts and stored_counts[task_id] == count:
-                continue
+                if not fetch_missing or self.path(task_id).exists():
+                    continue
             self._fetch(task_id)
             if not self.enabled:
                 return
@@ -247,23 +253,27 @@ class _CommentStore:
             pages = fetch_pages(self.client, COMMENTS, {"task_id": task_id}, COMMENTS_PAGE_LIMIT, "results")
         except PlanRestricted:
             log.warning(
-                "the Todoist plan does not allow fetching comments; the comments of completed tasks cannot be "
-                "backed up on this plan"
+                "the Todoist plan does not allow fetching comments; the comments of %s cannot be backed up on "
+                "this plan",
+                self.owner,
             )
             self.enabled = False
             return
         except ApiError as exc:
             if exc.http_status != 404:
                 raise
-            log.debug("the comments of a completed task were not found (HTTP 404); the task may have been deleted")
+            log.debug("the comments of a task were not found (HTTP 404); the task may have been deleted")
             return
-        path = self.directory / f"{storage.encode_key(task_id)}{JSON_SUFFIX}"
+        path = self.path(task_id)
         stored = read_stored(path, "results")
         if stored is not None:
             _check_comments(path, stored, task_id)
         merged = merge_pages([stored, *pages] if stored is not None else pages, "results", "posted_at", by_id=True)
         if storage.write_bytes_atomic(path, storage.encode_json(merged)):
             self.written += 1
+
+    def path(self, task_id: str) -> Path:
+        return self.directory / f"{storage.encode_key(task_id)}{JSON_SUFFIX}"
 
 
 def _check_comments(path: Path, stored: dict, task_id: str) -> None:

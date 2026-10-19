@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from todoist_takeout import completed, resources, storage
+from todoist_takeout import archived, completed, resources, storage
 from todoist_takeout.api import Client
 from todoist_takeout.errors import ConfigError, RunError, StorageError
 from todoist_takeout.lock import LOCK_FILE, TargetLock
@@ -41,8 +41,8 @@ MAX_ROUNDS = 2
 # Flags in `user_plan_limits.current` that, when false, mean that the plan leaves a part of the
 # account out of the backup (design D12), and the part each one names.
 PLAN_FEATURES = {
-    "comments": "task and project comments",
-    "completed_tasks": "completed tasks, completion events and their comments",
+    "comments": "task and project comments (including those of archived projects)",
+    "completed_tasks": "completed tasks, completion events and their comments (including those of archived projects)",
 }
 
 
@@ -99,6 +99,7 @@ def run_backup(target: Path, client: Client, *, now: Callable[[], datetime] | No
             log.info("following the full sync with an incremental sync to catch up")
 
         completed.run(target, client, state, now)
+        archived.run(target, client, state, now)
         _warn_about_plan_limits(target)
         state["last_successful_run_utc"] = _timestamp(now())
         storage.write_state(target, state)
