@@ -49,10 +49,10 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 7. Fixture recording, contract tests and probe removal
 
-- [ ] 7.1 Extend `scripts/record_fixtures.py` to record the archived list and one `/full`, read-only, scrubbed by the existing rules, and add both endpoints to `shapes.json`. Verify with an offline scrubber test that IDs inside `subprojects` and `collaborators` are pseudonymized consistently
-- [ ] 7.2 Add a read-only contract test for the archived list and one `/full`, compared with the recorded shapes, and run it with the user against both accounts. Verify that it passes on both and fails offline when a field is added to a recorded shape
-- [ ] 7.3 Add a write contract test, Free account only and behind the existing guard: create a project with a sub-project, a section, an open task, a completed task and comments, archive the parent, run the tool into a temporary backup, force a full sync, and assert both snapshots, the comment files and no missing-object warning. Run it with the user. Verify that it passes and cleans up the projects it created
-- [ ] 7.4 Remove the probe spike (`tests/contract/probes.py`, `tests/contract/test_probe_*.py`, `tests/test_contract_probes.py`) now that its findings are in the proposals. Verify that the offline suite and `pytest --collect-only tests/contract` pass, and that no remaining file imports `probes`
+- [x] 7.1 Extend `scripts/record_fixtures.py` to record the archived list and one `/full`, read-only, scrubbed by the existing rules, and add both endpoints to `shapes.json`. Verify with an offline scrubber test that IDs inside `subprojects` and `collaborators` are pseudonymized consistently
+- [x] 7.2 Add a read-only contract test for the archived list and one `/full`, compared with the recorded shapes, and run it with the user against both accounts. Verify that it passes on both and fails offline when a field is added to a recorded shape
+- [x] 7.3 Add a write contract test, Free account only and behind the existing guard: create a project with a sub-project, a section, an open task, a completed task and comments, archive the parent, run the tool into a temporary backup, force a full sync, and assert both snapshots, the comment files and no missing-object warning. Run it with the user. Verify that it passes and cleans up the projects it created
+- [x] 7.4 Remove the probe spike (`tests/contract/probes.py`, `tests/contract/test_probe_*.py`, `tests/test_contract_probes.py`) now that its findings are in the proposals. Verify that the offline suite and `pytest --collect-only tests/contract` pass, and that no remaining file imports `probes`
 
 ## Workflow follow-up
 

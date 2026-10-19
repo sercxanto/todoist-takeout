@@ -89,7 +89,7 @@ def test_contract_tests_skip_without_the_variables(tmp_path):
         timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "10 skipped" in result.stdout, result.stdout
+    assert "9 skipped" in result.stdout, result.stdout
     assert "passed" not in result.stdout and "failed" not in result.stdout
     assert "TODOIST_CONTRACT_TOKEN is not set" in result.stdout
     assert "TODOIST_CONTRACT_WRITE_TOKEN is not set" in result.stdout
@@ -101,7 +101,7 @@ def test_write_tests_skip_without_the_allow_flag(tmp_path):
     result = subprocess.run(
         [
             sys.executable, "-m", "pytest", "-m", "contract", "-q", "-rs", "-p", "no:cacheprovider",
-            "tests/contract/test_write.py", "tests/contract/test_probe_write.py",
+            "tests/contract/test_write.py", "tests/contract/test_archived_write.py",
         ],
         cwd=ROOT,
         env=env,
@@ -111,4 +111,4 @@ def test_write_tests_skip_without_the_allow_flag(tmp_path):
         timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "4 skipped" in result.stdout and "TODOIST_CONTRACT_ALLOW_WRITES is not 1" in result.stdout
+    assert "3 skipped" in result.stdout and "TODOIST_CONTRACT_ALLOW_WRITES is not 1" in result.stdout

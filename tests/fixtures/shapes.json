@@ -348,6 +348,9 @@
         "item_id": [
           "string"
         ],
+        "karma_level": [
+          "integer"
+        ],
         "notification_key": [
           "string"
         ],
@@ -355,6 +358,9 @@
           "string"
         ],
         "project_id": [
+          "string"
+        ],
+        "promo_img": [
           "string"
         ],
         "responsible_uid": [
@@ -1448,6 +1454,364 @@
             ],
             "uids_to_notify": [
               "null"
+            ]
+          }
+        }
+      }
+    },
+    "projects_archived": {
+      "sources": [
+        "recorded/read/projects_archived.json",
+        "recorded/write/projects_archived.json"
+      ],
+      "keys": {
+        "next_cursor": {
+          "kind": "value",
+          "types": [
+            "null",
+            "string"
+          ]
+        },
+        "results": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {
+            "access": [
+              "object"
+            ],
+            "can_assign_tasks": [
+              "boolean"
+            ],
+            "can_comment": [
+              "boolean"
+            ],
+            "child_order": [
+              "integer"
+            ],
+            "color": [
+              "string"
+            ],
+            "created_at": [
+              "string"
+            ],
+            "creator_uid": [
+              "string"
+            ],
+            "default_order": [
+              "integer"
+            ],
+            "default_order_key": [
+              "null"
+            ],
+            "description": [
+              "string"
+            ],
+            "icon": [
+              "null"
+            ],
+            "id": [
+              "string"
+            ],
+            "is_archived": [
+              "boolean"
+            ],
+            "is_collapsed": [
+              "boolean"
+            ],
+            "is_deleted": [
+              "boolean"
+            ],
+            "is_favorite": [
+              "boolean"
+            ],
+            "is_frozen": [
+              "boolean"
+            ],
+            "is_shared": [
+              "boolean"
+            ],
+            "name": [
+              "string"
+            ],
+            "order_key": [
+              "null"
+            ],
+            "parent_id": [
+              "null"
+            ],
+            "public_access": [
+              "boolean"
+            ],
+            "public_key": [
+              "string"
+            ],
+            "role": [
+              "string"
+            ],
+            "updated_at": [
+              "string"
+            ],
+            "view_style": [
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "project_full": {
+      "sources": [
+        "recorded/read/project_full.json"
+      ],
+      "keys": {
+        "collaborator_states": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {
+            "is_deleted": [
+              "boolean"
+            ],
+            "project_id": [
+              "string"
+            ],
+            "state": [
+              "string"
+            ],
+            "user_id": [
+              "string"
+            ]
+          }
+        },
+        "collaborators": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {
+            "email": [
+              "string"
+            ],
+            "full_name": [
+              "string"
+            ],
+            "id": [
+              "string"
+            ],
+            "image_id": [
+              "null"
+            ],
+            "status": [
+              "null"
+            ],
+            "timezone": [
+              "string"
+            ]
+          }
+        },
+        "comments_count": {
+          "kind": "value",
+          "types": [
+            "integer"
+          ]
+        },
+        "folder": {
+          "kind": "value",
+          "types": [
+            "null"
+          ]
+        },
+        "project": {
+          "kind": "map",
+          "types": [
+            "object"
+          ],
+          "fields": {
+            "access": [
+              "object"
+            ],
+            "can_assign_tasks": [
+              "boolean"
+            ],
+            "can_comment": [
+              "boolean"
+            ],
+            "child_order": [
+              "integer"
+            ],
+            "color": [
+              "string"
+            ],
+            "created_at": [
+              "string"
+            ],
+            "creator_uid": [
+              "string"
+            ],
+            "default_order": [
+              "integer"
+            ],
+            "default_order_key": [
+              "null"
+            ],
+            "description": [
+              "string"
+            ],
+            "icon": [
+              "null"
+            ],
+            "id": [
+              "string"
+            ],
+            "is_archived": [
+              "boolean"
+            ],
+            "is_collapsed": [
+              "boolean"
+            ],
+            "is_deleted": [
+              "boolean"
+            ],
+            "is_favorite": [
+              "boolean"
+            ],
+            "is_frozen": [
+              "boolean"
+            ],
+            "is_shared": [
+              "boolean"
+            ],
+            "name": [
+              "string"
+            ],
+            "order_key": [
+              "null"
+            ],
+            "parent_id": [
+              "null"
+            ],
+            "public_access": [
+              "boolean"
+            ],
+            "public_key": [
+              "string"
+            ],
+            "role": [
+              "string"
+            ],
+            "updated_at": [
+              "string"
+            ],
+            "view_style": [
+              "string"
+            ]
+          }
+        },
+        "sections": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {}
+        },
+        "subprojects": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {}
+        },
+        "tasks": {
+          "kind": "list",
+          "types": [
+            "array"
+          ],
+          "fields": {
+            "added_at": [
+              "string"
+            ],
+            "added_by_uid": [
+              "string"
+            ],
+            "assigned_by_uid": [
+              "null"
+            ],
+            "checked": [
+              "boolean"
+            ],
+            "child_order": [
+              "integer"
+            ],
+            "completed_at": [
+              "null"
+            ],
+            "completed_by_uid": [
+              "null"
+            ],
+            "completed_count": [
+              "integer"
+            ],
+            "content": [
+              "string"
+            ],
+            "day_order": [
+              "integer"
+            ],
+            "deadline": [
+              "null"
+            ],
+            "description": [
+              "string"
+            ],
+            "due": [
+              "null"
+            ],
+            "duration": [
+              "null"
+            ],
+            "id": [
+              "string"
+            ],
+            "is_collapsed": [
+              "boolean"
+            ],
+            "is_deleted": [
+              "boolean"
+            ],
+            "labels": [
+              "array"
+            ],
+            "note_count": [
+              "integer"
+            ],
+            "order_key": [
+              "string"
+            ],
+            "parent_id": [
+              "null"
+            ],
+            "postponed_count": [
+              "integer"
+            ],
+            "priority": [
+              "integer"
+            ],
+            "project_id": [
+              "string"
+            ],
+            "responsible_uid": [
+              "null"
+            ],
+            "section_id": [
+              "null"
+            ],
+            "updated_at": [
+              "string"
+            ],
+            "user_id": [
+              "string"
             ]
           }
         }

@@ -6,7 +6,18 @@ import pytest
 
 from todoist_takeout import completed, storage
 
-from fake_api import ACTIVITIES, BY_COMPLETION_DATE, COMMENTS, TASKS_COMPLETED, FakeApi, completed_fixture
+from todoist_takeout import archived
+
+from fake_api import (
+    ACTIVITIES,
+    ARCHIVED_PROJECTS,
+    BY_COMPLETION_DATE,
+    COMMENTS,
+    TASKS_COMPLETED,
+    FakeApi,
+    archived_fixture,
+    completed_fixture,
+)
 
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
 
@@ -280,7 +291,8 @@ def test_record_takes_one_page_of_each_completed_tasks_endpoint(recording):
     directory = recording(fake)
 
     assert sorted(path.stem for path in directory.iterdir()) == sorted(
-        ["full", "incremental", "by_completion_date", "tasks_completed", "activities", "comments"]
+        ["full", "incremental", "by_completion_date", "tasks_completed", "activities", "comments",
+         "projects_archived"]
     )
     limit = {"limit": "50"}
     assert fake.requested(BY_COMPLETION_DATE) == [
@@ -344,7 +356,163 @@ def test_endpoint_shapes_follow_the_page_merge(recorder):
     assert added == ["field items.brand_new (integer)"]
 
 
-def test_committed_shapes_describe_the_completed_tasks_endpoints(recorder):
+def test_committed_shapes_describe_the_get_endpoints(recorder):
     shapes = json.loads(recorder.SHAPES.read_bytes())
     assert sorted(shapes["endpoints"]) == sorted(recorder.ENDPOINTS)
     assert all("full_sync" not in entry for e in shapes["endpoints"].values() for entry in e["keys"].values())
+
+
+# --- Archived-projects endpoints ----------------------------------------------------------------
+
+PARENT_ID, CHILD_ID, OWNER_ID, COLLABORATOR_ID = "6Xr2Pq7Wm4Kd9Hc3", "6Xr2Pq8Tn5Lf2Jb6", "2671355", "48213907"
+
+
+def shared_full() -> dict:
+    """`/full` of the parent fixture, shared with a collaborator."""
+    full = archived_fixture("full_parent")
+    full["collaborators"] = [
+        {"id": OWNER_ID, "email": "jane.doe@example.com", "full_name": "Jane Doe", "timezone": "Europe/Berlin",
+         "image_id": None},
+        {"id": COLLABORATOR_ID, "email": "max@example.com", "full_name": "Max Mustermann",
+         "timezone": "Europe/Vienna", "image_id": "a1b2c3d4e5f6"},
+    ]
+    full["collaborator_states"] = [
+        {"project_id": PARENT_ID, "user_id": user_id, "state": "active", "is_deleted": False, "role": "CREATOR"}
+        for user_id in (OWNER_ID, COLLABORATOR_ID)
+    ]
+    return full
+
+
+def test_ids_inside_subprojects_and_collaborators_get_consistent_pseudonyms(recorder):
+    listed, full = archived_fixture("list_1"), shared_full()
+    bodies = recorder.scrubbed_bytes([json.dumps(listed).encode(), json.dumps(full).encode()], TOKEN)
+    listed_out, full_out = (json.loads(data) for data in bodies)
+    project, [subproject] = full_out["project"], full_out["subprojects"]
+    collaborators, states = full_out["collaborators"], full_out["collaborator_states"]
+
+    # The listed project, the project of /full and the parent of its sub-project are the same.
+    assert listed_out["results"][0]["id"] == project["id"] == subproject["parent_id"] != PARENT_ID
+    assert subproject["id"] != CHILD_ID and same_classes(CHILD_ID, subproject["id"])
+    assert subproject["id"] != project["id"]
+    # Collaborators and their states point at the same users, and the owner is the creator.
+    assert [state["user_id"] for state in states] == [collaborator["id"] for collaborator in collaborators]
+    assert {state["project_id"] for state in states} == {project["id"]}
+    assert collaborators[0]["id"] == project["creator_uid"] == subproject["creator_uid"] != OWNER_ID
+    assert collaborators[1]["id"] != COLLABORATOR_ID and same_classes(COLLABORATOR_ID, collaborators[1]["id"])
+    assert all(collaborator["email"] == recorder.EMAIL_PLACEHOLDER for collaborator in collaborators)
+
+    text = b"".join(bodies).decode("utf-8")
+    for original in [PARENT_ID, CHILD_ID, OWNER_ID, COLLABORATOR_ID, "a1b2c3d4e5f6", "Jane", "Max", "Vienna",
+                     "Renovation", "Kitchen", "YXJjaGl2ZWQ6Mg"]:
+        assert original not in text, original
+    assert recorder.endpoint_shape_of(full_out) == recorder.endpoint_shape_of(full)
+
+
+def test_record_takes_the_archived_list_and_one_full(recording):
+    full_path = archived.full_path(PARENT_ID)
+    fake = fake_account({"2026-08": completed_fixture("by_completion_date_1")})
+    fake.answer(ARCHIVED_PROJECTS, {}, archived_fixture("list_1"))
+    fake.answer(full_path, {}, shared_full())
+    directory = recording(fake)
+
+    # One page of the list, although it has a next cursor. Its first project has tasks and sections,
+    # so its /full is the only one requested.
+    assert fake.requested(ARCHIVED_PROJECTS) == [{"limit": "50"}]
+    assert fake.requested(full_path) == [{}]
+    assert [path for path, _params in fake.get_requests if path.startswith("projects/")] == [
+        ARCHIVED_PROJECTS, full_path,
+    ]
+    listed = json.loads((directory / "projects_archived.json").read_bytes())
+    full = json.loads((directory / "project_full.json").read_bytes())
+    assert listed["results"][0]["id"] == full["project"]["id"] != PARENT_ID
+    # Scrubbed with the scrubber of the whole recording: the user matches the sync's.
+    assert full["collaborators"][0]["id"] == listed["results"][0]["creator_uid"]
+
+
+def archived_account(contents: list[set[str]]) -> tuple[FakeApi, list[str]]:
+    """An account whose archived projects have /full responses with the named lists non-empty."""
+    template = archived_fixture("full_parent")
+    template["collaborators"] = shared_full()["collaborators"]
+    project_ids = [f"6Xr2Pq7Wm4Kd{n:04d}" for n in range(len(contents))]
+    projects = [{**archived_fixture("list_1")["results"][0], "id": project_id} for project_id in project_ids]
+    fake = fake_account({"2026-08": completed_fixture("by_completion_date_1")})
+    fake.answer(ARCHIVED_PROJECTS, {}, {"results": projects, "next_cursor": None})
+    for project, filled in zip(projects, contents):
+        full = {key: (value if key in filled or not isinstance(value, list) else [])
+                for key, value in template.items()}
+        fake.answer(archived.full_path(project["id"]), {}, {**full, "project": project})
+    return fake, project_ids
+
+
+def full_requests(fake: FakeApi) -> list[str]:
+    return [path for path, _params in fake.get_requests if path.endswith("/full")]
+
+
+def test_record_stops_at_the_first_full_with_tasks_and_sections(recording):
+    fake, project_ids = archived_account([set(), {"tasks"}, {"tasks", "sections"}, {"tasks", "sections"}])
+    directory = recording(fake)
+    assert full_requests(fake) == [archived.full_path(project_id) for project_id in project_ids[:3]]
+    full = json.loads((directory / "project_full.json").read_bytes())
+    listed = json.loads((directory / "projects_archived.json").read_bytes())
+    assert full["project"]["id"] == listed["results"][2]["id"]
+    assert full["tasks"] and full["sections"]
+
+
+def test_record_takes_the_full_with_the_most_content_among_the_candidates(recording, recorder, monkeypatch):
+    monkeypatch.setattr(recorder, "FULL_CANDIDATES", 10)
+    contents = [set(), {"tasks"}, set(), {"tasks", "collaborators"}, {"sections", "collaborators"},
+                *[set()] * 5, {"tasks", "sections"}]
+    fake, project_ids = archived_account(contents)
+    directory = recording(fake)
+    # The eleventh project would have tasks and sections, but only ten are tried.
+    assert recorder.FULL_CANDIDATES == 10
+    assert full_requests(fake) == [archived.full_path(p) for p in project_ids[:recorder.FULL_CANDIDATES]]
+    full = json.loads((directory / "project_full.json").read_bytes())
+    listed = json.loads((directory / "projects_archived.json").read_bytes())
+    # The fourth and the fifth have two non-empty lists each; the earlier one wins.
+    assert full["project"]["id"] == listed["results"][3]["id"]
+
+
+def test_record_without_archived_projects_drops_an_old_full_file(recording):
+    fake = fake_account({"2026-08": completed_fixture("by_completion_date_1")})
+    fake.answer(ARCHIVED_PROJECTS, {}, archived_fixture("list_1"))
+    fake.answer(archived.full_path(PARENT_ID), {}, archived_fixture("full_parent"))
+    directory = recording(fake)
+    assert (directory / "project_full.json").exists()
+
+    fake = fake_account({"2026-08": completed_fixture("by_completion_date_1")})
+    recording(fake)
+    assert (directory / "projects_archived.json").exists()
+    assert not (directory / "project_full.json").exists()
+    assert [path for path, _params in fake.get_requests if path.startswith("projects/")] == [ARCHIVED_PROJECTS]
+
+
+def test_committed_shapes_describe_the_archived_endpoints(recorder):
+    endpoints = json.loads(recorder.SHAPES.read_bytes())["endpoints"]
+    listed, full = endpoints["projects_archived"]["keys"], endpoints["project_full"]["keys"]
+    assert listed["results"]["kind"] == "list" and listed["results"]["fields"]["is_archived"] == ["boolean"]
+    assert sorted(full) == sorted(
+        ["project", "tasks", "sections", "subprojects", "collaborators", "collaborator_states", "folder",
+         "comments_count"]
+    )
+    assert full["project"]["kind"] == "map" and full["subprojects"]["kind"] == "list"
+
+
+def test_archived_contract_comparison_fails_on_an_added_field(recorder):
+    # What the contract test of the archived endpoints compares: the committed shapes against the
+    # recordings they were made from, or the hand-written fixtures without a recording.
+    expected = json.loads(recorder.SHAPES.read_bytes())["endpoints"]
+    sources = recorder.endpoint_shape_sources()
+    bodies = {name: sources[name][0].read_bytes() for name in recorder.ARCHIVED_ENDPOINTS}
+    assert recorder.compare_endpoint_bodies(expected, bodies) == {
+        "projects_archived": ([], []), "project_full": ([], []),
+    }
+
+    listed, full = (json.loads(bodies[name]) for name in ("projects_archived", "project_full"))
+    listed["results"][0]["brand_new"] = True
+    full["project"]["brand_new"] = "x"
+    full["brand_new_key"] = []
+    bodies = {"projects_archived": json.dumps(listed).encode(), "project_full": json.dumps(full).encode()}
+    result = recorder.compare_endpoint_bodies(expected, bodies)
+    assert result["projects_archived"][0] == ["field results.brand_new (boolean)"]
+    assert result["project_full"][0] == ["key 'brand_new_key' (list)", "field project.brand_new (string)"]
