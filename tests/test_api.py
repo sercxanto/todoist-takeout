@@ -1,5 +1,6 @@
 import email.message
 import gzip
+import http.client
 import io
 import json
 import logging
@@ -14,6 +15,7 @@ from todoist_takeout import __version__, api, storage
 from todoist_takeout.errors import (
     ApiError,
     AttachmentRefused,
+    AttachmentUnusable,
     AuthError,
     NetworkError,
     PlanRestricted,
@@ -727,11 +729,58 @@ def test_download_rejects_a_body_shorter_than_its_content_length():
     assert info.value.retryable
 
 
-def test_download_rejects_an_unsupported_encoding():
+def test_download_rejects_an_unsupported_encoding_as_unusable():
     transport, _opener = _stub_transport({FILE_URL: (200, {"Content-Encoding": "br"}, b"...")})
-    with pytest.raises(api.TransportError, match="'br'") as info:
+    with pytest.raises(api.FileUnusable, match="'br'"):
         transport.download(FILE_URL, _collect)
-    assert not info.value.retryable
+
+
+@pytest.mark.parametrize("chunk_size", [api.CHUNK_SIZE, "first member"])
+def test_download_decodes_every_gzip_member(monkeypatch, chunk_size):
+    first, second = gzip.compress(b"first part, "), gzip.compress(b"second part" * 10000)
+    if chunk_size == "first member":
+        monkeypatch.setattr(api, "CHUNK_SIZE", len(first))  # a block ends exactly where the member ends
+    transport, _opener = _stub_transport({FILE_URL: (200, {"Content-Encoding": "gzip"}, first + second)})
+    assert transport.download(FILE_URL, _collect)[2] == b"first part, " + b"second part" * 10000
+
+
+@pytest.mark.parametrize(
+    "url, sent",
+    [
+        ("https://files.todoist.com/app/n1/Rechnung März 2026.pdf",
+         "https://files.todoist.com/app/n1/Rechnung%20M%C3%A4rz%202026.pdf"),
+        ("https://files.todoist.com/app/n1/Rechnung%20M%C3%A4rz.pdf", "https://files.todoist.com/app/n1/Rechnung%20M%C3%A4rz.pdf"),
+        ("https://files.todoist.com/app/n1/a\tb.pdf?x=ä y", "https://files.todoist.com/app/n1/a%09b.pdf?x=%C3%A4%20y"),
+        (FILE_URL, FILE_URL),
+        (SIGNED_URL, SIGNED_URL),
+    ],
+)
+def test_download_percent_encodes_what_http_client_refuses(url, sent):
+    transport, opener = _stub_transport({sent: (200, {}, b"x")})
+    assert transport.download(url, _collect)[2] == b"x"
+    assert [request[0] for request in opener.requests] == [sent]
+
+
+def test_download_percent_encodes_a_redirect_target():
+    target = "https://d1abc.cloudfront.net/app/n1/März.pdf?Signature=s"
+    transport, opener = _stub_transport({FILE_URL: (302, {"Location": target}, b""),
+                                         "https://d1abc.cloudfront.net/app/n1/M%C3%A4rz.pdf?Signature=s": (200, {}, b"x")})
+    assert transport.download(FILE_URL, _collect)[2] == b"x"
+    assert opener.requests[1][1] is None
+
+
+@pytest.mark.parametrize("error", [http.client.InvalidURL("control character in host"),
+                                   UnicodeEncodeError("ascii", "ä", 0, 1, "not ASCII")])
+def test_download_turns_a_url_that_cannot_be_sent_into_unusable(error):
+    transport, _opener = _stub_transport({FILE_URL: error})
+    with pytest.raises(api.FileUnusable, match=type(error).__name__):
+        transport.download(FILE_URL, _collect)
+
+
+def test_download_of_a_url_with_a_control_character_in_the_host_is_unusable():
+    # The real opener: http.client refuses the host before it connects.
+    with pytest.raises(api.FileUnusable):
+        api.UrllibTransport(TOKEN).download("https://files.todoist.com\x01/x.pdf", _collect)
 
 
 def test_download_wraps_errors_while_reading_the_body():
@@ -915,6 +964,13 @@ def test_client_download_4xx_is_a_refusal_not_an_auth_error(status):
     assert sleeps == [] and len(transport.urls) == 1
 
 
+def test_client_download_unusable_file_is_skipped_without_retrying():
+    client, sleeps = _client(FakeFileTransport(api.FileUnusable("the file host sent an unsupported Content-Encoding 'br'")))
+    with pytest.raises(AttachmentUnusable, match=r"GET files.todoist.com/app/n1/preise.pdf cannot be used: .*'br'"):
+        client.download(FILE_URL, _collect)
+    assert sleeps == []
+
+
 def test_client_download_unfollowed_redirect_is_a_refusal():
     client, _sleeps = _client(FakeFileTransport(api.RedirectNotFollowed("HTTP 302 redirect to a URL that is not HTTPS", http_status=302)))
     with pytest.raises(AttachmentRefused, match="not HTTPS") as info:
@@ -927,7 +983,9 @@ def test_client_download_unfollowed_redirect_is_a_refusal():
     [
         ("https://example.com/preise.pdf", "example.com", "example.com is not a Todoist host"),
         ("http://files.todoist.com/preise.pdf", "files.todoist.com", "does not use HTTPS"),
-        ("https://files.todoist.com:8443/preise.pdf", "files.todoist.com", "files.todoist.com is not a Todoist host"),
+        ("https://files.todoist.com:8443/preise.pdf", "files.todoist.com", "its URL names the port 8443"),
+        ("https://user@files.todoist.com/preise.pdf", "files.todoist.com", "its URL holds user information"),
+        ("https://files.todoist.com:99999/preise.pdf", "files.todoist.com", "its URL is not valid"),
         (None, None, "does not use HTTPS"),
     ],
 )

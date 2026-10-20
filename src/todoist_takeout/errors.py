@@ -80,6 +80,10 @@ class AttachmentRefused(AttachmentSkipped):
         self.http_status = http_status
 
 
+class AttachmentUnusable(AttachmentSkipped):
+    """An attachment file cannot be requested or decoded: an invalid URL, or an encoding the tool cannot read."""
+
+
 class UnexpectedHost(AttachmentSkipped):
     """An attachment file's URL is not HTTPS on a Todoist host, so it is not requested."""
 

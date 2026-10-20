@@ -306,7 +306,7 @@ def remove_temp_files(root: Path) -> int:
     removed = 0
     for dirpath, _dirnames, filenames in os.walk(root):
         for name in filenames:
-            if name.startswith(".") and name.endswith(".tmp"):
+            if is_temp_name(name):
                 path = Path(dirpath, name)
                 try:
                     path.unlink()
@@ -316,6 +316,11 @@ def remove_temp_files(root: Path) -> int:
                     raise StorageError(f"cannot remove temp file {path}: {exc.strerror or exc}") from exc
                 removed += 1
     return removed
+
+
+def is_temp_name(name: str) -> bool:
+    """Whether `name` is the name of a temp file that `_create_temp` makes (`.<name>.<hex>.tmp`)."""
+    return name.startswith(".") and name.endswith(".tmp")
 
 
 def _create_temp(path: Path) -> tuple[int, Path]:

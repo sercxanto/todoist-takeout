@@ -186,11 +186,7 @@ def _holds_file(root: Path, names: set[str], stem: str) -> bool:
                 f"{stem!r} was not stored"
             )
         return False
-    return any(not _is_temp(name) and (directory / name).is_file() for name in _listdir(directory))
-
-
-def _is_temp(name: str) -> bool:
-    return name.startswith(".") and name.endswith(".tmp")
+    return any(not storage.is_temp_name(name) and (directory / name).is_file() for name in _listdir(directory))
 
 
 def _remove_if_empty(directory: Path) -> None:

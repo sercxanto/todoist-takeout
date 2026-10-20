@@ -512,6 +512,29 @@ def test_refused_file_warns_and_the_run_succeeds(tmp_path, monkeypatch, caplog, 
     assert json.loads((tmp_path / "state.json").read_bytes())["last_successful_run_utc"] is not None
 
 
+def test_file_in_an_encoding_the_tool_cannot_read_warns_and_the_run_succeeds(tmp_path, monkeypatch, caplog):
+    unreadable, other = note("N1"), note("N2", "zwei.pdf")
+    api = serve(FakeApi(with_notes(unreadable, other)), other)
+    api.answer_file(url("N1"), 200, b"\x8b\x00brotli", {"Content-Encoding": "br"})
+    with caplog.at_level(logging.WARNING):
+        assert cli(tmp_path, api, monkeypatch, "--quiet") == 0
+    assert warnings(caplog) == [
+        "the attachment file of comment N1 was not downloaded: GET files.todoist.com/fake/test/N1/preise.pdf "
+        "cannot be used: the file host sent an unsupported Content-Encoding 'br'"
+    ]
+    assert api.file_requests.count(url("N1")) == 1  # not retried
+    assert set(files_under(tmp_path)) == {"6X7rfFVQXwRmcvFp/list.pdf", "N2/zwei.pdf"}
+    assert not (tmp_path / "attachments" / "N1").exists()
+
+
+def test_file_url_with_spaces_and_umlauts_is_requested_percent_encoded(tmp_path):
+    comment = note("N1", "Rechnung März.pdf", file_url=f"{FILES}/N1/Rechnung März.pdf")
+    store_note(tmp_path, comment)
+    api = FakeApi(files={}).serve_file(f"{FILES}/N1/Rechnung%20M%C3%A4rz.pdf", file_body("x", 20))
+    download(tmp_path, api)
+    assert files_under(tmp_path) == {"N1/Rechnung März.pdf": file_body("x", 20)}
+
+
 def test_refused_file_is_requested_again_in_the_next_run(tmp_path):
     comment = note("N1")
     store_note(tmp_path, comment)

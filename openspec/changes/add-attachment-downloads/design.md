@@ -90,7 +90,9 @@ file_url
   |               +-- 2xx --> stream (D6)
 ```
 
-The host check compares the lower-cased host from `urllib.parse.urlsplit`, never a substring of the URL, so `todoist.com.example.net` and `evil-todoist.com` are rejected. A URL with user info (`user@host`) or an explicit port other than 443 is rejected as well.
+The host check compares the lower-cased host from `urllib.parse.urlsplit`, never a substring of the URL, so `todoist.com.example.net` and `evil-todoist.com` are rejected. A URL with user info (`user@host`) or an explicit port other than 443 is rejected as well. The warning names the actual reason: no HTTPS, user info, the port, or the host.
+
+Before a request, the stored URL and every redirect target are percent-encoded where http.client would refuse them: spaces, control characters and non-ASCII characters in the path or query, such as an umlaut in a file name. Existing escapes stay, so an ASCII URL is sent unchanged. A URL that still cannot be sent counts as unusable (D6).
 
 Redirects are followed by hand, through the same `_NoRedirect` opener: urllib's own redirect handler copies the request headers, including `Authorization`, to the new URL. Every hop after the first goes without the token, also when it points back to a Todoist host. The probes confirmed that none needs it: `files.todoist.com` answers 302 to a CloudFront host outside `todoist.com`, with a signed query string, which serves the file without the token. A real download takes one redirect, well inside the limit of 5.
 
@@ -100,7 +102,7 @@ Only the host and path are logged, never the query string, because a signed URL 
 
 ### D6: Streaming transport and retries
 
-The transport gets a second method, `download(url, token_allowed) -> response`, which returns the status, the headers and, for a 2xx, an open stream instead of the body. It asks for `Accept-Encoding: identity`, so the stored bytes are the file itself; if the host still sends `Content-Encoding: gzip`, the stream is decoded with `zlib.decompressobj` while it is written.
+The transport gets a second method, `download(url, token_allowed) -> response`, which returns the status, the headers and, for a 2xx, an open stream instead of the body. It asks for `Accept-Encoding: identity`, so the stored bytes are the file itself; if the host still sends `Content-Encoding: gzip`, the stream is decoded with `zlib.decompressobj` while it is written, member by member when the body holds several gzip members. Any other encoding cannot be decoded, and the file counts as unusable.
 
 `Client.request` and a new `Client.download` share one retry loop, extracted from `request`: network errors and 5xx back off and retry up to `MAX_ATTEMPTS`, 429 waits through `_wait_for_rate_limit` and counts toward the same per-run cap. A network error while the body is streamed counts as a failed attempt; the next attempt starts the file from the beginning, into a new temp file.
 
@@ -112,6 +114,7 @@ Status handling for a file request (spec: Refused files produce a warning):
 | 3xx | D5 |
 | 429 | wait, retry |
 | other 4xx, including 401 and 403 | `AttachmentRefused`: warning, next file |
+| URL that cannot be sent, unsupported `Content-Encoding` | `AttachmentUnusable`: warning, next file, no retry |
 | 5xx, network, timeout after the last attempt | `NetworkError` / `ApiError`: the run fails, exit 1 |
 | rate-limit cap | `RateLimitExhausted`: the run fails, exit 1 |
 

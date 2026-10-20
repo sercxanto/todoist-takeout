@@ -295,6 +295,17 @@ def test_remove_temp_files(tmp_path):
     assert all(p.exists() for p in keep)
 
 
+def test_temp_name_rule_matches_the_temp_files_that_writes_create(tmp_path, monkeypatch):
+    # The download step uses the rule to tell a stored attachment from a leftover temp file.
+    created = []
+    real = storage._create_temp
+    monkeypatch.setattr(storage, "_create_temp", lambda path: created.append(real(path)) or created[-1])
+    storage.write_bytes_atomic(tmp_path / "preise.pdf", b"x")
+    storage.write_stream_atomic(tmp_path / ".env", [b"y"], None)
+    assert len(created) == 2 and all(storage.is_temp_name(tmp.name) for _fd, tmp in created)
+    assert not any(storage.is_temp_name(name) for name in ["preise.pdf", ".env", "notes.tmp", ".lock"])
+
+
 # --- 2.4 Fault injection -----------------------------------------------------
 
 

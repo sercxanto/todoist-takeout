@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from todoist_takeout import completed, storage
+from todoist_takeout import attachments, completed, storage
 from todoist_takeout.api import BASE_URL, TIMEOUT, USER_AGENT, Client, is_todoist_file_url
 from todoist_takeout.attachments import Attachment
 from todoist_takeout.errors import ApiError
@@ -222,7 +222,7 @@ def delete_upload(token: str, file_url: str) -> int:
 
 
 def check_download(client: Client, attachment: Attachment, directory: Path) -> dict:
-    """Download one attachment file through `Client.download` into `directory`, as the tool does, and
+    """Download one attachment file into `directory` through the tool's own download step, and
     remove it again. Return its byte count and whether it equals the stated `file_size`.
 
     Raises SizeMismatch when it does not, and leaves `directory` as it found it, missing or empty.
@@ -231,8 +231,7 @@ def check_download(client: Client, attachment: Attachment, directory: Path) -> d
     directory = Path(directory)
     path = directory / storage.attachment_file_name(attachment.file_name)
     try:
-        size = client.download(attachment.url,
-                               lambda chunks: storage.write_stream_atomic(path, chunks, attachment.size))
+        size = attachments._download(client, attachment, directory)
         assert sorted(os.listdir(directory)) == [path.name], "the download left another file behind"
         assert path.stat().st_size == size
     finally:

@@ -26,6 +26,7 @@ from todoist_takeout import __version__
 from todoist_takeout.errors import (
     ApiError,
     AttachmentRefused,
+    AttachmentUnusable,
     AuthError,
     NetworkError,
     PlanRestricted,
@@ -89,6 +90,10 @@ class RedirectNotFollowed(Exception):
         self.http_status = http_status
 
 
+class FileUnusable(Exception):
+    """An attachment request cannot be sent, or its body cannot be decoded; a retry cannot change that."""
+
+
 class Transport(Protocol):
     def send(self, method: str, path: str, params: Mapping[str, str]) -> tuple[int, Mapping[str, str], bytes]:
         """Send one request. Return status, headers and the body after transfer decoding.
@@ -101,7 +106,8 @@ class Transport(Protocol):
         """GET an attachment file. For a 2xx, pass the decoded body to `write` and return its result.
 
         Any other status is returned with the start of its body. A redirect that is not followed
-        raises RedirectNotFollowed; network failures, also while the body is read, raise TransportError.
+        raises RedirectNotFollowed, and a URL that cannot be requested or a body that cannot be decoded
+        raises FileUnusable; network failures, also while the body is read, raise TransportError.
         """
 
 
@@ -125,6 +131,38 @@ def is_todoist_file_url(url) -> bool:
         and parts.hostname is not None
         and _TODOIST_HOST.fullmatch(parts.hostname) is not None
     )
+
+
+def _not_requested_because(url) -> str:
+    """Why `is_todoist_file_url` rejects `url`, for the warning."""
+    try:
+        parts = urllib.parse.urlsplit(url) if isinstance(url, str) else None
+        port = parts.port if parts is not None else None
+    except ValueError:
+        return "its URL is not valid"
+    if parts is None or parts.scheme != "https":
+        return "its URL does not use HTTPS"
+    if "@" in parts.netloc:
+        return "its URL holds user information"
+    if port not in (None, 443):
+        return f"its URL names the port {port}"
+    return f"{parts.hostname or 'its URL'} is not a Todoist host"
+
+
+def _encoded_url(url: str) -> str:
+    """`url` with spaces, control and non-ASCII characters percent-encoded, as browsers send it.
+
+    A file name in the path may hold such characters, which http.client refuses. Escapes already
+    in the URL and the reserved characters stay, so an ASCII URL is returned unchanged.
+    """
+    if all("!" <= char <= "~" for char in url):
+        return url
+    # urlsplit would drop tabs and line breaks silently, which would request another URL.
+    parts = urllib.parse.urlsplit(url.replace("\t", "%09").replace("\r", "%0D").replace("\n", "%0A"))
+    reserved = "%!$&'()*+,;=:@/?~"
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, urllib.parse.quote(parts.path, safe=reserved),
+                                    urllib.parse.quote(parts.query, safe=reserved),
+                                    urllib.parse.quote(parts.fragment, safe=reserved)))
 
 
 def url_host(url) -> str | None:
@@ -228,8 +266,8 @@ class UrllibTransport:
 
     @contextmanager
     def _open_file(self, url: str, headers: Mapping[str, str]):
-        request = urllib.request.Request(url, headers=dict(headers))
         try:
+            request = urllib.request.Request(_encoded_url(url), headers=dict(headers))
             response = self._opener.open(request, timeout=self._timeout)
             status = response.status
         except urllib.error.HTTPError as exc:
@@ -237,6 +275,10 @@ class UrllibTransport:
             response, status = exc, exc.code
         except urllib.error.URLError as exc:
             raise _unreachable(url, exc) from exc
+        except (http.client.InvalidURL, ValueError) as exc:
+            # A URL that http.client refuses, for example with a control character in its host.
+            # UnicodeError is a ValueError. Neither is a network error that a retry could fix.
+            raise FileUnusable(f"the URL cannot be requested ({type(exc).__name__})") from exc
         except _READ_ERRORS as exc:
             raise TransportError(f"request failed: {type(exc).__name__}: {exc}") from exc
         with response:
@@ -271,22 +313,34 @@ def _unreachable(url: str, exc: urllib.error.URLError) -> TransportError:
     return TransportError(f"cannot reach {host}: {reason}")
 
 
+def _gzip_decoder():
+    return zlib.decompressobj(16 + zlib.MAX_WBITS)
+
+
 def _file_chunks(response, headers: Mapping[str, str]) -> Iterator[bytes]:
     """Yield the body of a file response in blocks, decoding gzip if the host sent it anyway."""
     encoding = (_header(headers, "Content-Encoding") or "identity").strip().lower()
     if encoding in ("gzip", "x-gzip"):
-        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        decoder = _gzip_decoder()
     elif encoding == "identity":
         decoder = None
     else:
-        raise TransportError(f"the file host sent an unsupported Content-Encoding {encoding!r}", retryable=False)
+        raise FileUnusable(f"the file host sent an unsupported Content-Encoding {encoding!r}")
     # http.client's read(n) ends quietly when the connection closes early, so the length is checked here.
     announced = _content_length(headers)
     received = 0
     try:
         while chunk := response.read(CHUNK_SIZE):
             received += len(chunk)
-            yield decoder.decompress(chunk) if decoder else chunk
+            if decoder is None:
+                yield chunk
+                continue
+            data = decoder.decompress(chunk)
+            # A gzip body may consist of several members; together they are the file.
+            while decoder.eof and decoder.unused_data:
+                rest, decoder = decoder.unused_data, _gzip_decoder()
+                data += decoder.decompress(rest)
+            yield data
         if announced is not None and received != announced:
             raise TransportError(f"request failed: the file body is cut off after {received} of {announced} bytes")
         if decoder:
@@ -358,14 +412,11 @@ class Client:
         Raises UnexpectedHost, without a request, for a URL that is not HTTPS on a Todoist host, and
         AttachmentRefused for a 4xx other than 429 or a redirect that is not followed. A 401 or 403
         here is such a refusal, never an AuthError: the API accepted the token earlier in the run.
+        Raises AttachmentUnusable for a URL that cannot be requested or a body in an encoding the
+        tool cannot decode, without retrying.
         """
         if not is_todoist_file_url(url):
-            host = url_host(url)
-            if not isinstance(url, str) or urllib.parse.urlsplit(url).scheme != "https":
-                reason = "its URL does not use HTTPS"
-            else:
-                reason = f"{host or 'its URL'} is not a Todoist host"
-            raise UnexpectedHost(reason, host=host)
+            raise UnexpectedHost(_not_requested_because(url), host=url_host(url))
         label = f"GET {_loggable_url(url)}"
 
         def failure(status: int, body: bytes, suffix: str) -> Exception:
@@ -377,6 +428,8 @@ class Client:
             return self._with_retries(label, lambda: self._transport.download(url, write), failure)
         except RedirectNotFollowed as exc:
             raise AttachmentRefused(f"{label} was refused: {exc}", http_status=exc.http_status) from exc
+        except FileUnusable as exc:
+            raise AttachmentUnusable(f"{label} cannot be used: {exc}") from exc
 
     def _with_retries(
         self,
