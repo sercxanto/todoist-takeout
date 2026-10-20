@@ -38,6 +38,10 @@ ruff check .            # add --fix to apply the safe fixes
 ruff format .           # or --check to only report
 ```
 
+## Dependencies and CI
+
+The workflows under [.github/workflows/](.github/workflows/) pin each action to a commit hash, with its version in a comment, because a tag can be moved to other code. [Dependabot](.github/dependabot.yml) proposes updates of the actions and of the development dependencies in uv.lock once a month, each group in one pull request, and only for releases that are at least a week old.
+
 ## Contract tests against the real API
 
 The contract tests detect when Todoist changes its API. They are deselected by default; select them with `pytest -m contract`. They use two accounts, each given by its own variable:
