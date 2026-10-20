@@ -2,7 +2,7 @@
 
 How to set up a development environment, run the checks and the tests, and record fixtures, followed by the requirements the tool is built against and the key design decisions. How to install and use the tool is described in the [README](README.md).
 
-- The dev container ([.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)) provides Python 3.12 and uv, and runs `uv sync` when it is created.
+- The dev container ([.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)) provides Python 3.12, uv and the OpenSpec CLI, and runs `uv sync` when it is created.
 - Planning uses [OpenSpec](https://github.com/Fission-AI/OpenSpec). Run `openspec list` to see changes in progress.
 
 ## Setup and tests
