@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "ruff>=0.17"]
 
 [project.scripts]
 todoist-takeout = "todoist_takeout.cli:main"
@@ -36,6 +36,19 @@ packages = ["src/todoist_takeout"]
 # unpacked sdist.
 include = ["src/", "tests/", "scripts/", "README.md", "LICENSE"]
 exclude = ["tests/contract/findings/"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# pycodestyle, Pyflakes, import sorting, pyupgrade and bugbear. Line length is left to the
+# formatter; the lines it cannot shorten are long strings.
+select = ["E", "W", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Fake API responders are lambdas, and the contract tests warn about their own findings.
+"tests/**" = ["E731", "B028"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

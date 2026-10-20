@@ -218,6 +218,15 @@ The commands below are written without `uv run`; either prefix them with it or a
 
 The default run is fully offline: it uses the fixtures under [tests/fixtures/](tests/fixtures/) and never calls the real API. CI runs it on Linux, macOS and Windows.
 
+### Linting and formatting
+
+[Ruff](https://docs.astral.sh/ruff/) lints and formats the code; its settings are in [pyproject.toml](pyproject.toml), and uv.lock pins its version. CI fails when either check finds something:
+
+```sh
+ruff check .            # add --fix to apply the safe fixes
+ruff format .           # or --check to only report
+```
+
 ### Contract tests against the real API
 
 The contract tests detect when Todoist changes its API. They are deselected by default; select them with `pytest -m contract`. They use two accounts, each given by its own variable:

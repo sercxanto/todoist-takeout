@@ -33,11 +33,6 @@ Status: `roh` · `geklärt` · `als Change angelegt` · `verworfen`
 - Offen: Versionierung, Tagging, Build und Veröffentlichung (PyPI?),
   Zusammenspiel mit Changelog und Lizenz.
 
-## Linter / Formatter laufen lassen
-
-- Status: roh
-- Linter und Formatter definieren und laufen lassen
-
 ## Code-Coverage messen
 
 - Status: roh
