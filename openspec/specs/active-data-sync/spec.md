@@ -84,11 +84,11 @@ When a sync returns an object as live (`is_deleted` is not true) that the backup
 - **THEN** the stored task becomes that payload, its tombstone file is removed, and the task no longer counts as deleted
 
 ### Requirement: Comments on active tasks and projects
-The backup SHALL include the task comments (`notes`) and project comments (`project_notes`) that the sync returns, with their attachment metadata as it appears in the payload. Attachment files SHALL NOT be downloaded.
+The backup SHALL include the task comments (`notes`) and project comments (`project_notes`) that the sync returns, with their attachment metadata as it appears in the payload. Uploaded attachment files are downloaded as the `attachment-downloads` capability describes.
 
 #### Scenario: Comment with attachment
 - **WHEN** a task comment carries a `file_attachment` object
-- **THEN** the stored comment contains that object unchanged and no attachment file is downloaded
+- **THEN** the stored comment contains that object unchanged
 
 ### Requirement: Checkpoint advances only after the data is stored
 The tool SHALL store a new sync token as the checkpoint only after every object of the corresponding response has been written. If a run ends early, the next run SHALL continue from the last stored checkpoint.
