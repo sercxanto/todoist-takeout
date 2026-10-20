@@ -1,15 +1,24 @@
-"""Helpers for the contract tests: account variables, the write-account guard, sync commands, observer.
+"""Helpers for the contract tests: account variables, the write-account guard, sync commands, observer,
+uploads and attachment downloads.
 
 The offline test `tests/test_contract_support.py` checks the guard, so that a misconfigured shell
-can never send write commands to the read account.
+can never send write commands to the read account, and the upload and download helpers.
 """
 
 import json
 import os
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
 
-from todoist_takeout.api import Client
+from todoist_takeout import completed, storage
+from todoist_takeout.api import BASE_URL, TIMEOUT, USER_AGENT, Client, is_todoist_file_url
+from todoist_takeout.attachments import Attachment
 from todoist_takeout.errors import ApiError
 
 READ_TOKEN = "TODOIST_CONTRACT_TOKEN"
@@ -117,3 +126,117 @@ class Commands:
 
     def add(self, command: str, args: dict):
         return self.run(command, args, temp_id=str(uuid.uuid4()))
+
+
+# --- Completed tasks ---------------------------------------------------------
+
+# by_completion_date listed new completions within seconds in the probes.
+COMPLETION_TIMEOUT = 60.0
+POLL_INTERVAL = 3.0
+
+
+def completion_listed(client: Client, project_id, task_id, started: datetime) -> bool:
+    """Wait until by_completion_date lists the completion; a snapshot fetches it only once."""
+    since = completed.month_window(completed.month_of(started))[0]
+    deadline = time.monotonic() + COMPLETION_TIMEOUT
+    while True:
+        until = completed.month_window(completed.month_of(datetime.now(timezone.utc)))[1]
+        params = {"project_id": str(project_id), "since": since, "until": until, "limit": "50"}
+        page = json.loads(client.get(completed.BY_COMPLETION_DATE, params))
+        if str(task_id) in {str(task.get("id")) for task in page.get("items") or [] if isinstance(task, dict)}:
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(POLL_INTERVAL)
+
+
+# --- Uploads and attachment files --------------------------------------------
+
+UPLOADS = "uploads"
+
+
+class CountingTransport:
+    """Passes every request on to `transport` and lists the URL of each attachment file request."""
+
+    def __init__(self, transport):
+        self.transport = transport
+        self.file_requests: list[str] = []
+
+    def send(self, method, path, params):
+        return self.transport.send(method, path, params)
+
+    def download(self, url, write):
+        self.file_requests.append(url)
+        return self.transport.download(url, write)
+
+
+def multipart(fields: dict[str, str], file_field: str, file_name: str, content: bytes,
+              content_type: str) -> tuple[bytes, str]:
+    """A multipart/form-data body and its Content-Type header."""
+    boundary = f"todoist-takeout-{uuid.uuid4().hex}"
+    parts = []
+    for name, value in fields.items():
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
+    parts.append(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{file_field}"; filename="{file_name}"\r\n'
+        f"Content-Type: {content_type}\r\n\r\n".encode() + content + b"\r\n"
+    )
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _api_request(token: str, method: str, path: str, data: bytes | None = None,
+                 content_type: str | None = None) -> tuple[int, bytes]:
+    """One request to the API that the tool's transport cannot send. Redirects are not followed, so
+    the token goes to the API host only."""
+    headers = {"User-Agent": USER_AGENT, "Authorization": f"Bearer {token}"}
+    if content_type is not None:
+        headers["Content-Type"] = content_type
+    request = urllib.request.Request(urllib.parse.urljoin(BASE_URL, path), data=data, method=method, headers=headers)
+    try:
+        response = urllib.request.build_opener(_NoRedirect()).open(request, timeout=TIMEOUT)
+    except urllib.error.HTTPError as exc:
+        response = exc
+    with response:
+        return response.status if hasattr(response, "status") else response.code, response.read()
+
+
+def upload_file(token: str, project_id: str, file_name: str, content: bytes, content_type: str) -> dict:
+    """Upload a file with `POST /uploads` and return the attachment object that `note_add` takes."""
+    body, header = multipart({"file_name": file_name, "project_id": project_id}, "file", file_name, content,
+                             content_type)
+    status, data = _api_request(token, "POST", UPLOADS, body, header)
+    if not 200 <= status < 300:
+        raise ApiError(f"POST /{UPLOADS} failed (HTTP {status})", http_status=status)
+    return json.loads(data)
+
+
+def delete_upload(token: str, file_url: str) -> int:
+    """Delete an uploaded file with `DELETE /uploads` and return the status."""
+    return _api_request(token, "DELETE", f"{UPLOADS}?{urllib.parse.urlencode({'file_url': file_url})}")[0]
+
+
+def check_download(client: Client, attachment: Attachment, directory: Path) -> dict:
+    """Download one attachment file through `Client.download` into `directory`, as the tool does, and
+    remove it again. Return its byte count and whether it equals the stated `file_size`.
+
+    Raises SizeMismatch when it does not, and leaves `directory` as it found it, missing or empty.
+    """
+    assert is_todoist_file_url(attachment.url)
+    directory = Path(directory)
+    path = directory / storage.attachment_file_name(attachment.file_name)
+    try:
+        size = client.download(attachment.url,
+                               lambda chunks: storage.write_stream_atomic(path, chunks, attachment.size))
+        assert sorted(os.listdir(directory)) == [path.name], "the download left another file behind"
+        assert path.stat().st_size == size
+    finally:
+        path.unlink(missing_ok=True)
+        if directory.is_dir() and not os.listdir(directory):
+            directory.rmdir()
+    return {"bytes": size, "size_stated": attachment.size is not None, "size_matches": size == attachment.size}

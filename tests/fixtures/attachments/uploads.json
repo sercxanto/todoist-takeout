@@ -1,0 +1,50 @@
+{
+  "results": [
+    {
+      "id": "6Xd5Mq2Tv8Xz4Ce6",
+      "posted_uid": "2671355",
+      "item_id": "6X3Tk9Pq2Vm5Rs8W",
+      "content": "Notes from the call",
+      "file_attachment": {
+        "file_name": "notizen.txt",
+        "file_size": 2048,
+        "file_type": "text/plain",
+        "file_url": "https://files.todoist.com/fake/uploads/6Xd5Mq2Tv8Xz4Ce6/notizen.txt",
+        "image": null,
+        "image_height": null,
+        "image_width": null,
+        "resource_type": "file",
+        "upload_state": "completed"
+      },
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2026-10-02T08:15:00.000000Z",
+      "reactions": {}
+    },
+    {
+      "id": "6Xd5Mr3Uw9Ya5Df7",
+      "posted_uid": "2671355",
+      "item_id": "6X3Tk9Pq2Vm5Rs8W",
+      "content": "Photo of the meter",
+      "file_attachment": {
+        "file_name": "zaehler.png",
+        "file_size": 51234,
+        "file_type": "image/png",
+        "file_url": "https://files.todoist.com/fake/uploads/6Xd5Mr3Uw9Ya5Df7/zaehler.png",
+        "image": "https://files.todoist.com/fake/uploads/6Xd5Mr3Uw9Ya5Df7/zaehler_tn.png",
+        "image_height": 480,
+        "image_width": 640,
+        "resource_type": "image",
+        "tn_l": ["https://files.todoist.com/fake/uploads/6Xd5Mr3Uw9Ya5Df7/tn_l.png", 528, 396],
+        "tn_m": ["https://files.todoist.com/fake/uploads/6Xd5Mr3Uw9Ya5Df7/tn_m.png", 400, 300],
+        "tn_s": ["https://files.todoist.com/fake/uploads/6Xd5Mr3Uw9Ya5Df7/tn_s.png", 200, 150],
+        "upload_state": "completed"
+      },
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2026-10-02T08:16:00.000000Z",
+      "reactions": {}
+    }
+  ],
+  "next_cursor": null
+}

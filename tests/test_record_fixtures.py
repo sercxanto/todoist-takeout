@@ -16,6 +16,7 @@ from fake_api import (
     TASKS_COMPLETED,
     FakeApi,
     archived_fixture,
+    attachment_fixture,
     completed_fixture,
 )
 
@@ -516,3 +517,96 @@ def test_archived_contract_comparison_fails_on_an_added_field(recorder):
     result = recorder.compare_endpoint_bodies(expected, bodies)
     assert result["projects_archived"][0] == ["field results.brand_new (boolean)"]
     assert result["project_full"][0] == ["key 'brand_new_key' (list)", "field project.brand_new (string)"]
+
+
+# --- Uploaded files (add-attachment-downloads) --------------------------------------------------
+
+UPLOAD = {
+    "id": "6Xd9Kp3Rt5Vw7Yb2",
+    "item_id": "6X7rM8997g3RQmvh",
+    "content": "Rechnung von Dr. Müller",
+    "file_attachment": {
+        "file_name": "Rechnung März 2026.png",
+        "file_size": 48213,
+        "file_type": "image/png",
+        "file_url": "https://files.todoist.com/Xq3v9TzW/by_id/6Xd9Kp3Rt5Vw7Yb2/Rechnung%20M%C3%A4rz%202026.png",
+        "image": "https://files.todoist.com/Xq3v9TzW/tn/Rechnung.png?Expires=1767225600&Signature=c2lnbmF0dXJl",
+        "image_height": 480,
+        "image_width": 640,
+        "resource_type": "image",
+        "tn_l": ["https://d1abcdefgh.cloudfront.net/Xq3v9TzW/tn_l.png?Key-Pair-Id=K2JCJMDEHXQW5F", 528, 396],
+        "upload_state": "completed",
+    },
+}
+UPLOAD_SECRETS = ["files.todoist.com", "cloudfront", "Xq3v9TzW", "by_id", "Rechnung", "März", "M%C3%A4rz", "?",
+                  "Expires", "Signature", "Key-Pair-Id", "image/png", "Müller", "6Xd9Kp3Rt5Vw7Yb2", "6X7rM8997g3RQmvh"]
+
+
+def strings(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield key
+            yield from strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from strings(item)
+    elif isinstance(value, str):
+        yield value
+
+
+def test_scrubbed_upload_keeps_no_host_path_query_or_file_name(recorder):
+    scrubbed = recorder.Scrubber().scrub({"notes": [UPLOAD]})
+    [comment] = scrubbed["notes"]
+    attachment = comment["file_attachment"]
+    assert attachment["file_name"] == attachment["file_type"] == recorder.PLACEHOLDER
+    assert attachment["file_url"] == attachment["image"] == recorder.URL_PLACEHOLDER
+    assert attachment["tn_l"] == [recorder.URL_PLACEHOLDER, 0, 0]
+    assert (attachment["file_size"], attachment["image_width"], attachment["image_height"]) == (0, 0, 0)
+    # What the download step and the shapes need stays: the kind of upload and its state.
+    assert (attachment["resource_type"], attachment["upload_state"]) == ("image", "completed")
+    assert comment["id"] != UPLOAD["id"] and same_classes(UPLOAD["id"], comment["id"])
+    text = json.dumps(scrubbed, ensure_ascii=False)
+    for secret in UPLOAD_SECRETS:
+        assert secret not in text, secret
+    assert recorder.uploaded_attachments(scrubbed) == [attachment]
+    assert recorder.attachment_shape_of([attachment]) == recorder.attachment_shape_of([UPLOAD["file_attachment"]])
+
+
+def test_no_recording_holds_a_file_host_path_query_or_file_name(recorder):
+    recordings = sorted(recorder.RECORDED.glob("*/*.json"))
+    assert recordings
+    for path in recordings:
+        for text in strings(json.loads(path.read_bytes())):
+            if text.startswith(("http://", "https://")):
+                assert text == recorder.URL_PLACEHOLDER, path
+            assert "?" not in text and "todoist.com" not in text and "cloudfront" not in text, path
+        for attachment in recorder.uploaded_attachments(json.loads(path.read_bytes())):
+            assert attachment.get("file_name") in (recorder.PLACEHOLDER, None), path
+
+
+def test_uploaded_attachments_follow_the_download_rule(recorder):
+    link, pending, foreign = attachment_fixture("comments")["results"]
+    uploads = attachment_fixture("uploads")["results"]
+    response = {"notes": [link, pending, foreign, {"id": "N1", "file_attachment": None}], "results": uploads}
+    # Links and pending uploads are not uploaded files; a file on a foreign host is one, which the step skips.
+    assert recorder.uploaded_attachments(response) == [foreign["file_attachment"],
+                                                        *(c["file_attachment"] for c in uploads)]
+
+
+def test_committed_shapes_describe_uploaded_files(recorder):
+    shapes = json.loads(recorder.SHAPES.read_bytes())["file_attachments"]
+    assert shapes["sources"] == [p.relative_to(recorder.FIXTURES).as_posix() for p in recorder.attachment_shape_sources()]
+    entry = shapes["keys"]["file_attachment"]
+    assert entry["kind"] == "file|image"
+    assert {"file_name", "file_size", "file_url", "resource_type", "upload_state", "tn_l"} <= entry["fields"].keys()
+
+    uploads = [c["file_attachment"] for c in attachment_fixture("uploads")["results"]]
+    assert recorder.compare_shapes(shapes, recorder.attachment_shape_of(uploads)) == ([], [])
+    # A text file has no thumbnails: reported as removed, which the contract tests only report.
+    text = uploads[0]
+    assert recorder.compare_shapes(shapes, recorder.attachment_shape_of([text])) == (
+        [], ["field file_attachment.tn_l", "field file_attachment.tn_m", "field file_attachment.tn_s"])
+    changed = {**text, "resource_type": "video", "checksum": "abc"}
+    added, _removed = recorder.compare_shapes(shapes, recorder.attachment_shape_of([changed]))
+    assert added == ["kind 'video' of 'file_attachment' (expected 'file|image')",
+                     "field file_attachment.checksum (string)"]

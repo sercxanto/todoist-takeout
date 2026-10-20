@@ -8,16 +8,12 @@ object of the archived projects counts as missing. The findings hold booleans an
 
 import json
 import logging
-import time
 from datetime import datetime, timezone
 
 from todoist_takeout import archived, completed, storage, sync
 from todoist_takeout.sync import run_backup
 
 PREFIX = "todoist-takeout contract test"
-# by_completion_date listed new completions within seconds in the probes.
-COMPLETION_TIMEOUT = 60.0
-POLL_INTERVAL = 3.0
 MISSING_WARNING = "were not in the full sync; they may have been deleted"
 LEFT_OUT_INFO = "were not in the full sync, as expected"
 
@@ -29,21 +25,6 @@ def read_json(path):
 
 def ids(objects) -> set[str]:
     return {str(obj.get("id")) for obj in objects or [] if isinstance(obj, dict)}
-
-
-def completion_listed(client, project_id, task_id, started: datetime) -> bool:
-    """Wait until by_completion_date lists the completion; the snapshot fetches it only once."""
-    since = completed.month_window(completed.month_of(started))[0]
-    deadline = time.monotonic() + COMPLETION_TIMEOUT
-    while True:
-        until = completed.month_window(completed.month_of(datetime.now(timezone.utc)))[1]
-        params = {"project_id": str(project_id), "since": since, "until": until, "limit": "50"}
-        page = json.loads(client.get(completed.BY_COMPLETION_DATE, params))
-        if str(task_id) in ids(page.get("items")):
-            return True
-        if time.monotonic() >= deadline:
-            return False
-        time.sleep(POLL_INTERVAL)
 
 
 def test_archived_projects_backup(write_client, contract_support, tmp_path, caplog, write_findings):
@@ -76,7 +57,7 @@ def test_archived_projects_backup(write_client, contract_support, tmp_path, capl
             "project": add("note_add", {"content": f"{PREFIX}: comment", "project_id": parent}, "a comment"),
         }
         findings["complete_accepted"] = bool(commands.run("item_complete", {"id": done_task}))
-        findings["completion_listed"] = completion_listed(client, parent, done_task, started)
+        findings["completion_listed"] = contract_support.completion_listed(client, parent, done_task, started)
         run_backup(target, client)  # sync/ holds the objects before the archiving
 
         findings["archive_accepted"] = bool(commands.run("project_archive", {"id": parent}))

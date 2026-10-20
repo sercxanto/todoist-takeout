@@ -236,6 +236,10 @@ pytest -m contract tests/contract/test_completed_read.py
 # Read-only: the first page of archived projects and the /full of up to all of them, compared with tests/fixtures/shapes.json.
 pytest -m contract tests/contract/test_archived_read.py
 
+# Read-only: downloads one uploaded file of the synced comments into a temporary directory, checks its size, and
+# deletes it again. Skips when the comments hold no uploaded file.
+pytest -m contract tests/contract/test_attachments_read.py
+
 # Write: creates, deletes, restores and archives temporary projects in the test account, then removes them.
 # Its second test completes a recurring task twice and a task with a comment, and checks completed/.
 TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_write.py
@@ -243,6 +247,10 @@ TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_write.py
 # Write: archives a temporary project with a sub-project, checks both snapshots under archived/ and that a
 # forced full sync counts none of their objects as missing, then removes them.
 TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_archived_write.py
+
+# Write: uploads a small file to a comment of a temporary task, checks it under attachments/, then completes the
+# task, archives the project and checks that the next run downloads nothing; removes the project and the upload.
+TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_attachments_write.py
 ```
 
 `test_completed_read.py` fails on keys, fields or types that `shapes.json` lacks, and also when `GET /tasks/completed` is gone or the activity log rejects the completion filter: either means that recurring completions can no longer be backed up. The completed-tasks write test reruns the backup for up to two minutes, until the new completion events appear in the activity log.
@@ -251,7 +259,7 @@ Findings, such as the shape of deletion payloads, rejected commands and the plan
 
 ### Recording fixtures
 
-[scripts/record_fixtures.py](scripts/record_fixtures.py) records a full and an incremental sync from a real account and writes them to `tests/fixtures/recorded/<account>/`, together with one page of each completed-tasks endpoint: `by_completion_date.json` and `tasks_completed.json` for the latest month with completed tasks in the past year, `activities.json` with the latest completion events, `comments.json` with the comments of one completed task (not written if no completed task in that year has comments), `projects_archived.json` with the first page of archived projects, and `project_full.json` with the `/full` of one of them: of those on the page, the first with tasks and sections, or else the one with the most content (not written without an archived project). Recording is read-only. Nothing of the account is kept: strings become placeholders (except enum-like values such as colours), IDs become random pseudonyms that still match each other within a recording, and numbers become `0` (except plan limits). Then the script regenerates `tests/fixtures/shapes.json`, which the contract tests compare against. Its `endpoints` section describes the completed-tasks and archived-projects endpoints; as long as an endpoint has no recording, it is taken from the hand-written fixtures in [tests/fixtures/completed/](tests/fixtures/completed/) and [tests/fixtures/archived/](tests/fixtures/archived/).
+[scripts/record_fixtures.py](scripts/record_fixtures.py) records a full and an incremental sync from a real account and writes them to `tests/fixtures/recorded/<account>/`, together with one page of each completed-tasks endpoint: `by_completion_date.json` and `tasks_completed.json` for the latest month with completed tasks in the past year, `activities.json` with the latest completion events, `comments.json` with the comments of one completed task (not written if no completed task in that year has comments), `projects_archived.json` with the first page of archived projects, and `project_full.json` with the `/full` of one of them: of those on the page, the first with tasks and sections, or else the one with the most content (not written without an archived project). Recording is read-only. Nothing of the account is kept: strings become placeholders (except enum-like values such as colours), IDs become random pseudonyms that still match each other within a recording, and numbers become `0` (except plan limits). Then the script regenerates `tests/fixtures/shapes.json`, which the contract tests compare against. Its `endpoints` section describes the completed-tasks and archived-projects endpoints; as long as an endpoint has no recording, it is taken from the hand-written fixtures in [tests/fixtures/completed/](tests/fixtures/completed/) and [tests/fixtures/archived/](tests/fixtures/archived/). Its `file_attachments` section describes the `file_attachment` of uploaded files, from the recordings that hold one, or else from [tests/fixtures/attachments/uploads.json](tests/fixtures/attachments/uploads.json); file names and URLs are scrubbed like all other strings.
 
 ```sh
 python scripts/record_fixtures.py record --account read    # uses TODOIST_CONTRACT_TOKEN

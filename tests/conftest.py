@@ -39,9 +39,3 @@ def recorder():
 def contract_support():
     """Helpers of the contract tests that the offline tests check too."""
     return load_module("contract_support", Path(__file__).parent / "contract" / "support.py")
-
-
-@pytest.fixture
-def probes():
-    """Helpers of the attachment probes (a spike) that the offline tests check too."""
-    return load_module("contract_probes", Path(__file__).parent / "contract" / "probes.py")

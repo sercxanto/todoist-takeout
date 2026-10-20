@@ -49,10 +49,10 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 7. Contract tests and probe removal
 
-- [ ] 7.1 Extend `scripts/record_fixtures.py` and `shapes.json` with the shape of a `file_attachment` of an uploaded file, scrubbed so that `file_name`, `file_url` and every ID are pseudonymized. Verify with an offline scrubber test that no recorded value holds a real host path, query string or file name
-- [ ] 7.2 Add a read-only contract test that downloads one attachment of the read account into a temporary directory through `Client.download` and checks the byte count against `file_size`, and run it with the user against the Pro account. Verify that it passes, skips cleanly on an account without attachments, and leaves nothing behind
-- [ ] 7.3 Add a write contract test, Free account only and behind the existing guard: upload a small file to a comment of a new task, run the tool into a temporary backup, and assert the file under `attachments/` byte for byte; then complete the task, archive its project, run again, and assert that no file request is made. Run it with the user. Verify that it passes and cleans up what it created
-- [ ] 7.4 Remove the probes (`tests/contract/probes.py`, `tests/contract/test_probe_attachments.py` and their offline test) now that their findings are in the proposal. Verify that the offline suite and `pytest --collect-only tests/contract` pass, and that no remaining file imports `probes`
+- [x] 7.1 Extend `scripts/record_fixtures.py` and `shapes.json` with the shape of a `file_attachment` of an uploaded file, scrubbed so that `file_name`, `file_url` and every ID are pseudonymized. Verify with an offline scrubber test that no recorded value holds a real host path, query string or file name
+- [x] 7.2 Add a read-only contract test that downloads one attachment of the read account into a temporary directory through `Client.download` and checks the byte count against `file_size`, and run it with the user against the Pro account. Verify that it passes, skips cleanly on an account without attachments, and leaves nothing behind
+- [x] 7.3 Add a write contract test, Free account only and behind the existing guard: upload a small file to a comment of a new task, run the tool into a temporary backup, and assert the file under `attachments/` byte for byte; then complete the task, archive its project, run again, and assert that no file request is made. Run it with the user. Verify that it passes and cleans up what it created
+- [x] 7.4 Remove the probes (`tests/contract/probes.py`, `tests/contract/test_probe_attachments.py` and their offline test) now that their findings are in the proposal. Verify that the offline suite and `pytest --collect-only tests/contract` pass, and that no remaining file imports `probes`
 
 ## Workflow follow-up
 
