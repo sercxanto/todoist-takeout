@@ -3,16 +3,10 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
-from todoist_takeout import attachments, storage, sync
-from todoist_takeout.api import Client
-from todoist_takeout.cli import main
-from todoist_takeout.errors import NetworkError, RateLimitExhausted, StorageError
-
 from fake_api import (
     FILE_TOKEN,
     FIXTURE_FILES,
@@ -24,7 +18,12 @@ from fake_api import (
     file_body,
 )
 
-NOW = datetime(2026, 10, 19, 12, 0, tzinfo=timezone.utc)
+from todoist_takeout import attachments, storage, sync
+from todoist_takeout.api import Client
+from todoist_takeout.cli import main
+from todoist_takeout.errors import NetworkError, RateLimitExhausted, StorageError
+
+NOW = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
 FILES = "https://files.todoist.com/fake/test"

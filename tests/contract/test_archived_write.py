@@ -8,7 +8,7 @@ object of the archived projects counts as missing. The findings hold booleans an
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from todoist_takeout import archived, completed, storage, sync
 from todoist_takeout.sync import run_backup
@@ -31,7 +31,7 @@ def test_archived_projects_backup(write_client, contract_support, tmp_path, capl
     token, client = write_client
     commands = contract_support.Commands(client)
     target = tmp_path / "backup"
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     findings: dict = {}
     problems: list[str] = []
     projects: list = []

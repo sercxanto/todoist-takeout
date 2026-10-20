@@ -7,12 +7,11 @@ import sys
 from pathlib import Path
 
 import pytest
+from fake_api import FakeApi, file_body
 
 from todoist_takeout.api import Client
 from todoist_takeout.attachments import Attachment
 from todoist_takeout.errors import SizeMismatch
-
-from fake_api import FakeApi, file_body
 
 ROOT = Path(__file__).parent.parent
 READ = "read-token-0123456789abcdef0123456789abcd"

@@ -9,13 +9,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
+from fake_api import FakeApi, empty_page
 
 from todoist_takeout import __version__, storage
 from todoist_takeout.api import Client, TransportError
 from todoist_takeout.cli import main
 from todoist_takeout.lock import TargetLock
-
-from fake_api import FakeApi, empty_page
 
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
 TOKEN = "0123456789abcdef0123456789abcdef01234567"

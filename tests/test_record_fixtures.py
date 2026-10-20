@@ -1,13 +1,8 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
-from todoist_takeout import completed, storage
-
-from todoist_takeout import archived
-
 from fake_api import (
     ACTIVITIES,
     ARCHIVED_PROJECTS,
@@ -19,6 +14,8 @@ from fake_api import (
     attachment_fixture,
     completed_fixture,
 )
+
+from todoist_takeout import archived, completed, storage
 
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
 
@@ -264,7 +261,7 @@ def test_large_event_ids_become_numeric_pseudonyms_of_the_same_length(recorder):
 
     pages = [json.loads(data) for data in recorder.scrubbed_bytes([json.dumps(p).encode() for p in (first, second)])]
     pseudonyms = [event["id"] for page in pages for event in page["results"]]
-    for original, pseudonym in zip(originals, pseudonyms):
+    for original, pseudonym in zip(originals, pseudonyms, strict=True):
         assert isinstance(pseudonym, int) and pseudonym != 0 and pseudonym != original
         assert len(str(pseudonym)) == len(str(original))
     # Consistent within the recording: the repeated event keeps its pseudonym, the others differ.
@@ -295,7 +292,7 @@ def recording(recorder, tmp_path, monkeypatch):
 
     def run(fake: FakeApi) -> Path:
         monkeypatch.setattr(recorder, "UrllibTransport", lambda token: fake)
-        recorder.record("read", now=datetime(2026, 10, 18, 10, tzinfo=timezone.utc))
+        recorder.record("read", now=datetime(2026, 10, 18, 10, tzinfo=UTC))
         return tmp_path / "recorded" / "read"
 
     return run
@@ -481,7 +478,7 @@ def archived_account(contents: list[set[str]]) -> tuple[FakeApi, list[str]]:
     projects = [{**archived_fixture("list_1")["results"][0], "id": project_id} for project_id in project_ids]
     fake = fake_account({"2026-08": completed_fixture("by_completion_date_1")})
     fake.answer(ARCHIVED_PROJECTS, {}, {"results": projects, "next_cursor": None})
-    for project, filled in zip(projects, contents):
+    for project, filled in zip(projects, contents, strict=True):
         full = {key: (value if key in filled or not isinstance(value, list) else []) for key, value in template.items()}
         fake.answer(archived.full_path(project["id"]), {}, {**full, "project": project})
     return fake, project_ids

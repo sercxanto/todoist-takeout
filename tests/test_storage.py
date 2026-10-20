@@ -28,7 +28,7 @@ def test_encode_json_exact_bytes():
         '  "priority": 1,\n'
         '  "due": null\n'
         "}\n"
-    ).encode("utf-8")
+    ).encode()
     assert storage.encode_json(value) == expected
 
 
@@ -52,7 +52,7 @@ def test_encode_json_round_trips():
 def test_encode_json_keeps_lone_surrogate_as_escape():
     value = json.loads('{"s": "a\\ud800b 🍎"}')
     data = storage.encode_json(value)
-    assert data == '{\n  "s": "a\\ud800b 🍎"\n}\n'.encode("utf-8")
+    assert data == '{\n  "s": "a\\ud800b 🍎"\n}\n'.encode()
     assert json.loads(data) == value
 
 

@@ -1,17 +1,10 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
-from todoist_takeout import completed, storage, sync
-from todoist_takeout.api import Client, cursor_pages
-from todoist_takeout.cli import main
-from todoist_takeout.errors import ConfigError, StorageError
-from todoist_takeout.sync import run_backup
-
 from fake_api import (
     ACTIVITIES,
     ARCHIVED_PROJECTS,
@@ -22,6 +15,12 @@ from fake_api import (
     FakeApi,
     completed_fixture,
 )
+
+from todoist_takeout import completed, storage, sync
+from todoist_takeout.api import Client, cursor_pages
+from todoist_takeout.cli import main
+from todoist_takeout.errors import ConfigError, StorageError
+from todoist_takeout.sync import run_backup
 
 # --- 3.1 fixtures --------------------------------------------------------------------------
 
@@ -109,7 +108,7 @@ def test_fake_api_refuses_unknown_endpoints():
 # --- group 4: completed-task months and their comments ----------------------------------------
 
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
-NOW = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
 OLD = 1_000_000_000
 
 # The sync fixtures: the account was created on 2026-08-14.
@@ -366,19 +365,19 @@ def test_month_with_450_tasks_in_three_pages(tmp_path):
 
 
 def test_month_within_the_grace_period_stays_open(tmp_path):
-    api = run(tmp_path, now=datetime(2026, 10, 5, 12, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 10, 5, 12, tzinfo=UTC))
     assert months_requested(api) == FIRST_MONTHS
     assert progress(tmp_path)["tasks_closed_through"] == "2026-08"
-    api = run(tmp_path, now=datetime(2026, 10, 6, 12, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 10, 6, 12, tzinfo=UTC))
     assert months_requested(api) == ["2026-09", "2026-10"]
 
 
 def test_month_closes_after_the_grace_period_and_is_not_fetched_again(tmp_path):
-    run(tmp_path, now=datetime(2026, 10, 5, tzinfo=timezone.utc))
-    api = run(tmp_path, now=datetime(2026, 10, 8, tzinfo=timezone.utc))
+    run(tmp_path, now=datetime(2026, 10, 5, tzinfo=UTC))
+    api = run(tmp_path, now=datetime(2026, 10, 8, tzinfo=UTC))
     assert months_requested(api) == ["2026-09", "2026-10"]
     assert progress(tmp_path)["tasks_closed_through"] == "2026-09"
-    api = run(tmp_path, now=datetime(2026, 10, 9, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 10, 9, tzinfo=UTC))
     assert months_requested(api) == ["2026-10"]
 
 
@@ -406,7 +405,7 @@ def test_second_run_requests_only_open_months(tmp_path):
     run(tmp_path)
     api = run(tmp_path, now=NOW + timedelta(hours=1))
     assert months_requested(api) == ["2026-10"]
-    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=UTC))
     assert months_requested(api) == ["2026-10", "2026-11", "2026-12"]
     assert progress(tmp_path)["tasks_closed_through"] == "2026-10"
 
@@ -444,18 +443,18 @@ def test_open_month_follows_completions_and_uncompletions(tmp_path):
         {"items": [task("Z", "2026-10-18T13:00:00.000000Z"), task("X", "2026-10-02T09:00:00.000000Z"), reopened]},
     )
     september_before = completed_tree(tmp_path)["2026-09.json"]
-    run(tmp_path, later, now=datetime(2026, 10, 19, 11, tzinfo=timezone.utc))
+    run(tmp_path, later, now=datetime(2026, 10, 19, 11, tzinfo=UTC))
     assert [t["id"] for t in stored(tmp_path, "2026-10.json")["items"]] == ["X", "Z", reopened["id"]]
     assert completed_tree(tmp_path)["2026-09.json"] == september_before
     assert reopened["id"] in [t["id"] for t in stored(tmp_path, "2026-09.json")["items"]]
 
 
 def test_unchanged_open_month_is_not_rewritten(tmp_path):
-    run(tmp_path, september(FakeApi(account())), now=datetime(2026, 10, 5, tzinfo=timezone.utc))
+    run(tmp_path, september(FakeApi(account())), now=datetime(2026, 10, 5, tzinfo=UTC))
     for path in (tmp_path / "completed").rglob("*.json"):
         os.utime(path, ns=(OLD, OLD))
     before = completed_tree(tmp_path)
-    run(tmp_path, september(FakeApi(account())), now=datetime(2026, 10, 6, tzinfo=timezone.utc))
+    run(tmp_path, september(FakeApi(account())), now=datetime(2026, 10, 6, tzinfo=UTC))
     assert completed_tree(tmp_path) == before
     assert all(p.stat().st_mtime_ns == OLD for p in (tmp_path / "completed").rglob("*.json"))
 
@@ -645,7 +644,7 @@ def test_crash_after_the_comments_and_before_the_month_file(tmp_path, monkeypatc
 
 RECURRING_TASK = "6X8Gr7Mn2pQwVb4T"
 LARGE_EVENT_ID = 152735830295847392018475629384756102938
-NOVEMBER = datetime(2026, 11, 2, 12, tzinfo=timezone.utc)
+NOVEMBER = datetime(2026, 11, 2, 12, tzinfo=UTC)
 
 
 def activity_api(pages=None, **kwargs):
@@ -921,7 +920,7 @@ def test_killed_after_the_last_month_before_the_status_is_complete(tmp_path, mon
 
 def test_complete_backfill_makes_no_more_requests(tmp_path):
     run(tmp_path)
-    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=UTC))
     assert api.requested(TASKS_COMPLETED) == []
     assert progress(tmp_path)["backfill_through"] == "2026-10"
 
@@ -946,7 +945,7 @@ def test_endpoint_removed_warns_once_keeps_the_stored_months_and_exits_with_stat
     api.answer(TASKS_COMPLETED, window("2026-09"), completed_fixture(f"error_{status}"), status=status)
     monkeypatch.setenv("TODOIST_API_TOKEN", "0123456789abcdef0123456789abcdef01234567")
     monkeypatch.setattr(sync, "_utc_now", lambda: NOW)
-    factory = lambda token, wait: Client(api, sleep=_no_sleep)  # noqa: E731
+    factory = lambda token, wait: Client(api, sleep=_no_sleep)
     assert main(["backup", "--quiet", str(tmp_path)], client_factory=factory) == 0
     assert capsys.readouterr().err.splitlines() == [
         f"WARNING GET /tasks/completed is no longer available (HTTP {status}); completions of recurring tasks before "

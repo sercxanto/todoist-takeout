@@ -11,7 +11,7 @@ findings hold booleans, counts and statuses only.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from todoist_takeout import archived, attachments, completed, storage, sync
 from todoist_takeout.api import Client, UrllibTransport
@@ -35,7 +35,7 @@ def test_attachment_is_downloaded_once(write_client, contract_support, recorder,
     token, client = write_client
     commands = contract_support.Commands(client)
     target = tmp_path / "backup"
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     findings: dict = {}
     problems: list[str] = []
     projects: list[str] = []

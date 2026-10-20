@@ -7,10 +7,11 @@ import json
 import os
 import shutil
 import unicodedata
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from fake_api import FakeApi, archived_answers, completed_answers
 
 from todoist_takeout import storage, sync
 from todoist_takeout.api import Client
@@ -19,13 +20,11 @@ from todoist_takeout.errors import StorageError
 from todoist_takeout.lock import LOCK_FILE
 from todoist_takeout.resources import Classifier
 
-from fake_api import FakeApi, archived_answers, completed_answers
-
 FIXTURES = Path(__file__).parent / "fixtures"
 EXPECTED_TREE = FIXTURES / "expected_tree"
 UPDATE_VARIABLE = "TODOIST_TAKEOUT_UPDATE_EXPECTED"
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
-NOW = datetime(2026, 10, 18, 10, 0, 5, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 18, 10, 0, 5, tzinfo=UTC)
 
 
 def case_insensitive(directory: Path) -> bool:

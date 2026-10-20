@@ -1,15 +1,9 @@
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib import resources
 
 import pytest
-
-from todoist_takeout import archived, completed, storage
-from todoist_takeout.api import Client
-from todoist_takeout.resources import COLLECTION, KNOWN, ONE_OF, SINGLE, Classifier
-from todoist_takeout.sync import apply_response, run_backup
-
 from fake_api import (
     ACTIVITIES,
     ARCHIVED_PROJECTS,
@@ -20,6 +14,11 @@ from fake_api import (
     archived_fixture,
     completed_fixture,
 )
+
+from todoist_takeout import archived, completed, storage
+from todoist_takeout.api import Client
+from todoist_takeout.resources import COLLECTION, KNOWN, ONE_OF, SINGLE, Classifier
+from todoist_takeout.sync import apply_response, run_backup
 
 
 def _format_description() -> str:
@@ -73,12 +72,12 @@ def _produced_sync_tree(tmp_path, sync_fixture):
 def _produced_completed_tree(tmp_path, sync_fixture):
     responses = {"*": json.dumps(sync_fixture("full_sync")).encode(), "FULL-1": b'{"sync_token": "INC-1"}'}
     api = FakeApi(responses)
-    september = dict(zip(["since", "until"], completed.month_window("2026-09")))
+    september = dict(zip(["since", "until"], completed.month_window("2026-09"), strict=True))
     api.cursor_pages(BY_COMPLETION_DATE, september, [completed_fixture(f"by_completion_date_{i}") for i in (1, 2)])
     api.answer(COMMENTS, {"task_id": "6X8Gq4CfVh9xPm2R"}, completed_fixture("comments"))
     api.cursor_pages(ACTIVITIES, {}, [completed_fixture(f"activities_{i}") for i in (1, 2)])
     api.answer(TASKS_COMPLETED, september, completed_fixture("tasks_completed"))
-    run_backup(tmp_path, Client(api), now=lambda: datetime(2026, 10, 18, 12, tzinfo=timezone.utc))
+    run_backup(tmp_path, Client(api), now=lambda: datetime(2026, 10, 18, 12, tzinfo=UTC))
 
 
 def _produced_archived_tree(tmp_path, sync_fixture):
@@ -94,7 +93,7 @@ def _produced_archived_tree(tmp_path, sync_fixture):
     [commented] = [t for t in archived_fixture("full_parent")["tasks"] if t["note_count"]]
     api.answer(COMMENTS, {"task_id": commented["id"]}, archived_fixture("comments_task"))
     api.answer(COMMENTS, {"project_id": commented["project_id"]}, archived_fixture("comments_project"))
-    run_backup(tmp_path, Client(api), now=lambda: datetime(2026, 10, 18, 12, tzinfo=timezone.utc))
+    run_backup(tmp_path, Client(api), now=lambda: datetime(2026, 10, 18, 12, tzinfo=UTC))
 
 
 LAYOUTS = {

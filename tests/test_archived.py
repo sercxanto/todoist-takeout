@@ -1,17 +1,11 @@
+import itertools
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
-from todoist_takeout import archived, completed, storage
-from todoist_takeout.api import Client
-from todoist_takeout.cli import main
-from todoist_takeout.errors import RateLimitExhausted, StorageError
-from todoist_takeout.sync import run_backup
-
 from fake_api import (
     ACTIVITIES,
     ARCHIVED_FIXTURES,
@@ -23,6 +17,12 @@ from fake_api import (
     archived_fixture,
     completed_fixture,
 )
+
+from todoist_takeout import archived, completed, storage
+from todoist_takeout.api import Client
+from todoist_takeout.cli import main
+from todoist_takeout.errors import RateLimitExhausted, StorageError
+from todoist_takeout.sync import run_backup
 
 # --- 3.1 fixtures --------------------------------------------------------------------------
 
@@ -96,7 +96,7 @@ def test_fixtures_have_the_recorded_shapes():
 # --- 3.3 the snapshot fetch -------------------------------------------------------------------
 
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
-NOW = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
 
 PARENT = archived_fixture("full_parent")["project"]
@@ -332,7 +332,7 @@ def test_windows_cover_three_months_each_from_the_creation_month_through_the_cur
     assert len(found) == 13
     assert found[0] == ("2023-10-01T00:00:00.000000Z", "2023-12-31T23:59:59.999999Z")
     assert found[-1] == ("2026-10-01T00:00:00.000000Z", "2026-12-31T23:59:59.999999Z")
-    for (since, until), (next_since, _) in zip(found, found[1:]):
+    for (_, until), (next_since, _) in itertools.pairwise(found):
         assert completed.parse_time(next_since) - completed.parse_time(until) == timedelta(microseconds=1)
     assert max(completed.parse_time(u) - completed.parse_time(s) for s, u in found) < timedelta(days=92)
 

@@ -25,7 +25,7 @@ import random
 import re
 import string
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -525,11 +525,11 @@ def record(account: str, now: datetime | None = None) -> list[Path]:
     full = client.sync("*")
     incremental = client.sync(json.loads(full)["sync_token"])
     bodies = {"full": full, "incremental": incremental}
-    bodies.update(record_completed(client, now or datetime.now(timezone.utc)))
+    bodies.update(record_completed(client, now or datetime.now(UTC)))
     bodies.update(record_archived(client))
     directory = RECORDED / account
     directory.mkdir(parents=True, exist_ok=True)
-    return _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values()), token))))
+    return _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values()), token), strict=True)))
 
 
 def record_completed(client: Client, now: datetime) -> dict[str, bytes]:
@@ -634,7 +634,7 @@ def rescrub() -> list[Path]:
     for directory in sorted(path for path in RECORDED.iterdir() if path.is_dir()):
         paths = {name: directory / f"{name}.json" for name in RECORDING_FILES}
         bodies = {name: path.read_bytes() for name, path in paths.items() if path.exists()}
-        written += _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values())))))
+        written += _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values())), strict=True)))
     return written
 
 

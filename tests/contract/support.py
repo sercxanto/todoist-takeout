@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from todoist_takeout import attachments, completed, storage
@@ -139,7 +139,7 @@ def completion_listed(client: Client, project_id, task_id, started: datetime) ->
     since = completed.month_window(completed.month_of(started))[0]
     deadline = time.monotonic() + COMPLETION_TIMEOUT
     while True:
-        until = completed.month_window(completed.month_of(datetime.now(timezone.utc)))[1]
+        until = completed.month_window(completed.month_of(datetime.now(UTC)))[1]
         params = {"project_id": str(project_id), "since": since, "until": until, "limit": "50"}
         page = json.loads(client.get(completed.BY_COMPLETION_DATE, params))
         if str(task_id) in {str(task.get("id")) for task in page.get("items") or [] if isinstance(task, dict)}:

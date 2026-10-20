@@ -2,6 +2,7 @@ import email.message
 import gzip
 import http.client
 import io
+import itertools
 import json
 import logging
 import threading
@@ -658,7 +659,7 @@ def test_download_does_not_follow_a_redirect_that_is_not_https(location):
 
 def _redirect_chain(hops):
     urls = [FILE_URL] + [f"https://hop{i}.example.net/f" for i in range(1, hops + 1)]
-    routes = {url: (302, {"Location": nxt}, b"") for url, nxt in zip(urls, urls[1:])}
+    routes = {url: (302, {"Location": nxt}, b"") for url, nxt in itertools.pairwise(urls)}
     routes[urls[-1]] = (200, {}, b"done")
     return routes
 
@@ -716,7 +717,7 @@ def test_download_streams_in_blocks():
 
 @pytest.mark.parametrize("encoding", ["gzip", "x-gzip", "GZIP"])
 def test_download_decodes_gzip_sent_anyway(encoding):
-    payload = "Größe 🍎\n".encode("utf-8") * 10000
+    payload = "Größe 🍎\n".encode() * 10000
     transport, _opener = _stub_transport({FILE_URL: (200, {"Content-Encoding": encoding}, gzip.compress(payload))})
     assert transport.download(FILE_URL, _collect)[2] == payload
 

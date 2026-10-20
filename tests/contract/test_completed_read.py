@@ -7,7 +7,7 @@ completion filter, so that either is noticed before users lose recurring complet
 
 import json
 import warnings
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -36,7 +36,7 @@ def test_completed_endpoints_match_recorded_shapes(account, contract_support, re
 
     client = Watching(client_for(token))
     try:
-        bodies = recorder.record_completed(client, datetime.now(timezone.utc))
+        bodies = recorder.record_completed(client, datetime.now(UTC))
     except ApiError as exc:
         if client.path == completed.TASKS_COMPLETED and exc.http_status in completed.GONE_STATUSES:
             pytest.fail(
