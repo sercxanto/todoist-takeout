@@ -67,5 +67,7 @@ branch = true
 patch = ["subprocess"]
 
 [tool.coverage.report]
+# Below this, `pytest --cov` fails. It leaves room for the code that runs on one operating system only.
+fail_under = 90
 show_missing = true
 skip_covered = true
