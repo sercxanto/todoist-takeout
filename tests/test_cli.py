@@ -9,13 +9,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
+from fake_api import FakeApi, empty_page
 
 from todoist_takeout import __version__, storage
 from todoist_takeout.api import Client, TransportError
 from todoist_takeout.cli import main
 from todoist_takeout.lock import TargetLock
-
-from fake_api import FakeApi, empty_page
 
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
@@ -104,7 +103,13 @@ def test_help_names_the_backup_command_and_the_token_variable(capsys):
 
 @pytest.mark.parametrize(
     "argv",
-    [[], ["backup"], ["backup", "a", "b"], ["backup", "a", "--quiet", "--verbose"], ["backup", "a", "--max-rate-limit-wait", "-1"]],
+    [
+        [],
+        ["backup"],
+        ["backup", "a", "b"],
+        ["backup", "a", "--quiet", "--verbose"],
+        ["backup", "a", "--max-rate-limit-wait", "-1"],
+    ],
 )
 def test_usage_errors_exit_with_status_2(tmp_path, capsys, argv):
     cli = Cli(FakeApi(ACCOUNT))
@@ -149,7 +154,9 @@ def test_summary_counts_unchanged_and_deleted_objects(tmp_path, capsys):
     assert cli("backup", str(tmp_path)) == 0
     capsys.readouterr()
     assert cli("backup", str(tmp_path)) == 0
-    assert stderr_lines(capsys)[-1] == "INFO backup complete: 0 objects written, 0 unchanged, 1 marked deleted, 0 warnings"
+    assert (
+        stderr_lines(capsys)[-1] == "INFO backup complete: 0 objects written, 0 unchanged, 1 marked deleted, 0 warnings"
+    )
 
 
 def test_max_rate_limit_wait_reaches_the_client(tmp_path):
@@ -266,7 +273,11 @@ def test_auth_failure_exits_with_status_1(tmp_path, capsys):
     before = json.loads((tmp_path / "state.json").read_bytes())["sync_token"]
     capsys.readouterr()
 
-    unauthorized = lambda token: (401, {}, b'{"error": "Invalid token", "error_tag": "AUTH_INVALID_TOKEN", "http_code": 401}')
+    unauthorized = lambda token: (
+        401,
+        {},
+        b'{"error": "Invalid token", "error_tag": "AUTH_INVALID_TOKEN", "http_code": 401}',
+    )
     cli = Cli(FakeApi(failure=unauthorized))
     assert cli("backup", str(tmp_path), "--verbose") == 1
     err = capsys.readouterr().err
@@ -365,7 +376,14 @@ def test_runs_without_stdin_and_terminal(tmp_path):
     thread.start()
     try:
         result = subprocess.run(
-            [sys.executable, "-c", _LOCAL_CLI, f"http://127.0.0.1:{httpd.server_address[1]}/api/v1/", "backup", str(tmp_path)],
+            [
+                sys.executable,
+                "-c",
+                _LOCAL_CLI,
+                f"http://127.0.0.1:{httpd.server_address[1]}/api/v1/",
+                "backup",
+                str(tmp_path),
+            ],
             env={**os.environ, "TODOIST_API_TOKEN": TOKEN},
             stdin=subprocess.DEVNULL,
             capture_output=True,

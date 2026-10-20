@@ -90,8 +90,11 @@ def archived_answers(api: "FakeApi") -> "FakeApi":
     /full names, completed tasks in two pages of one window, a commented task and a project comment."""
     parent = archived_fixture("full_parent")
     project_id = parent["project"]["id"]
-    api.cursor_pages(ARCHIVED_PROJECTS, {}, [{"results": [], "next_cursor": "YXJjaGl2ZWQ6Mg"},
-                                             {"results": [parent["project"]], "next_cursor": None}])
+    api.cursor_pages(
+        ARCHIVED_PROJECTS,
+        {},
+        [{"results": [], "next_cursor": "YXJjaGl2ZWQ6Mg"}, {"results": [parent["project"]], "next_cursor": None}],
+    )
     for full in (parent, archived_fixture("full_child")):
         api.answer(archived.full_path(full["project"]["id"]), {}, full)
     window = {"since": "2024-01-01T00:00:00.000000Z", "until": "2024-03-31T23:59:59.999999Z", "project_id": project_id}
@@ -190,8 +193,9 @@ class FakeApi:
 
     # --- Attachment files ----------------------------------------------------------------------
 
-    def serve_file(self, url: str, body: bytes, *, gzipped: bool = False, fail_after: int | None = None,
-                   times: int | None = None) -> "FakeApi":
+    def serve_file(
+        self, url: str, body: bytes, *, gzipped: bool = False, fail_after: int | None = None, times: int | None = None
+    ) -> "FakeApi":
         """Answer `url` with 200 and `body`, with a Content-Length.
 
         `gzipped` sends the body gzip-compressed with `Content-Encoding: gzip`. `fail_after` makes
@@ -205,8 +209,9 @@ class FakeApi:
         headers["Content-Length"] = str(len(body))
         return self._route(url, (200, headers, body, fail_after), times)
 
-    def answer_file(self, url: str, status: int, body: bytes = b"", headers=None, *,
-                    times: int | None = None) -> "FakeApi":
+    def answer_file(
+        self, url: str, status: int, body: bytes = b"", headers=None, *, times: int | None = None
+    ) -> "FakeApi":
         """Answer `url` with any status, such as 404, or 429 with a `Retry-After` header."""
         return self._route(url, (status, dict(headers or {}), body, None), times)
 

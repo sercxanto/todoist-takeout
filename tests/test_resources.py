@@ -145,12 +145,16 @@ def test_one_of_entry_with_neither_or_both_fields_falls_back_with_one_warning(en
         classifier.classify("completed_info", [entry])
     assert kind.name == SINGLE
     [record] = caplog.records
-    assert "'completed_info'" in record.getMessage() and "one of project_id | section_id | item_id" in record.getMessage()
+    assert (
+        "'completed_info'" in record.getMessage() and "one of project_id | section_id | item_id" in record.getMessage()
+    )
 
 
 # Sync recordings only; the other recorded files are responses of the completed-tasks endpoints.
 RECORDED = sorted(
-    path for name in ("full", "incremental") for path in (Path(__file__).parent / "fixtures" / "recorded").glob(f"*/{name}.json")
+    path
+    for name in ("full", "incremental")
+    for path in (Path(__file__).parent / "fixtures" / "recorded").glob(f"*/{name}.json")
 )
 
 

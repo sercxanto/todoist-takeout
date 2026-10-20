@@ -58,9 +58,7 @@ class TargetLock:
         except OSError as exc:
             os.close(fd)
             if exc.errno in _HELD_ERRNOS:
-                raise LockHeld(
-                    f"another run is in progress on {self.target} (it holds {self.path})"
-                ) from None
+                raise LockHeld(f"another run is in progress on {self.target} (it holds {self.path})") from None
             raise StorageError(f"cannot lock {self.path}: {exc.strerror or exc}") from exc
         self._fd = fd
 

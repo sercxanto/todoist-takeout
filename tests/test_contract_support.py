@@ -7,12 +7,11 @@ import sys
 from pathlib import Path
 
 import pytest
+from fake_api import FakeApi, file_body
 
 from todoist_takeout.api import Client
 from todoist_takeout.attachments import Attachment
 from todoist_takeout.errors import SizeMismatch
-
-from fake_api import FakeApi, file_body
 
 ROOT = Path(__file__).parent.parent
 READ = "read-token-0123456789abcdef0123456789abcd"
@@ -104,8 +103,17 @@ def test_write_tests_skip_without_the_allow_flag(tmp_path):
     env["TODOIST_CONTRACT_WRITE_TOKEN"] = WRITE
     result = subprocess.run(
         [
-            sys.executable, "-m", "pytest", "-m", "contract", "-q", "-rs", "-p", "no:cacheprovider",
-            "tests/contract/test_write.py", "tests/contract/test_archived_write.py",
+            sys.executable,
+            "-m",
+            "pytest",
+            "-m",
+            "contract",
+            "-q",
+            "-rs",
+            "-p",
+            "no:cacheprovider",
+            "tests/contract/test_write.py",
+            "tests/contract/test_archived_write.py",
             "tests/contract/test_attachments_write.py",
         ],
         cwd=ROOT,
@@ -123,8 +131,9 @@ def test_write_tests_skip_without_the_allow_flag(tmp_path):
 
 
 def test_multipart_body_holds_the_fields_and_the_file(contract_support):
-    body, header = contract_support.multipart({"file_name": "a: b.txt", "project_id": "P1"}, "file", "a: b.txt",
-                                              b"bytes\r\n", "text/plain")
+    body, header = contract_support.multipart(
+        {"file_name": "a: b.txt", "project_id": "P1"}, "file", "a: b.txt", b"bytes\r\n", "text/plain"
+    )
     boundary = header.removeprefix("multipart/form-data; boundary=")
     assert header != boundary and boundary.startswith("todoist-takeout-")
     assert body.split(f"--{boundary}".encode()) == [
@@ -142,8 +151,9 @@ URL = "https://files.todoist.com/fake/support/N1/notiz.txt"
 
 def test_check_download_stores_through_the_tool_and_leaves_nothing(contract_support, tmp_path):
     transport = contract_support.CountingTransport(FakeApi(files={URL: file_body("notiz.txt", 300)}))
-    result = contract_support.check_download(Client(transport), Attachment("N1", URL, "a: b.txt", 300),
-                                             tmp_path / "check")
+    result = contract_support.check_download(
+        Client(transport), Attachment("N1", URL, "a: b.txt", 300), tmp_path / "check"
+    )
     assert result == {"bytes": 300, "size_stated": True, "size_matches": True}
     assert transport.file_requests == [URL]
     assert list(tmp_path.iterdir()) == []

@@ -140,9 +140,7 @@ class Classifier:
                 reason = "unknown resource"
             else:
                 reason = f"resource with an unexpected shape (expected {_describe(kind)})"
-            log.warning(
-                "%s %r in the sync response; storing it unchanged as %s", reason, key, _describe(fallback)
-            )
+            log.warning("%s %r in the sync response; storing it unchanged as %s", reason, key, _describe(fallback))
         return fallback
 
 

@@ -73,9 +73,7 @@ def run(target: Path, client: Client, now: Callable[[], datetime]) -> None:
                 if directory.is_dir():
                     names.add(stem)
     finally:
-        log.info(
-            "downloaded %d attachment files (%.1f MB); %d could not be downloaded", downloaded, size / 1e6, failed
-        )
+        log.info("downloaded %d attachment files (%.1f MB); %d could not be downloaded", downloaded, size / 1e6, failed)
 
 
 def _download(client: Client, attachment: Attachment, directory: Path) -> int:
@@ -84,8 +82,11 @@ def _download(client: Client, attachment: Attachment, directory: Path) -> int:
     Return its size. Raises AttachmentSkipped for a file that a warning reports.
     """
     path = directory / storage.attachment_file_name(attachment.file_name)
-    log.debug("downloading the attachment file of comment %s from %s", attachment.comment_id,
-              url_host(attachment.url) or "a URL without a host")
+    log.debug(
+        "downloading the attachment file of comment %s from %s",
+        attachment.comment_id,
+        url_host(attachment.url) or "a URL without a host",
+    )
     return client.download(attachment.url, lambda chunks: storage.write_stream_atomic(path, chunks, attachment.size))
 
 
@@ -133,8 +134,10 @@ def _stored_comments(target: Path) -> Iterator:
     """Every stored comment, in the order of design D2, each file in name order."""
     for resource in SYNC_COMMENT_RESOURCES:
         # A live copy before its tombstone, which holds the deletion payload.
-        for path in _json_files(target / sync.SYNC_DIR / storage.encode_key(resource),
-                                key=lambda name: (name.endswith(sync.DELETED_SUFFIX), name)):
+        for path in _json_files(
+            target / sync.SYNC_DIR / storage.encode_key(resource),
+            key=lambda name: (name.endswith(sync.DELETED_SUFFIX), name),
+        ):
             yield _read_json(path)
     for path in _json_files(target / completed.COMPLETED_DIR / completed.COMMENTS_DIR):
         yield from _results(path)

@@ -1,17 +1,10 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
-from todoist_takeout import completed, storage, sync
-from todoist_takeout.api import Client, cursor_pages
-from todoist_takeout.cli import main
-from todoist_takeout.errors import ConfigError, StorageError
-from todoist_takeout.sync import run_backup
-
 from fake_api import (
     ACTIVITIES,
     ARCHIVED_PROJECTS,
@@ -22,6 +15,12 @@ from fake_api import (
     FakeApi,
     completed_fixture,
 )
+
+from todoist_takeout import completed, storage, sync
+from todoist_takeout.api import Client, cursor_pages
+from todoist_takeout.cli import main
+from todoist_takeout.errors import ConfigError, StorageError
+from todoist_takeout.sync import run_backup
 
 # --- 3.1 fixtures --------------------------------------------------------------------------
 
@@ -77,7 +76,11 @@ def test_activity_fixtures_hold_an_event_before_the_test_t0():
 
 def test_fake_api_answers_by_path_and_parameters_and_records_requests():
     api = FakeApi({"*": b'{"sync_token": "S"}'})
-    api.cursor_pages(BY_COMPLETION_DATE, {"since": "A"}, [completed_fixture("by_completion_date_1"), completed_fixture("by_completion_date_2")])
+    api.cursor_pages(
+        BY_COMPLETION_DATE,
+        {"since": "A"},
+        [completed_fixture("by_completion_date_1"), completed_fixture("by_completion_date_2")],
+    )
     api.answer(COMMENTS, {"task_id": "T"}, completed_fixture("error_404"), status=404)
     client = Client(api, sleep=lambda delay: None)
 
@@ -105,7 +108,7 @@ def test_fake_api_refuses_unknown_endpoints():
 # --- group 4: completed-task months and their comments ----------------------------------------
 
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
-NOW = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
 OLD = 1_000_000_000
 
 # The sync fixtures: the account was created on 2026-08-14.
@@ -235,7 +238,10 @@ def test_plan_without_completed_tasks_warns_once_and_makes_no_request(tmp_path, 
 
 def test_pages_are_concatenated_and_sorted_by_time_then_id():
     pages = [
-        {"items": [task("c", "2026-09-03T00:00:00.000000Z"), task("b", "2026-09-01T00:00:00.000000Z")], "next_cursor": "2"},
+        {
+            "items": [task("c", "2026-09-03T00:00:00.000000Z"), task("b", "2026-09-01T00:00:00.000000Z")],
+            "next_cursor": "2",
+        },
         {"items": [task("a", "2026-09-03T00:00:00.000000Z")], "next_cursor": "3"},
         {"items": [task("d", "2026-09-02T00:00:00.000000Z")]},
     ]
@@ -247,7 +253,13 @@ def test_pages_are_concatenated_and_sorted_by_time_then_id():
 
 def test_maps_are_merged_and_other_keys_take_the_last_value():
     pages = [
-        {"items": [], "projects": {"P1": {"name": "old"}, "P2": {"name": "two"}}, "sections": {}, "total": 1, "next_cursor": "x"},
+        {
+            "items": [],
+            "projects": {"P1": {"name": "old"}, "P2": {"name": "two"}},
+            "sections": {},
+            "total": 1,
+            "next_cursor": "x",
+        },
         {"items": [], "projects": {"P1": {"name": "new"}, "P3": {"name": "three"}}, "sections": {"S": {}}, "total": 2},
     ]
     merged = completed.merge_pages(pages, "items", "completed_at")
@@ -280,12 +292,23 @@ def test_page_order_does_not_change_the_bytes():
 
 
 def test_merge_by_id_lets_a_new_entry_replace_a_stored_one():
-    stored = {"results": [{"id": "1", "content": "old", "posted_at": "2026-09-01T00:00:00.000000Z"},
-                          {"id": "2", "content": "kept", "posted_at": "2026-09-02T00:00:00.000000Z"}]}
-    new = {"results": [{"id": "1", "content": "edited", "posted_at": "2026-09-01T00:00:00.000000Z"}], "next_cursor": None}
+    stored = {
+        "results": [
+            {"id": "1", "content": "old", "posted_at": "2026-09-01T00:00:00.000000Z"},
+            {"id": "2", "content": "kept", "posted_at": "2026-09-02T00:00:00.000000Z"},
+        ]
+    }
+    new = {
+        "results": [{"id": "1", "content": "edited", "posted_at": "2026-09-01T00:00:00.000000Z"}],
+        "next_cursor": None,
+    }
     merged = completed.merge_pages([stored, new], "results", "posted_at", by_id=True)
-    assert merged == {"results": [{"id": "1", "content": "edited", "posted_at": "2026-09-01T00:00:00.000000Z"},
-                                  {"id": "2", "content": "kept", "posted_at": "2026-09-02T00:00:00.000000Z"}]}
+    assert merged == {
+        "results": [
+            {"id": "1", "content": "edited", "posted_at": "2026-09-01T00:00:00.000000Z"},
+            {"id": "2", "content": "kept", "posted_at": "2026-09-02T00:00:00.000000Z"},
+        ]
+    }
 
 
 def test_empty_fetch_gives_an_empty_list():
@@ -334,25 +357,27 @@ def test_month_boundary_and_several_pages(tmp_path):
 
 def test_month_with_450_tasks_in_three_pages(tmp_path):
     tasks = [task(f"T{i:03d}", f"2026-09-{1 + i % 30:02d}T08:00:00.000000Z") for i in range(450)]
-    pages = [{"items": tasks[i : i + 200], "next_cursor": f"c{i}"} for i in range(0, 400, 200)] + [{"items": tasks[400:]}]
+    pages = [{"items": tasks[i : i + 200], "next_cursor": f"c{i}"} for i in range(0, 400, 200)] + [
+        {"items": tasks[400:]}
+    ]
     run(tmp_path, september(FakeApi(account()), pages))
     assert len(stored(tmp_path, "2026-09.json")["items"]) == 450
 
 
 def test_month_within_the_grace_period_stays_open(tmp_path):
-    api = run(tmp_path, now=datetime(2026, 10, 5, 12, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 10, 5, 12, tzinfo=UTC))
     assert months_requested(api) == FIRST_MONTHS
     assert progress(tmp_path)["tasks_closed_through"] == "2026-08"
-    api = run(tmp_path, now=datetime(2026, 10, 6, 12, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 10, 6, 12, tzinfo=UTC))
     assert months_requested(api) == ["2026-09", "2026-10"]
 
 
 def test_month_closes_after_the_grace_period_and_is_not_fetched_again(tmp_path):
-    run(tmp_path, now=datetime(2026, 10, 5, tzinfo=timezone.utc))
-    api = run(tmp_path, now=datetime(2026, 10, 8, tzinfo=timezone.utc))
+    run(tmp_path, now=datetime(2026, 10, 5, tzinfo=UTC))
+    api = run(tmp_path, now=datetime(2026, 10, 8, tzinfo=UTC))
     assert months_requested(api) == ["2026-09", "2026-10"]
     assert progress(tmp_path)["tasks_closed_through"] == "2026-09"
-    api = run(tmp_path, now=datetime(2026, 10, 9, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 10, 9, tzinfo=UTC))
     assert months_requested(api) == ["2026-10"]
 
 
@@ -366,15 +391,21 @@ def test_historical_months_close_as_they_are_stored(tmp_path):
             return super().send(method, path, params)
 
     run(tmp_path, Watching(account(user={"joined_at": "2026-05-02T00:00:00.000000Z"})))
-    assert seen == {"2026-05": None, "2026-06": "2026-05", "2026-07": "2026-06", "2026-08": "2026-07",
-                    "2026-09": "2026-08", "2026-10": "2026-09"}
+    assert seen == {
+        "2026-05": None,
+        "2026-06": "2026-05",
+        "2026-07": "2026-06",
+        "2026-08": "2026-07",
+        "2026-09": "2026-08",
+        "2026-10": "2026-09",
+    }
 
 
 def test_second_run_requests_only_open_months(tmp_path):
     run(tmp_path)
     api = run(tmp_path, now=NOW + timedelta(hours=1))
     assert months_requested(api) == ["2026-10"]
-    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=UTC))
     assert months_requested(api) == ["2026-10", "2026-11", "2026-12"]
     assert progress(tmp_path)["tasks_closed_through"] == "2026-10"
 
@@ -397,25 +428,33 @@ def test_interrupted_first_run_continues_with_the_first_month_not_closed(tmp_pat
 
 def test_open_month_follows_completions_and_uncompletions(tmp_path):
     october = window("2026-10")
-    first = FakeApi(account()).answer(BY_COMPLETION_DATE, october, {"items": [task("X", "2026-10-02T09:00:00.000000Z"), task("Y", "2026-10-03T09:00:00.000000Z")]})
+    first = FakeApi(account()).answer(
+        BY_COMPLETION_DATE,
+        october,
+        {"items": [task("X", "2026-10-02T09:00:00.000000Z"), task("Y", "2026-10-03T09:00:00.000000Z")]},
+    )
     run(tmp_path, september(first))
     # Y was uncompleted, Z completed since; September is closed and not fetched again, though one of
     # its tasks was uncompleted and completed again in October.
     reopened = {**completed_fixture("by_completion_date_2")["items"][0], "completed_at": "2026-10-19T10:00:00.000000Z"}
-    later = FakeApi(account()).answer(BY_COMPLETION_DATE, october, {"items": [task("Z", "2026-10-18T13:00:00.000000Z"), task("X", "2026-10-02T09:00:00.000000Z"), reopened]})
+    later = FakeApi(account()).answer(
+        BY_COMPLETION_DATE,
+        october,
+        {"items": [task("Z", "2026-10-18T13:00:00.000000Z"), task("X", "2026-10-02T09:00:00.000000Z"), reopened]},
+    )
     september_before = completed_tree(tmp_path)["2026-09.json"]
-    run(tmp_path, later, now=datetime(2026, 10, 19, 11, tzinfo=timezone.utc))
+    run(tmp_path, later, now=datetime(2026, 10, 19, 11, tzinfo=UTC))
     assert [t["id"] for t in stored(tmp_path, "2026-10.json")["items"]] == ["X", "Z", reopened["id"]]
     assert completed_tree(tmp_path)["2026-09.json"] == september_before
     assert reopened["id"] in [t["id"] for t in stored(tmp_path, "2026-09.json")["items"]]
 
 
 def test_unchanged_open_month_is_not_rewritten(tmp_path):
-    run(tmp_path, september(FakeApi(account())), now=datetime(2026, 10, 5, tzinfo=timezone.utc))
+    run(tmp_path, september(FakeApi(account())), now=datetime(2026, 10, 5, tzinfo=UTC))
     for path in (tmp_path / "completed").rglob("*.json"):
         os.utime(path, ns=(OLD, OLD))
     before = completed_tree(tmp_path)
-    run(tmp_path, september(FakeApi(account())), now=datetime(2026, 10, 6, tzinfo=timezone.utc))
+    run(tmp_path, september(FakeApi(account())), now=datetime(2026, 10, 6, tzinfo=UTC))
     assert completed_tree(tmp_path) == before
     assert all(p.stat().st_mtime_ns == OLD for p in (tmp_path / "completed").rglob("*.json"))
 
@@ -483,7 +522,11 @@ def test_plan_without_comments_gets_no_comment_request(tmp_path):
 
 def october_api(note_count, comments):
     api = FakeApi(account())
-    api.answer(BY_COMPLETION_DATE, window("2026-10"), {"items": [task(TASK_WITH_COMMENTS, "2026-10-02T09:00:00.000000Z", note_count)]})
+    api.answer(
+        BY_COMPLETION_DATE,
+        window("2026-10"),
+        {"items": [task(TASK_WITH_COMMENTS, "2026-10-02T09:00:00.000000Z", note_count)]},
+    )
     api.answer(COMMENTS, {"task_id": TASK_WITH_COMMENTS}, {"results": comments, "next_cursor": None})
     return api
 
@@ -601,7 +644,7 @@ def test_crash_after_the_comments_and_before_the_month_file(tmp_path, monkeypatc
 
 RECURRING_TASK = "6X8Gr7Mn2pQwVb4T"
 LARGE_EVENT_ID = 152735830295847392018475629384756102938
-NOVEMBER = datetime(2026, 11, 2, 12, tzinfo=timezone.utc)
+NOVEMBER = datetime(2026, 11, 2, 12, tzinfo=UTC)
 
 
 def activity_api(pages=None, **kwargs):
@@ -664,7 +707,9 @@ def test_overlapping_fetches_store_each_event_once_with_the_latest_content(tmp_p
     run(tmp_path, activity_api(), now=NOVEMBER)
     first, second = completed_fixture("activities_1")["results"]
     edited = {**second, "extra_data": {**second["extra_data"], "content": "Take out the bins (edited)"}}
-    api = run(tmp_path, activity_api([{"results": [edited, first], "next_cursor": None}]), now=NOVEMBER + timedelta(hours=1))
+    api = run(
+        tmp_path, activity_api([{"results": [edited, first], "next_cursor": None}]), now=NOVEMBER + timedelta(hours=1)
+    )
     assert api.requested(ACTIVITIES)[0]["date_from"] == "2026-11-01"
     assert events(tmp_path, "2026-10") == [first, edited]
 
@@ -816,7 +861,10 @@ def test_backfill_month_keeps_the_response_shape(tmp_path):
 
 def test_backfill_follows_the_offset_pages(tmp_path):
     entries = [completion(f"c{i:03d}", f"2026-09-{1 + i % 30:02d}T06:30:00.000000Z") for i in range(201)]
-    pages = [{"items": entries[:200], "projects": {}, "sections": {}}, {"items": entries[200:], "projects": {}, "sections": {}}]
+    pages = [
+        {"items": entries[:200], "projects": {}, "sections": {}},
+        {"items": entries[200:], "projects": {}, "sections": {}},
+    ]
     api = run(tmp_path, FakeApi(account()).offset_pages(TASKS_COMPLETED, window("2026-09"), pages, 200))
     assert [p["offset"] for p in api.requested(TASKS_COMPLETED) if p["since"].startswith("2026-09")] == ["0", "200"]
     assert len(backfill(tmp_path, "2026-09")["items"]) == 201
@@ -825,7 +873,11 @@ def test_backfill_follows_the_offset_pages(tmp_path):
 def test_backfill_drops_completions_at_or_after_t0(tmp_path):
     october = {"since": "2026-10-01T00:00:00.000000Z", "until": T0}
     before = completion("before", "2026-10-18T11:59:59.999999Z")
-    page = {"items": [before, completion("at", T0), completion("after", "2026-10-18T12:00:01.000000Z")], "projects": {}, "sections": {}}
+    page = {
+        "items": [before, completion("at", T0), completion("after", "2026-10-18T12:00:01.000000Z")],
+        "projects": {},
+        "sections": {},
+    }
     run(tmp_path, FakeApi(account()).answer(TASKS_COMPLETED, october, page))
     assert backfill(tmp_path, "2026-10")["items"] == [before]
 
@@ -868,7 +920,7 @@ def test_killed_after_the_last_month_before_the_status_is_complete(tmp_path, mon
 
 def test_complete_backfill_makes_no_more_requests(tmp_path):
     run(tmp_path)
-    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=timezone.utc))
+    api = run(tmp_path, now=datetime(2026, 12, 7, tzinfo=UTC))
     assert api.requested(TASKS_COMPLETED) == []
     assert progress(tmp_path)["backfill_through"] == "2026-10"
 
@@ -886,12 +938,14 @@ def test_unknown_backfill_status_is_a_config_error(tmp_path):
 
 
 @pytest.mark.parametrize("status", [404, 410])
-def test_endpoint_removed_warns_once_keeps_the_stored_months_and_exits_with_status_0(tmp_path, monkeypatch, capsys, status):
+def test_endpoint_removed_warns_once_keeps_the_stored_months_and_exits_with_status_0(
+    tmp_path, monkeypatch, capsys, status
+):
     api = september(FakeApi(account()))
     api.answer(TASKS_COMPLETED, window("2026-09"), completed_fixture(f"error_{status}"), status=status)
     monkeypatch.setenv("TODOIST_API_TOKEN", "0123456789abcdef0123456789abcdef01234567")
     monkeypatch.setattr(sync, "_utc_now", lambda: NOW)
-    factory = lambda token, wait: Client(api, sleep=_no_sleep)  # noqa: E731
+    factory = lambda token, wait: Client(api, sleep=_no_sleep)
     assert main(["backup", "--quiet", str(tmp_path)], client_factory=factory) == 0
     assert capsys.readouterr().err.splitlines() == [
         f"WARNING GET /tasks/completed is no longer available (HTTP {status}); completions of recurring tasks before "
@@ -906,7 +960,10 @@ def test_endpoint_removed_warns_once_keeps_the_stored_months_and_exits_with_stat
     # A later run makes no request to the endpoint and prints no warning about it.
     later = september(FakeApi(account()))
     monkeypatch.setattr(sync, "_utc_now", lambda: NOW + timedelta(days=1))
-    assert main(["backup", "--quiet", str(tmp_path)], client_factory=lambda token, wait: Client(later, sleep=_no_sleep)) == 0
+    assert (
+        main(["backup", "--quiet", str(tmp_path)], client_factory=lambda token, wait: Client(later, sleep=_no_sleep))
+        == 0
+    )
     assert capsys.readouterr().err == ""
     assert later.requested(TASKS_COMPLETED) == []
 
@@ -931,7 +988,9 @@ def test_backfill_restricted_by_the_plan_is_tried_again_next_run(tmp_path, caplo
 # --- 7.1 the order of the parts and a failure in the last one ------------------------------------
 
 
-def test_backfill_on_the_rate_limit_fails_the_run_and_keeps_what_the_earlier_parts_stored(tmp_path, monkeypatch, capsys):
+def test_backfill_on_the_rate_limit_fails_the_run_and_keeps_what_the_earlier_parts_stored(
+    tmp_path, monkeypatch, capsys
+):
     api = september(FakeApi(account()))
     api.answer(TASKS_COMPLETED, window("2026-09"), {"error": "Too many requests", "http_code": 429}, status=429)
     monkeypatch.setenv("TODOIST_API_TOKEN", "0123456789abcdef0123456789abcdef01234567")
@@ -944,7 +1003,14 @@ def test_backfill_on_the_rate_limit_fails_the_run_and_keeps_what_the_earlier_par
 
     # The activity log first, then the months with their comments, then the backfill (design D2).
     parts = [path for path, _ in api.get_requests]
-    assert parts == [ACTIVITIES, *[BY_COMPLETION_DATE] * 3, COMMENTS, BY_COMPLETION_DATE, TASKS_COMPLETED, TASKS_COMPLETED]
+    assert parts == [
+        ACTIVITIES,
+        *[BY_COMPLETION_DATE] * 3,
+        COMMENTS,
+        BY_COMPLETION_DATE,
+        TASKS_COMPLETED,
+        TASKS_COMPLETED,
+    ]
     lines = capsys.readouterr().err.splitlines()
     prefixes = ("INFO completion events", "INFO completed tasks", "INFO earlier completions")
     assert [line for line in lines if line.startswith(prefixes)] == [
@@ -1021,8 +1087,12 @@ def test_crash_points_cover_this_part_of_the_first_run(tmp_path, full_reference)
     run(tmp_path / "beyond", full_api())
     assert storage._fault_after == 0  # armed, never reached
     tree = full_reference
-    assert {"completed/activity/2026-10.json", f"completed/comments/{TASK_WITH_COMMENTS}.json",
-            "completed/2026-09.json", "completed/backfill/2026-09.json"} <= tree.keys()
+    assert {
+        "completed/activity/2026-10.json",
+        f"completed/comments/{TASK_WITH_COMMENTS}.json",
+        "completed/2026-09.json",
+        "completed/backfill/2026-09.json",
+    } <= tree.keys()
 
 
 @pytest.mark.parametrize("fault_after", range(SYNC_WRITES, FIRST_RUN_WRITES))
@@ -1057,6 +1127,10 @@ def test_repeat_run_leaves_every_file_of_this_part_unchanged(tmp_path):
     assert months_requested(api) == ["2026-10"]
     assert len(api.requested(ACTIVITIES)) == 1
     assert completed_tree(tmp_path) == before
-    assert set(before) == {*(f"{m}.json" for m in FIRST_MONTHS), *(f"backfill/{m}.json" for m in FIRST_MONTHS),
-                           "activity/2026-10.json", f"comments/{TASK_WITH_COMMENTS}.json"}
+    assert set(before) == {
+        *(f"{m}.json" for m in FIRST_MONTHS),
+        *(f"backfill/{m}.json" for m in FIRST_MONTHS),
+        "activity/2026-10.json",
+        f"comments/{TASK_WITH_COMMENTS}.json",
+    }
     assert [p for p in paths if p.stat().st_mtime_ns != OLD] == []

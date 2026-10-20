@@ -8,7 +8,7 @@ object of the archived projects counts as missing. The findings hold booleans an
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from todoist_takeout import archived, completed, storage, sync
 from todoist_takeout.sync import run_backup
@@ -31,7 +31,7 @@ def test_archived_projects_backup(write_client, contract_support, tmp_path, capl
     token, client = write_client
     commands = contract_support.Commands(client)
     target = tmp_path / "backup"
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     findings: dict = {}
     problems: list[str] = []
     projects: list = []
@@ -47,8 +47,9 @@ def test_archived_projects_backup(write_client, contract_support, tmp_path, capl
         child = add("project_add", {"name": f"{PREFIX}: archived child", "parent_id": parent}, "a sub-project")
         projects.append(child)
         section = add("section_add", {"name": f"{PREFIX}: section", "project_id": parent}, "a section")
-        open_task = add("item_add", {"content": f"{PREFIX}: open", "project_id": parent, "section_id": section},
-                        "a task")
+        open_task = add(
+            "item_add", {"content": f"{PREFIX}: open", "project_id": parent, "section_id": section}, "a task"
+        )
         done_task = add("item_add", {"content": f"{PREFIX}: done", "project_id": parent}, "a task")
         child_task = add("item_add", {"content": f"{PREFIX}: child task", "project_id": child}, "a task")
         notes = {
@@ -71,8 +72,9 @@ def test_archived_projects_backup(write_client, contract_support, tmp_path, capl
         with caplog.at_level(logging.INFO, logger="todoist_takeout"):
             run_backup(target, client)
         messages = [(record.levelno, record.getMessage()) for record in caplog.records]
-        findings["missing_warning"] = any(MISSING_WARNING in text for level, text in messages
-                                          if level >= logging.WARNING)
+        findings["missing_warning"] = any(
+            MISSING_WARNING in text for level, text in messages if level >= logging.WARNING
+        )
         findings["left_out_logged"] = any(LEFT_OUT_INFO in text for _level, text in messages)
         if findings["missing_warning"]:
             problems.append("the full sync after archiving logged the missing-object warning")
@@ -82,8 +84,10 @@ def test_archived_projects_backup(write_client, contract_support, tmp_path, capl
         limits = sync.current_plan_limits(target)
         findings["plan"] = {"completed_tasks": limits.get("completed_tasks"), "comments": limits.get("comments")}
         parent_dir, child_dir = archived.snapshot_dir(target, parent), archived.snapshot_dir(target, child)
-        for name, directory, project_id, tasks in (("parent", parent_dir, parent, {open_task}),
-                                                    ("child", child_dir, child, {child_task})):
+        for name, directory, project_id, tasks in (
+            ("parent", parent_dir, parent, {open_task}),
+            ("child", child_dir, child, {child_task}),
+        ):
             project = read_json(directory / archived.PROJECT_FILE)
             full = read_json(directory / archived.FULL_FILE)
             findings[name] = {"project_json": project is not None, "full_json": full is not None}

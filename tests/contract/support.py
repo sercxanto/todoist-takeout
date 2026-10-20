@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from todoist_takeout import attachments, completed, storage
@@ -56,8 +56,7 @@ def check_write_account(write_token: str, read_token: str, client_for) -> None:
         raise AccountGuardError(f"{WRITE_TOKEN} is not set")
     if not read_token:
         raise AccountGuardError(
-            f"{READ_TOKEN} is not set; the write test needs it to check that {WRITE_TOKEN} "
-            "belongs to another account"
+            f"{READ_TOKEN} is not set; the write test needs it to check that {WRITE_TOKEN} belongs to another account"
         )
     if write_token == read_token:
         raise AccountGuardError(f"{WRITE_TOKEN} equals {READ_TOKEN}; writes must go to a dedicated test account")
@@ -140,7 +139,7 @@ def completion_listed(client: Client, project_id, task_id, started: datetime) ->
     since = completed.month_window(completed.month_of(started))[0]
     deadline = time.monotonic() + COMPLETION_TIMEOUT
     while True:
-        until = completed.month_window(completed.month_of(datetime.now(timezone.utc)))[1]
+        until = completed.month_window(completed.month_of(datetime.now(UTC)))[1]
         params = {"project_id": str(project_id), "since": since, "until": until, "limit": "50"}
         page = json.loads(client.get(completed.BY_COMPLETION_DATE, params))
         if str(task_id) in {str(task.get("id")) for task in page.get("items") or [] if isinstance(task, dict)}:
@@ -170,8 +169,9 @@ class CountingTransport:
         return self.transport.download(url, write)
 
 
-def multipart(fields: dict[str, str], file_field: str, file_name: str, content: bytes,
-              content_type: str) -> tuple[bytes, str]:
+def multipart(
+    fields: dict[str, str], file_field: str, file_name: str, content: bytes, content_type: str
+) -> tuple[bytes, str]:
     """A multipart/form-data body and its Content-Type header."""
     boundary = f"todoist-takeout-{uuid.uuid4().hex}"
     parts = []
@@ -179,7 +179,9 @@ def multipart(fields: dict[str, str], file_field: str, file_name: str, content: 
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
     parts.append(
         f'--{boundary}\r\nContent-Disposition: form-data; name="{file_field}"; filename="{file_name}"\r\n'
-        f"Content-Type: {content_type}\r\n\r\n".encode() + content + b"\r\n"
+        f"Content-Type: {content_type}\r\n\r\n".encode()
+        + content
+        + b"\r\n"
     )
     parts.append(f"--{boundary}--\r\n".encode())
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
@@ -190,8 +192,9 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def _api_request(token: str, method: str, path: str, data: bytes | None = None,
-                 content_type: str | None = None) -> tuple[int, bytes]:
+def _api_request(
+    token: str, method: str, path: str, data: bytes | None = None, content_type: str | None = None
+) -> tuple[int, bytes]:
     """One request to the API that the tool's transport cannot send. Redirects are not followed, so
     the token goes to the API host only."""
     headers = {"User-Agent": USER_AGENT, "Authorization": f"Bearer {token}"}
@@ -208,8 +211,9 @@ def _api_request(token: str, method: str, path: str, data: bytes | None = None,
 
 def upload_file(token: str, project_id: str, file_name: str, content: bytes, content_type: str) -> dict:
     """Upload a file with `POST /uploads` and return the attachment object that `note_add` takes."""
-    body, header = multipart({"file_name": file_name, "project_id": project_id}, "file", file_name, content,
-                             content_type)
+    body, header = multipart(
+        {"file_name": file_name, "project_id": project_id}, "file", file_name, content, content_type
+    )
     status, data = _api_request(token, "POST", UPLOADS, body, header)
     if not 200 <= status < 300:
         raise ApiError(f"POST /{UPLOADS} failed (HTTP {status})", http_status=status)

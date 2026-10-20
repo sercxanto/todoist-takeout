@@ -160,9 +160,15 @@ def _encoded_url(url: str) -> str:
     # urlsplit would drop tabs and line breaks silently, which would request another URL.
     parts = urllib.parse.urlsplit(url.replace("\t", "%09").replace("\r", "%0D").replace("\n", "%0A"))
     reserved = "%!$&'()*+,;=:@/?~"
-    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, urllib.parse.quote(parts.path, safe=reserved),
-                                    urllib.parse.quote(parts.query, safe=reserved),
-                                    urllib.parse.quote(parts.fragment, safe=reserved)))
+    return urllib.parse.urlunsplit(
+        (
+            parts.scheme,
+            parts.netloc,
+            urllib.parse.quote(parts.path, safe=reserved),
+            urllib.parse.quote(parts.query, safe=reserved),
+            urllib.parse.quote(parts.fragment, safe=reserved),
+        )
+    )
 
 
 def url_host(url) -> str | None:

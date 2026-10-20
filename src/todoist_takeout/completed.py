@@ -8,7 +8,7 @@ only after the files it covers are written (design D3).
 import json
 import logging
 from collections.abc import Callable, Iterable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from todoist_takeout import storage, sync
@@ -124,7 +124,9 @@ def _fetch_activity(target: Path, client: Client, state: dict, start: datetime, 
         stored = read_stored(path, "results")
         known = {_id_order(e.get("id")) for e in stored["results"] if isinstance(e, dict)} if stored else set()
         new += sum(1 for e in events if not isinstance(e, dict) or _id_order(e.get("id")) not in known)
-        merged = merge_pages([stored, fetched] if stored is not None else [fetched], "results", "event_date", by_id=True)
+        merged = merge_pages(
+            [stored, fetched] if stored is not None else [fetched], "results", "event_date", by_id=True
+        )
         storage.write_bytes_atomic(path, storage.encode_json(merged))
     storage.update_completed_state(target, state, activity_fetched_utc=precise_timestamp(start))
     log.info("completion events: fetched the activity log since %s; %d new events stored", date_from, new)
@@ -216,8 +218,15 @@ def _fetch_months(target: Path, client: Client, state: dict, moment: datetime, *
 class _CommentStore:
     """Fetches the comments of tasks and stores them in `directory`, one file per task (design D8)."""
 
-    def __init__(self, directory: Path, client: Client, *, enabled: bool, owner: str = "completed tasks",
-                 empty_when_gone: bool = False):
+    def __init__(
+        self,
+        directory: Path,
+        client: Client,
+        *,
+        enabled: bool,
+        owner: str = "completed tasks",
+        empty_when_gone: bool = False,
+    ):
         self.directory = directory
         self.client = client
         self.enabled = enabled
@@ -488,24 +497,24 @@ def parse_time(value) -> datetime:
         raise ValueError(f"not a timestamp: {value!r}")
     moment = datetime.fromisoformat(value)
     if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=timezone.utc)
-    return moment.astimezone(timezone.utc)
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone(UTC)
 
 
 def precise_timestamp(moment: datetime) -> str:
-    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _readable_time(moment: datetime) -> str:
-    return moment.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return moment.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def month_of(moment: datetime) -> str:
-    return moment.astimezone(timezone.utc).strftime("%Y-%m")
+    return moment.astimezone(UTC).strftime("%Y-%m")
 
 
 def month_start(month: str) -> datetime:
-    return datetime.strptime(month, "%Y-%m").replace(tzinfo=timezone.utc)
+    return datetime.strptime(month, "%Y-%m").replace(tzinfo=UTC)
 
 
 def next_month(month: str) -> str:

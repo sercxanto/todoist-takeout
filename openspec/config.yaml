@@ -29,6 +29,9 @@ context: |
 #       - Always state what is out of scope
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
+rules:
+  tasks:
+    - End with a task that runs `uv run ruff format .`, `uv run ruff check .` and `uv run pytest`, and fixes what they report.
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.

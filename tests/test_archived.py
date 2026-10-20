@@ -1,17 +1,11 @@
+import itertools
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
-from todoist_takeout import archived, completed, storage
-from todoist_takeout.api import Client
-from todoist_takeout.cli import main
-from todoist_takeout.errors import RateLimitExhausted, StorageError
-from todoist_takeout.sync import run_backup
-
 from fake_api import (
     ACTIVITIES,
     ARCHIVED_FIXTURES,
@@ -23,6 +17,12 @@ from fake_api import (
     archived_fixture,
     completed_fixture,
 )
+
+from todoist_takeout import archived, completed, storage
+from todoist_takeout.api import Client
+from todoist_takeout.cli import main
+from todoist_takeout.errors import RateLimitExhausted, StorageError
+from todoist_takeout.sync import run_backup
 
 # --- 3.1 fixtures --------------------------------------------------------------------------
 
@@ -38,8 +38,16 @@ FIXTURE_NAMES = [
     "list_1",
     "list_2",
 ]
-FULL_KEYS = ["project", "tasks", "sections", "subprojects", "collaborators", "collaborator_states", "folder",
-             "comments_count"]
+FULL_KEYS = [
+    "project",
+    "tasks",
+    "sections",
+    "subprojects",
+    "collaborators",
+    "collaborator_states",
+    "folder",
+    "comments_count",
+]
 
 
 def test_every_fixture_parses_and_is_stored_in_the_backup_encoding():
@@ -88,7 +96,7 @@ def test_fixtures_have_the_recorded_shapes():
 # --- 3.3 the snapshot fetch -------------------------------------------------------------------
 
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
-NOW = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
 
 PARENT = archived_fixture("full_parent")["project"]
@@ -111,13 +119,24 @@ def account(*, plan=None):
     full = json.loads(sync_bytes("full_sync"))
     full["user_plan_limits"]["current"].update(plan or {})
     unchanged = {"sync_token": "INC-1", "full_sync": False, "items": [], "projects": []}
-    return {"*": json.dumps(full).encode(), "FULL-1": sync_bytes("incremental_edit"),
-            "INC-1": json.dumps(unchanged).encode()}
+    return {
+        "*": json.dumps(full).encode(),
+        "FULL-1": sync_bytes("incremental_edit"),
+        "INC-1": json.dumps(unchanged).encode(),
+    }
 
 
 def full_response(project, tasks=(), subprojects=()):
-    return {"project": project, "tasks": list(tasks), "sections": [], "subprojects": list(subprojects),
-            "collaborators": [], "collaborator_states": [], "folder": None, "comments_count": 0}
+    return {
+        "project": project,
+        "tasks": list(tasks),
+        "sections": [],
+        "subprojects": list(subprojects),
+        "collaborators": [],
+        "collaborator_states": [],
+        "folder": None,
+        "comments_count": 0,
+    }
 
 
 def windows(project, now=NOW):
@@ -132,8 +151,10 @@ def window_params(project_id, since_until):
 
 def listing(api, *pages):
     """Answer the list of archived projects with `pages`, each a list of project payloads."""
-    bodies = [{"results": list(page), "next_cursor": f"page{i + 2}" if i + 1 < len(pages) else None}
-              for i, page in enumerate(pages)]
+    bodies = [
+        {"results": list(page), "next_cursor": f"page{i + 2}" if i + 1 < len(pages) else None}
+        for i, page in enumerate(pages)
+    ]
     return api.cursor_pages(ARCHIVED_PROJECTS, {}, bodies)
 
 
@@ -180,14 +201,23 @@ def archived_files(target):
 
 def archived_requests(api):
     """The GET requests of this part: the list, /full, and those filtered by a project or task."""
-    return [(path, params) for path, params in api.get_requests
-            if path == ARCHIVED_PROJECTS or path.endswith("/full") or "project_id" in params or "task_id" in params]
+    return [
+        (path, params)
+        for path, params in api.get_requests
+        if path == ARCHIVED_PROJECTS or path.endswith("/full") or "project_id" in params or "task_id" in params
+    ]
 
 
 def completed_task(id, project_id, completed_at, note_count=0):
     entry = dict(archived_fixture("completed_2")["items"][0])
-    entry.update(id=id, project_id=project_id, completed_at=completed_at, updated_at=completed_at,
-                 note_count=note_count, content=f"task {id}")
+    entry.update(
+        id=id,
+        project_id=project_id,
+        completed_at=completed_at,
+        updated_at=completed_at,
+        note_count=note_count,
+        content=f"task {id}",
+    )
     return entry
 
 
@@ -240,8 +270,10 @@ def test_without_archived_projects_only_the_list_is_requested(tmp_path, monkeypa
 def test_snapshot_holds_the_open_tasks_and_sections_as_full_returned_them_and_the_completed_tasks(tmp_path):
     project = {**TRIP, "created_at": "2026-04-20T00:00:00.000000Z", "updated_at": "2026-10-01T09:00:00.000000Z"}
     full = {**archived_fixture("full_parent"), "project": project, "subprojects": []}
-    done = [completed_task(f"6Xt9Aa{n:010d}", project["id"], f"2026-0{5 + n % 5}-1{n % 10}T08:00:00.000000Z")
-            for n in range(18)]
+    done = [
+        completed_task(f"6Xt9Aa{n:010d}", project["id"], f"2026-0{5 + n % 5}-1{n % 10}T08:00:00.000000Z")
+        for n in range(18)
+    ]
     api = listing(FakeApi(account()), [project])
     api.answer(archived.full_path(project["id"]), {}, full)
     for since_until in windows(project):
@@ -263,15 +295,18 @@ def test_comments_of_open_and_completed_tasks_are_stored_and_tasks_without_comme
     done = completed_task("6Xt9Bb0000000001", PARENT["id"], "2024-03-20T10:00:00.000000Z", note_count=2)
     window = window_params(PARENT["id"], windows(PARENT)[1])
     api.cursor_pages(BY_COMPLETION_DATE, window, [archived_fixture("completed_1"), {"items": [done]}])
-    pair = [comment("6Xc9Cc0000000002", done["id"], "2024-03-19T10:00:00.000000Z"),
-            comment("6Xc9Cc0000000001", done["id"], "2024-03-18T10:00:00.000000Z")]
+    pair = [
+        comment("6Xc9Cc0000000002", done["id"], "2024-03-19T10:00:00.000000Z"),
+        comment("6Xc9Cc0000000001", done["id"], "2024-03-18T10:00:00.000000Z"),
+    ]
     api.answer(COMMENTS, {"task_id": done["id"]}, {"results": pair, "next_cursor": None})
 
     run(tmp_path, api)
 
     listed = archived_fixture("comments_task")["results"]
     assert snapshot_file(tmp_path, PARENT["id"], f"comments/{TILES}.json") == {
-        "results": sorted(listed, key=lambda c: c["posted_at"])}  # without the cursor
+        "results": sorted(listed, key=lambda c: c["posted_at"])
+    }  # without the cursor
     assert snapshot_file(tmp_path, PARENT["id"], f"comments/{done['id']}.json")["results"] == pair[::-1]
     assert sorted(p["task_id"] for p in api.requested(COMMENTS) if "task_id" in p) == sorted([TILES, done["id"]])
 
@@ -283,7 +318,10 @@ def test_project_comments_are_stored(tmp_path):
     assert snapshot_file(tmp_path, PARENT["id"], "project_comments.json") == expected
     assert snapshot_file(tmp_path, TRIP["id"], "project_comments.json") == {"results": []}
     assert [p["project_id"] for p in api.requested(COMMENTS) if "project_id" in p] == [
-        PARENT["id"], TRIP["id"], CHILD["id"]]
+        PARENT["id"],
+        TRIP["id"],
+        CHILD["id"],
+    ]
 
 
 # Completed tasks over the project's lifetime
@@ -294,14 +332,15 @@ def test_windows_cover_three_months_each_from_the_creation_month_through_the_cur
     assert len(found) == 13
     assert found[0] == ("2023-10-01T00:00:00.000000Z", "2023-12-31T23:59:59.999999Z")
     assert found[-1] == ("2026-10-01T00:00:00.000000Z", "2026-12-31T23:59:59.999999Z")
-    for (since, until), (next_since, _) in zip(found, found[1:]):
+    for (_, until), (next_since, _) in itertools.pairwise(found):
         assert completed.parse_time(next_since) - completed.parse_time(until) == timedelta(microseconds=1)
     assert max(completed.parse_time(u) - completed.parse_time(s) for s, u in found) < timedelta(days=92)
 
 
 def test_a_window_ending_in_the_current_month_is_the_last():
     assert windows({"created_at": "2026-08-31T23:00:00.000000Z"}) == [
-        ("2026-08-01T00:00:00.000000Z", "2026-10-31T23:59:59.999999Z")]
+        ("2026-08-01T00:00:00.000000Z", "2026-10-31T23:59:59.999999Z")
+    ]
 
 
 def test_completed_tasks_are_requested_in_windows_through_the_last_update(tmp_path):
@@ -318,12 +357,15 @@ def test_completed_tasks_are_requested_in_windows_through_the_last_update(tmp_pa
     assert len(stored["items"]) == 3
 
 
-@pytest.mark.parametrize("updated_at, count, until", [
-    pytest.param("2025-06-14T10:00:00.000000Z", 7, "2025-06-30T23:59:59.999999Z", id="three years ago"),
-    pytest.param(None, 13, "2026-12-31T23:59:59.999999Z", id="archive date unknown"),
-    pytest.param("not a time", 13, "2026-12-31T23:59:59.999999Z", id="archive date unparseable"),
-    pytest.param("2027-03-01T00:00:00.000000Z", 13, "2026-12-31T23:59:59.999999Z", id="after the current month"),
-])
+@pytest.mark.parametrize(
+    "updated_at, count, until",
+    [
+        pytest.param("2025-06-14T10:00:00.000000Z", 7, "2025-06-30T23:59:59.999999Z", id="three years ago"),
+        pytest.param(None, 13, "2026-12-31T23:59:59.999999Z", id="archive date unknown"),
+        pytest.param("not a time", 13, "2026-12-31T23:59:59.999999Z", id="archive date unparseable"),
+        pytest.param("2027-03-01T00:00:00.000000Z", 13, "2026-12-31T23:59:59.999999Z", id="after the current month"),
+    ],
+)
 def test_windows_end_at_the_month_of_the_projects_last_update(tmp_path, updated_at, count, until):
     project = {**TRIP, "created_at": "2023-10-05T09:00:00.000000Z", "updated_at": updated_at}
     api = listing(FakeApi(account()), [project])
@@ -363,13 +405,20 @@ def test_without_a_first_month_in_the_state_the_windows_start_at_the_accounts_cr
 
 def test_comment_attachments_are_stored_as_metadata_and_not_downloaded(tmp_path):
     api = run(tmp_path)
-    [stored] = [c for c in snapshot_file(tmp_path, PARENT["id"], f"comments/{TILES}.json")["results"]
-                if c["file_attachment"]]
+    [stored] = [
+        c for c in snapshot_file(tmp_path, PARENT["id"], f"comments/{TILES}.json")["results"] if c["file_attachment"]
+    ]
     [listed] = [c for c in archived_fixture("comments_task")["results"] if c["file_attachment"]]
     assert stored == listed
     paths = {path for path, _ in api.get_requests}
-    assert paths <= {ARCHIVED_PROJECTS, BY_COMPLETION_DATE, COMMENTS, ACTIVITIES, TASKS_COMPLETED,
-                     *(archived.full_path(p["id"]) for p in (PARENT, TRIP, CHILD))}
+    assert paths <= {
+        ARCHIVED_PROJECTS,
+        BY_COMPLETION_DATE,
+        COMMENTS,
+        ACTIVITIES,
+        TASKS_COMPLETED,
+        *(archived.full_path(p["id"]) for p in (PARENT, TRIP, CHILD)),
+    }
 
 
 # Project gone during the run
@@ -393,12 +442,20 @@ def test_project_deleted_between_list_and_fetch_is_skipped(tmp_path, monkeypatch
 def test_snapshot_files_follow_the_layout(tmp_path):
     run(tmp_path)
     parent, trip, child = PARENT["id"], TRIP["id"], CHILD["id"]
-    assert archived_files(tmp_path) == sorted([
-        f"{parent}/project.json", f"{parent}/full.json", f"{parent}/completed.json",
-        f"{parent}/project_comments.json", f"{parent}/comments/{TILES}.json",
-        *(f"{project}/{name}" for project in (trip, child)
-          for name in ("project.json", "full.json", "completed.json", "project_comments.json")),
-    ])
+    assert archived_files(tmp_path) == sorted(
+        [
+            f"{parent}/project.json",
+            f"{parent}/full.json",
+            f"{parent}/completed.json",
+            f"{parent}/project_comments.json",
+            f"{parent}/comments/{TILES}.json",
+            *(
+                f"{project}/{name}"
+                for project in (trip, child)
+                for name in ("project.json", "full.json", "completed.json", "project_comments.json")
+            ),
+        ]
+    )
     assert snapshot_file(tmp_path, parent, "project.json") == PARENT
     assert snapshot_file(tmp_path, parent, "full.json") == archived_fixture("full_parent")
     # Every file is in the backup encoding.
@@ -428,7 +485,7 @@ def test_project_json_is_written_last_and_flushed_as_the_checkpoint(tmp_path, mo
     run(tmp_path)
 
     parent = f"archived/{PARENT['id']}/"
-    assert [(p[len(parent):], full) for p, full in writes if p.startswith(parent)] == [
+    assert [(p[len(parent) :], full) for p, full in writes if p.startswith(parent)] == [
         (f"comments/{TILES}.json", False),
         ("project_comments.json", False),
         ("completed.json", False),
@@ -437,9 +494,12 @@ def test_project_json_is_written_last_and_flushed_as_the_checkpoint(tmp_path, mo
     ]
 
 
-@pytest.mark.parametrize("name, stored", [
-    ("full.json", {**archived_fixture("full_parent"), "project": {**PARENT, "id": PARENT["id"].lower()}}),
-])
+@pytest.mark.parametrize(
+    "name, stored",
+    [
+        ("full.json", {**archived_fixture("full_parent"), "project": {**PARENT, "id": PARENT["id"].lower()}}),
+    ],
+)
 def test_snapshot_of_another_project_in_the_same_directory_is_refused(tmp_path, name, stored):
     # A case-insensitive file system maps both IDs to one directory; the test writes the other
     # project's file under this project's ID to get the same situation on any file system.
@@ -471,8 +531,11 @@ def age_files(target):
 
 
 def rewritten(target):
-    return [p.relative_to(target).as_posix() for p in (target / "archived").rglob("*")
-            if p.is_file() and p.stat().st_mtime_ns != OLD]
+    return [
+        p.relative_to(target).as_posix()
+        for p in (target / "archived").rglob("*")
+        if p.is_file() and p.stat().st_mtime_ns != OLD
+    ]
 
 
 def rearchived(project, **changes):
@@ -597,12 +660,16 @@ def test_plan_upgraded_fills_in_the_completed_tasks_only(tmp_path):
     # The rest of the snapshots is not fetched again.
     assert [path for path, _ in archived_requests(api) if path.endswith("/full")] == []
     # The new task's comments complete the comments part again, with the project's comments last (design D6).
-    assert api.requested(COMMENTS) == [{"task_id": done["id"], "limit": "100"},
-                                       {"project_id": PARENT["id"], "limit": "100"}]
-    assert sorted(rewritten(tmp_path)) == sorted([
-        *(f"archived/{p['id']}/completed.json" for p in (PARENT, TRIP, CHILD)),
-        f"archived/{PARENT['id']}/comments/{done['id']}.json",
-    ])
+    assert api.requested(COMMENTS) == [
+        {"task_id": done["id"], "limit": "100"},
+        {"project_id": PARENT["id"], "limit": "100"},
+    ]
+    assert sorted(rewritten(tmp_path)) == sorted(
+        [
+            *(f"archived/{p['id']}/completed.json" for p in (PARENT, TRIP, CHILD)),
+            f"archived/{PARENT['id']}/comments/{done['id']}.json",
+        ]
+    )
 
 
 def test_plan_without_comments_then_with_comments_fills_in_the_comments(tmp_path):
@@ -650,8 +717,12 @@ def test_task_comments_not_found_on_a_refetch_keep_the_stored_ones(tmp_path):
     assert snapshot_file(tmp_path, PARENT["id"], f"comments/{TILES}.json") == kept
 
 
-HALL_TASK = {**archived_fixture("full_parent")["tasks"][2], "id": "6Xt3Rk5Zt3Qy7Sc2", "content": "Paint the hall",
-             "note_count": 1}
+HALL_TASK = {
+    **archived_fixture("full_parent")["tasks"][2],
+    "id": "6Xt3Rk5Zt3Qy7Sc2",
+    "content": "Paint the hall",
+    "note_count": 1,
+}
 HALL_COMMENT = comment("6Xc9Hh0000000001", HALL_TASK["id"], "2026-10-18T16:00:00.000000Z")
 
 
@@ -840,8 +911,7 @@ def test_info_line_counts_new_and_refetched_snapshots_and_filled_in_parts(tmp_pa
 
     # `first` gets its comments part, `changed` is fetched again, `third` and `fourth` are new.
     assert [r.getMessage() for r in caplog.records if r.name == "todoist_takeout.archived"] == [
-        "archived projects: 4 listed, 3 snapshots fetched (2 new, 1 again), 1 parts filled in; "
-        "4 comment files written"
+        "archived projects: 4 listed, 3 snapshots fetched (2 new, 1 again), 1 parts filled in; 4 comment files written"
     ]
 
 
@@ -852,8 +922,7 @@ def test_info_line_is_logged_when_the_run_fails(tmp_path, caplog):
     with caplog.at_level(logging.INFO, logger="todoist_takeout.archived"), pytest.raises(RateLimitExhausted):
         run_backup(tmp_path, client, now=lambda: NOW)
     assert [r.getMessage() for r in caplog.records if r.name == "todoist_takeout.archived"] == [
-        "archived projects: 2 listed, 1 snapshots fetched (1 new, 0 again), 0 parts filled in; "
-        "2 comment files written"
+        "archived projects: 2 listed, 1 snapshots fetched (1 new, 0 again), 0 parts filled in; 2 comment files written"
     ]
 
 
@@ -904,7 +973,9 @@ def crash(target, fault_after):
 def finished(target):
     """The IDs of the projects whose snapshot is finished."""
     root = target / "archived"
-    return {json.loads(p.read_bytes())["id"] for p in root.glob(f"*/{archived.PROJECT_FILE}")} if root.exists() else set()
+    return (
+        {json.loads(p.read_bytes())["id"] for p in root.glob(f"*/{archived.PROJECT_FILE}")} if root.exists() else set()
+    )
 
 
 def test_crash_points_cover_this_part_of_the_first_run(tmp_path, first_run_tree, monkeypatch):

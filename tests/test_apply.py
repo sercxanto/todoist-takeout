@@ -224,9 +224,7 @@ def test_second_deletion_of_a_never_stored_object_replaces_it(tmp_path, sync_fix
     second["projects"][0]["name"] = ""
     stats = apply(tmp_path, second)
     assert tree(tmp_path) == {"sync/projects/6X7fphhgwcXVGccJ.json"}
-    assert (tmp_path / "sync/projects/6X7fphhgwcXVGccJ.json").read_bytes() == storage.encode_json(
-        second["projects"][0]
-    )
+    assert (tmp_path / "sync/projects/6X7fphhgwcXVGccJ.json").read_bytes() == storage.encode_json(second["projects"][0])
     assert stats.deleted == 1
 
 
@@ -301,8 +299,14 @@ def server_full_sync(full, **omitted):
 
 
 def completed_task(full, task_id, project_id):
-    return {**full["items"][0], "id": task_id, "project_id": project_id, "section_id": None,
-            "checked": True, "completed_at": "2026-10-01T09:00:00.000000Z"}
+    return {
+        **full["items"][0],
+        "id": task_id,
+        "project_id": project_id,
+        "section_id": None,
+        "checked": True,
+        "completed_at": "2026-10-01T09:00:00.000000Z",
+    }
 
 
 def apply_and_log(tmp_path, response, caplog):
@@ -340,8 +344,12 @@ def test_archived_project_and_its_objects_do_not_count_as_missing(tmp_path, sync
     # The project, its section, its open task, its completed task, the open task's comment and the
     # project comment.
     response = server_full_sync(
-        full, projects={ARCHIVED_PROJECT}, sections={"6X7FxXvX84jHphx2"}, items={"6X7rM8997g3RQmvh"},
-        notes={"6X7rfFVQXwRmcvFp"}, project_notes={"6X7v4F2r7hH8cGWW"},
+        full,
+        projects={ARCHIVED_PROJECT},
+        sections={"6X7FxXvX84jHphx2"},
+        items={"6X7rM8997g3RQmvh"},
+        notes={"6X7rfFVQXwRmcvFp"},
+        project_notes={"6X7v4F2r7hH8cGWW"},
     )
 
     stats, warnings, infos = apply_and_log(tmp_path, response, caplog)
@@ -401,8 +409,12 @@ def test_missing_count_keeps_only_the_fields_that_decide_it(tmp_path, sync_fixtu
     values = [value for values in stored.values() for value in values.values()]
     assert len(values) == sum(len(full[name]) for name in stored) + 1
     assert all(set(value) <= kept for value in values)
-    assert stored["items"]["6X7rDone00000001"] == {"id": "6X7rDone00000001", "project_id": ACTIVE_PROJECT,
-                                                   "checked": True, "is_deleted": False}
+    assert stored["items"]["6X7rDone00000001"] == {
+        "id": "6X7rDone00000001",
+        "project_id": ACTIVE_PROJECT,
+        "checked": True,
+        "is_deleted": False,
+    }
     assert "item_id" in full["notes"][0]
     assert set(stored["notes"]["6X7rfFVQXwRmcvFp"]) == kept & set(full["notes"][0])
 

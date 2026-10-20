@@ -25,7 +25,7 @@ import random
 import re
 import string
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -142,7 +142,8 @@ def scrub_text(value: str, field: str | None) -> str:
     if _DATE_LIKE.match(value):
         # Keep the format, replace the digits.
         return "".join(
-            _DATE_TEMPLATE[i] if char.isdigit() and i < len(_DATE_TEMPLATE) and _DATE_TEMPLATE[i].isdigit()
+            _DATE_TEMPLATE[i]
+            if char.isdigit() and i < len(_DATE_TEMPLATE) and _DATE_TEMPLATE[i].isdigit()
             else ("0" if char.isdigit() else char)
             for i, char in enumerate(value)
         )
@@ -356,8 +357,11 @@ def attachment_shape_of(uploads: list[dict]) -> dict:
     shapes = []
     for upload in uploads:
         kind = upload.get("resource_type")
-        entry = {"kind": kind if isinstance(kind, str) else "unclassified", "types": [json_type(upload)],
-                 "fields": _fields([upload])}
+        entry = {
+            "kind": kind if isinstance(kind, str) else "unclassified",
+            "types": [json_type(upload)],
+            "fields": _fields([upload]),
+        }
         shapes.append({"keys": {ATTACHMENT_FIELD: entry}})
     return merge_shapes(shapes)
 
@@ -407,8 +411,11 @@ def attachment_shape_sources() -> list[Path]:
     return recorded or [UPLOADS_HAND_WRITTEN]
 
 
-def generate_shapes(sources: list[Path] | None = None, endpoint_sources: dict[str, list[Path]] | None = None,
-                    attachment_sources: list[Path] | None = None) -> dict:
+def generate_shapes(
+    sources: list[Path] | None = None,
+    endpoint_sources: dict[str, list[Path]] | None = None,
+    attachment_sources: list[Path] | None = None,
+) -> dict:
     sources = shape_sources() if sources is None else sources
     endpoint_sources = endpoint_shape_sources() if endpoint_sources is None else endpoint_sources
     attachment_sources = attachment_shape_sources() if attachment_sources is None else attachment_sources
@@ -425,8 +432,12 @@ def generate_shapes(sources: list[Path] | None = None, endpoint_sources: dict[st
         "sources": [path.relative_to(FIXTURES).as_posix() for path in attachment_sources],
         **attachment_shape_of(uploads),
     }
-    return {"sources": [path.relative_to(FIXTURES).as_posix() for path in sources], **shapes, "endpoints": endpoints,
-            "file_attachments": file_attachments}
+    return {
+        "sources": [path.relative_to(FIXTURES).as_posix() for path in sources],
+        **shapes,
+        "endpoints": endpoints,
+        "file_attachments": file_attachments,
+    }
 
 
 def compare_shapes(expected: dict, actual: dict) -> tuple[list[str], list[str]]:
@@ -502,7 +513,9 @@ def scrubbed_bytes(bodies: list[bytes], token: str | None = None) -> list[bytes]
         text = data.decode("utf-8")
         leaked = sorted(o for o in scrubber.originals if len(o) >= MIN_CHECKED_ID_LENGTH and o in text)
         if leaked:
-            raise SystemExit(f"error: the scrubbed response still contains {len(leaked)} original IDs; nothing was written")
+            raise SystemExit(
+                f"error: the scrubbed response still contains {len(leaked)} original IDs; nothing was written"
+            )
     return results
 
 
@@ -512,11 +525,11 @@ def record(account: str, now: datetime | None = None) -> list[Path]:
     full = client.sync("*")
     incremental = client.sync(json.loads(full)["sync_token"])
     bodies = {"full": full, "incremental": incremental}
-    bodies.update(record_completed(client, now or datetime.now(timezone.utc)))
+    bodies.update(record_completed(client, now or datetime.now(UTC)))
     bodies.update(record_archived(client))
     directory = RECORDED / account
     directory.mkdir(parents=True, exist_ok=True)
-    return _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values()), token))))
+    return _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values()), token), strict=True)))
 
 
 def record_completed(client: Client, now: datetime) -> dict[str, bytes]:
@@ -556,7 +569,10 @@ def record_completed(client: Client, now: datetime) -> dict[str, bytes]:
     if task_id is not None:
         bodies["comments"] = client.get(completed.COMMENTS, {"task_id": str(task_id), "limit": str(RECORD_PAGE_LIMIT)})
     else:
-        print(f"no completed task with comments in the last {SEARCH_MONTHS} months; comments not recorded", file=sys.stderr)
+        print(
+            f"no completed task with comments in the last {SEARCH_MONTHS} months; comments not recorded",
+            file=sys.stderr,
+        )
     return bodies
 
 
@@ -618,7 +634,7 @@ def rescrub() -> list[Path]:
     for directory in sorted(path for path in RECORDED.iterdir() if path.is_dir()):
         paths = {name: directory / f"{name}.json" for name in RECORDING_FILES}
         bodies = {name: path.read_bytes() for name, path in paths.items() if path.exists()}
-        written += _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values())))))
+        written += _write(directory, dict(zip(bodies, scrubbed_bytes(list(bodies.values())), strict=True)))
     return written
 
 
@@ -626,8 +642,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
     record_parser = commands.add_parser(
-        "record", help="record a full and an incremental sync, the completed-tasks and the archived-projects endpoints, "
-        "then regenerate shapes"
+        "record",
+        help="record a full and an incremental sync, the completed-tasks and the archived-projects endpoints, "
+        "then regenerate shapes",
     )
     record_parser.add_argument("--account", choices=sorted(TOKEN_VARIABLES), required=True)
     commands.add_parser("rescrub", help="apply the current scrubbing rules to the recordings, then regenerate shapes")

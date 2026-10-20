@@ -1,20 +1,19 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from fake_api import FakeApi
 
 from todoist_takeout import storage, sync
 from todoist_takeout.api import Client
 from todoist_takeout.errors import ConfigError, RunError
 from todoist_takeout.sync import format_description, run_backup
 
-from fake_api import FakeApi
-
 SYNC_FIXTURES = Path(__file__).parent / "fixtures" / "sync"
-NOW = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
 OLD = 1_000_000_000
 PENDING = "pending/sync-response.json"
 

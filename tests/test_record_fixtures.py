@@ -1,13 +1,8 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
-from todoist_takeout import completed, storage
-
-from todoist_takeout import archived
-
 from fake_api import (
     ACTIVITIES,
     ARCHIVED_PROJECTS,
@@ -19,6 +14,8 @@ from fake_api import (
     attachment_fixture,
     completed_fixture,
 )
+
+from todoist_takeout import archived, completed, storage
 
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
 
@@ -102,8 +99,23 @@ def test_scrubber_replaces_everything_of_the_account(recorder):
 
     # Nothing of the account survives anywhere, and the shape is unchanged.
     text = json.dumps(scrubbed, ensure_ascii=False)
-    for secret in ["Jane", "Doe", "jane.doe", TOKEN, "Müller", "💊", "Familie", "health", "Berlin",
-                   "cloudfront", "monday", "legacy", "54345", "Inbox", *IDS]:
+    for secret in [
+        "Jane",
+        "Doe",
+        "jane.doe",
+        TOKEN,
+        "Müller",
+        "💊",
+        "Familie",
+        "health",
+        "Berlin",
+        "cloudfront",
+        "monday",
+        "legacy",
+        "54345",
+        "Inbox",
+        *IDS,
+    ]:
         assert secret not in text, secret
     assert recorder.shape_of(scrubbed) == recorder.shape_of(PERSONAL)
 
@@ -249,7 +261,7 @@ def test_large_event_ids_become_numeric_pseudonyms_of_the_same_length(recorder):
 
     pages = [json.loads(data) for data in recorder.scrubbed_bytes([json.dumps(p).encode() for p in (first, second)])]
     pseudonyms = [event["id"] for page in pages for event in page["results"]]
-    for original, pseudonym in zip(originals, pseudonyms):
+    for original, pseudonym in zip(originals, pseudonyms, strict=True):
         assert isinstance(pseudonym, int) and pseudonym != 0 and pseudonym != original
         assert len(str(pseudonym)) == len(str(original))
     # Consistent within the recording: the repeated event keeps its pseudonym, the others differ.
@@ -280,7 +292,7 @@ def recording(recorder, tmp_path, monkeypatch):
 
     def run(fake: FakeApi) -> Path:
         monkeypatch.setattr(recorder, "UrllibTransport", lambda token: fake)
-        recorder.record("read", now=datetime(2026, 10, 18, 10, tzinfo=timezone.utc))
+        recorder.record("read", now=datetime(2026, 10, 18, 10, tzinfo=UTC))
         return tmp_path / "recorded" / "read"
 
     return run
@@ -292,8 +304,7 @@ def test_record_takes_one_page_of_each_completed_tasks_endpoint(recording):
     directory = recording(fake)
 
     assert sorted(path.stem for path in directory.iterdir()) == sorted(
-        ["full", "incremental", "by_completion_date", "tasks_completed", "activities", "comments",
-         "projects_archived"]
+        ["full", "incremental", "by_completion_date", "tasks_completed", "activities", "comments", "projects_archived"]
     )
     limit = {"limit": "50"}
     assert fake.requested(BY_COMPLETION_DATE) == [
@@ -301,8 +312,13 @@ def test_record_takes_one_page_of_each_completed_tasks_endpoint(recording):
         {"since": "2026-08-01T00:00:00.000000Z", "until": "2026-08-31T23:59:59.999999Z", **limit},
     ]
     assert fake.requested(TASKS_COMPLETED) == [
-        {"since": "2026-08-01T00:00:00.000000Z", "until": "2026-08-31T23:59:59.999999Z",
-         "annotate_items": "true", "offset": "0", **limit},
+        {
+            "since": "2026-08-01T00:00:00.000000Z",
+            "until": "2026-08-31T23:59:59.999999Z",
+            "annotate_items": "true",
+            "offset": "0",
+            **limit,
+        },
     ]
     assert fake.requested(ACTIVITIES) == [{"object_event_types": '["item:completed"]', **limit}]
     assert fake.requested(COMMENTS) == [{"task_id": "6X8Gq4CfVh9xPm2R", **limit}]
@@ -345,7 +361,9 @@ def test_endpoint_shapes_follow_the_page_merge(recorder):
     # The project map is described by the fields of its projects, not by their IDs.
     assert shape["projects"]["kind"] == "map" and shape["projects"]["fields"]["name"] == ["string"]
     assert recorder.endpoint_shape_of({"projects": {}})["keys"]["projects"] == {
-        "kind": "map", "types": ["object"], "fields": {},
+        "kind": "map",
+        "types": ["object"],
+        "fields": {},
     }
     events = recorder.endpoint_shape_of(completed_fixture("activities_1"))["keys"]
     assert events["results"]["fields"]["id"] == ["integer"] and events["next_cursor"]["kind"] == "value"
@@ -372,10 +390,20 @@ def shared_full() -> dict:
     """`/full` of the parent fixture, shared with a collaborator."""
     full = archived_fixture("full_parent")
     full["collaborators"] = [
-        {"id": OWNER_ID, "email": "jane.doe@example.com", "full_name": "Jane Doe", "timezone": "Europe/Berlin",
-         "image_id": None},
-        {"id": COLLABORATOR_ID, "email": "max@example.com", "full_name": "Max Mustermann",
-         "timezone": "Europe/Vienna", "image_id": "a1b2c3d4e5f6"},
+        {
+            "id": OWNER_ID,
+            "email": "jane.doe@example.com",
+            "full_name": "Jane Doe",
+            "timezone": "Europe/Berlin",
+            "image_id": None,
+        },
+        {
+            "id": COLLABORATOR_ID,
+            "email": "max@example.com",
+            "full_name": "Max Mustermann",
+            "timezone": "Europe/Vienna",
+            "image_id": "a1b2c3d4e5f6",
+        },
     ]
     full["collaborator_states"] = [
         {"project_id": PARENT_ID, "user_id": user_id, "state": "active", "is_deleted": False, "role": "CREATOR"}
@@ -403,8 +431,19 @@ def test_ids_inside_subprojects_and_collaborators_get_consistent_pseudonyms(reco
     assert all(collaborator["email"] == recorder.EMAIL_PLACEHOLDER for collaborator in collaborators)
 
     text = b"".join(bodies).decode("utf-8")
-    for original in [PARENT_ID, CHILD_ID, OWNER_ID, COLLABORATOR_ID, "a1b2c3d4e5f6", "Jane", "Max", "Vienna",
-                     "Renovation", "Kitchen", "YXJjaGl2ZWQ6Mg"]:
+    for original in [
+        PARENT_ID,
+        CHILD_ID,
+        OWNER_ID,
+        COLLABORATOR_ID,
+        "a1b2c3d4e5f6",
+        "Jane",
+        "Max",
+        "Vienna",
+        "Renovation",
+        "Kitchen",
+        "YXJjaGl2ZWQ6Mg",
+    ]:
         assert original not in text, original
     assert recorder.endpoint_shape_of(full_out) == recorder.endpoint_shape_of(full)
 
@@ -421,7 +460,8 @@ def test_record_takes_the_archived_list_and_one_full(recording):
     assert fake.requested(ARCHIVED_PROJECTS) == [{"limit": "50"}]
     assert fake.requested(full_path) == [{}]
     assert [path for path, _params in fake.get_requests if path.startswith("projects/")] == [
-        ARCHIVED_PROJECTS, full_path,
+        ARCHIVED_PROJECTS,
+        full_path,
     ]
     listed = json.loads((directory / "projects_archived.json").read_bytes())
     full = json.loads((directory / "project_full.json").read_bytes())
@@ -438,9 +478,8 @@ def archived_account(contents: list[set[str]]) -> tuple[FakeApi, list[str]]:
     projects = [{**archived_fixture("list_1")["results"][0], "id": project_id} for project_id in project_ids]
     fake = fake_account({"2026-08": completed_fixture("by_completion_date_1")})
     fake.answer(ARCHIVED_PROJECTS, {}, {"results": projects, "next_cursor": None})
-    for project, filled in zip(projects, contents):
-        full = {key: (value if key in filled or not isinstance(value, list) else [])
-                for key, value in template.items()}
+    for project, filled in zip(projects, contents, strict=True):
+        full = {key: (value if key in filled or not isinstance(value, list) else []) for key, value in template.items()}
         fake.answer(archived.full_path(project["id"]), {}, {**full, "project": project})
     return fake, project_ids
 
@@ -461,13 +500,20 @@ def test_record_stops_at_the_first_full_with_tasks_and_sections(recording):
 
 def test_record_takes_the_full_with_the_most_content_among_the_candidates(recording, recorder, monkeypatch):
     monkeypatch.setattr(recorder, "FULL_CANDIDATES", 10)
-    contents = [set(), {"tasks"}, set(), {"tasks", "collaborators"}, {"sections", "collaborators"},
-                *[set()] * 5, {"tasks", "sections"}]
+    contents = [
+        set(),
+        {"tasks"},
+        set(),
+        {"tasks", "collaborators"},
+        {"sections", "collaborators"},
+        *[set()] * 5,
+        {"tasks", "sections"},
+    ]
     fake, project_ids = archived_account(contents)
     directory = recording(fake)
     # The eleventh project would have tasks and sections, but only ten are tried.
     assert recorder.FULL_CANDIDATES == 10
-    assert full_requests(fake) == [archived.full_path(p) for p in project_ids[:recorder.FULL_CANDIDATES]]
+    assert full_requests(fake) == [archived.full_path(p) for p in project_ids[: recorder.FULL_CANDIDATES]]
     full = json.loads((directory / "project_full.json").read_bytes())
     listed = json.loads((directory / "projects_archived.json").read_bytes())
     # The fourth and the fifth have two non-empty lists each; the earlier one wins.
@@ -493,8 +539,16 @@ def test_committed_shapes_describe_the_archived_endpoints(recorder):
     listed, full = endpoints["projects_archived"]["keys"], endpoints["project_full"]["keys"]
     assert listed["results"]["kind"] == "list" and listed["results"]["fields"]["is_archived"] == ["boolean"]
     assert sorted(full) == sorted(
-        ["project", "tasks", "sections", "subprojects", "collaborators", "collaborator_states", "folder",
-         "comments_count"]
+        [
+            "project",
+            "tasks",
+            "sections",
+            "subprojects",
+            "collaborators",
+            "collaborator_states",
+            "folder",
+            "comments_count",
+        ]
     )
     assert full["project"]["kind"] == "map" and full["subprojects"]["kind"] == "list"
 
@@ -506,7 +560,8 @@ def test_archived_contract_comparison_fails_on_an_added_field(recorder):
     sources = recorder.endpoint_shape_sources()
     bodies = {name: sources[name][0].read_bytes() for name in recorder.ARCHIVED_ENDPOINTS}
     assert recorder.compare_endpoint_bodies(expected, bodies) == {
-        "projects_archived": ([], []), "project_full": ([], []),
+        "projects_archived": ([], []),
+        "project_full": ([], []),
     }
 
     listed, full = (json.loads(bodies[name]) for name in ("projects_archived", "project_full"))
@@ -538,8 +593,23 @@ UPLOAD = {
         "upload_state": "completed",
     },
 }
-UPLOAD_SECRETS = ["files.todoist.com", "cloudfront", "Xq3v9TzW", "by_id", "Rechnung", "März", "M%C3%A4rz", "?",
-                  "Expires", "Signature", "Key-Pair-Id", "image/png", "Müller", "6Xd9Kp3Rt5Vw7Yb2", "6X7rM8997g3RQmvh"]
+UPLOAD_SECRETS = [
+    "files.todoist.com",
+    "cloudfront",
+    "Xq3v9TzW",
+    "by_id",
+    "Rechnung",
+    "März",
+    "M%C3%A4rz",
+    "?",
+    "Expires",
+    "Signature",
+    "Key-Pair-Id",
+    "image/png",
+    "Müller",
+    "6Xd9Kp3Rt5Vw7Yb2",
+    "6X7rM8997g3RQmvh",
+]
 
 
 def strings(value):
@@ -589,13 +659,17 @@ def test_uploaded_attachments_follow_the_download_rule(recorder):
     uploads = attachment_fixture("uploads")["results"]
     response = {"notes": [link, pending, foreign, {"id": "N1", "file_attachment": None}], "results": uploads}
     # Links and pending uploads are not uploaded files; a file on a foreign host is one, which the step skips.
-    assert recorder.uploaded_attachments(response) == [foreign["file_attachment"],
-                                                        *(c["file_attachment"] for c in uploads)]
+    assert recorder.uploaded_attachments(response) == [
+        foreign["file_attachment"],
+        *(c["file_attachment"] for c in uploads),
+    ]
 
 
 def test_committed_shapes_describe_uploaded_files(recorder):
     shapes = json.loads(recorder.SHAPES.read_bytes())["file_attachments"]
-    assert shapes["sources"] == [p.relative_to(recorder.FIXTURES).as_posix() for p in recorder.attachment_shape_sources()]
+    assert shapes["sources"] == [
+        p.relative_to(recorder.FIXTURES).as_posix() for p in recorder.attachment_shape_sources()
+    ]
     entry = shapes["keys"]["file_attachment"]
     assert entry["kind"] == "file|image"
     assert {"file_name", "file_size", "file_url", "resource_type", "upload_state", "tn_l"} <= entry["fields"].keys()
@@ -605,8 +679,12 @@ def test_committed_shapes_describe_uploaded_files(recorder):
     # A text file has no thumbnails: reported as removed, which the contract tests only report.
     text = uploads[0]
     assert recorder.compare_shapes(shapes, recorder.attachment_shape_of([text])) == (
-        [], ["field file_attachment.tn_l", "field file_attachment.tn_m", "field file_attachment.tn_s"])
+        [],
+        ["field file_attachment.tn_l", "field file_attachment.tn_m", "field file_attachment.tn_s"],
+    )
     changed = {**text, "resource_type": "video", "checksum": "abc"}
     added, _removed = recorder.compare_shapes(shapes, recorder.attachment_shape_of([changed]))
-    assert added == ["kind 'video' of 'file_attachment' (expected 'file|image')",
-                     "field file_attachment.checksum (string)"]
+    assert added == [
+        "kind 'video' of 'file_attachment' (expected 'file|image')",
+        "field file_attachment.checksum (string)",
+    ]
