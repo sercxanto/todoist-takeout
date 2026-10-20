@@ -42,8 +42,3 @@ Status: `roh` · `geklärt` · `als Change angelegt` · `verworfen`
 
 - Status: roh
 - Code-Coverage sollte gemessen werden
-
-## Doppelte CI-Jobs vermeiden
-
-- Status: roh
-- Beim Anlegen eines PR werden die Jobs zweimal ausgeführt: Für den Push und für den PR
