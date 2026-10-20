@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
-from fake_api import FakeApi, empty_page
+from fake_api import FIXTURE_FILES, FakeApi, empty_page
 
 from todoist_takeout import __version__, storage
 from todoist_takeout.api import Client, TransportError
@@ -339,6 +339,11 @@ class _SyncHandler(BaseHTTPRequestHandler):
             self._send(200, ACCOUNT[form["sync_token"][0]])
 
     def do_GET(self):
+        if self.path.startswith("/files/"):
+            # An attachment file, which _LOCAL_CLI requests here instead of at files.todoist.com.
+            body = FIXTURE_FILES.get(f"https://files.todoist.com/{self.path.removeprefix('/files/')}")
+            self._send(404, b"") if body is None else self._send(200, body)
+            return
         # The completed-tasks backup: every endpoint has nothing to return.
         path = urllib.parse.urlsplit(self.path).path.removeprefix("/api/v1/")
         if self.headers.get("Authorization") != f"Bearer {TOKEN}":
@@ -357,13 +362,19 @@ class _SyncHandler(BaseHTTPRequestHandler):
         pass
 
 
-# Runs the CLI against the local server instead of api.todoist.com.
+# Runs the CLI against the local server instead of api.todoist.com, and fetches the attachment files
+# of the fixtures from there too, so the test never reaches the network.
 _LOCAL_CLI = """
 import sys
 from todoist_takeout import api, cli
 
+class LocalTransport(api.UrllibTransport):
+    def download(self, url, write):
+        assert url.startswith("https://files.todoist.com/"), url
+        return super().download(url.replace("https://files.todoist.com/", sys.argv[1] + "files/", 1), write)
+
 def client(token, max_rate_limit_wait):
-    transport = api.UrllibTransport(token, base_url=sys.argv[1])
+    transport = LocalTransport(token, base_url=sys.argv[1] + "api/v1/")
     return api.Client(transport, max_rate_limit_wait=max_rate_limit_wait)
 
 sys.exit(cli.main(sys.argv[2:], client_factory=client))
@@ -380,7 +391,7 @@ def test_runs_without_stdin_and_terminal(tmp_path):
                 sys.executable,
                 "-c",
                 _LOCAL_CLI,
-                f"http://127.0.0.1:{httpd.server_address[1]}/api/v1/",
+                f"http://127.0.0.1:{httpd.server_address[1]}/",
                 "backup",
                 str(tmp_path),
             ],
@@ -399,4 +410,5 @@ def test_runs_without_stdin_and_terminal(tmp_path):
     assert result.stdout == ""
     assert result.stderr.splitlines()[-1].startswith("INFO backup complete: 31 objects written")
     assert json.loads((tmp_path / "state.json").read_bytes())["sync_token"] == "INC-1"
+    assert (tmp_path / "attachments" / "6X7rfFVQXwRmcvFp" / "list.pdf").stat().st_size == 10520
     assert_token_absent(result.stderr, tmp_path)
