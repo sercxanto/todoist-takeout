@@ -46,8 +46,14 @@ def note(comment_id: str, name="preise.pdf", *, size=20, file_url=None, item_id=
         **fields,
     }
     attachment = {k: v for k, v in attachment.items() if v is not None}
-    return {"id": comment_id, "item_id": item_id, "content": "see the file", "file_attachment": attachment,
-            "is_deleted": False, "posted_at": "2026-09-12T17:00:00.000000Z"}
+    return {
+        "id": comment_id,
+        "item_id": item_id,
+        "content": "see the file",
+        "file_attachment": attachment,
+        "is_deleted": False,
+        "posted_at": "2026-09-12T17:00:00.000000Z",
+    }
 
 
 def store_note(target: Path, comment: dict, resource: str = "notes") -> None:
@@ -139,8 +145,10 @@ def test_files_of_comments_of_archived_projects(tmp_path):
 
 def test_file_of_a_comment_of_a_completed_task(tmp_path):
     comment = note("N3", "rechnung.pdf")
-    store_results(tmp_path / "completed" / "comments" / "T1.json", [note("N0", file_url=None) | {"file_attachment": None},
-                                                                    comment])
+    store_results(
+        tmp_path / "completed" / "comments" / "T1.json",
+        [note("N0", file_url=None) | {"file_attachment": None}, comment],
+    )
     download(tmp_path, serve(FakeApi(files={}), comment))
     assert list(files_under(tmp_path)) == ["N3/rechnung.pdf"]
 
@@ -250,7 +258,9 @@ def test_comment_stored_twice_is_downloaded_once(tmp_path):
 
 def test_first_copy_in_the_order_sync_completed_archived_supplies_the_url(tmp_path):
     in_sync = note("N1", file_url=url("N1", "sync.pdf"))
-    store_results(tmp_path / "archived" / "P1" / "comments" / "T1.json", [note("N1", file_url=url("N1", "archived.pdf"))])
+    store_results(
+        tmp_path / "archived" / "P1" / "comments" / "T1.json", [note("N1", file_url=url("N1", "archived.pdf"))]
+    )
     store_results(tmp_path / "completed" / "comments" / "T1.json", [note("N1", file_url=url("N1", "completed.pdf"))])
     store_note(tmp_path, in_sync)
     api = serve(FakeApi(files={}), in_sync)
@@ -407,8 +417,10 @@ def run_backup(target: Path, api: FakeApi, **client_options) -> FakeApi:
 
 def cli(target: Path, api: FakeApi, monkeypatch, *options) -> int:
     monkeypatch.setenv("TODOIST_API_TOKEN", TOKEN)
-    return main(["backup", *options, str(target)],
-                client_factory=lambda token, wait: Client(api, max_rate_limit_wait=wait, sleep=Waits()))
+    return main(
+        ["backup", *options, str(target)],
+        client_factory=lambda token, wait: Client(api, max_rate_limit_wait=wait, sleep=Waits()),
+    )
 
 
 # --- 4.3 Complete files only -----------------------------------------------------------------
@@ -648,8 +660,12 @@ def test_file_over_plain_http_is_not_requested(tmp_path, caplog):
 
 
 def test_log_of_a_run_with_downloads_a_stored_file_and_a_refusal(tmp_path, caplog):
-    comments = [note("N1", size=300_000), note("N2", "zwei.pdf", size=200_000), note("N3", "drei.pdf"),
-                note("N4", "vier.pdf")]
+    comments = [
+        note("N1", size=300_000),
+        note("N2", "zwei.pdf", size=200_000),
+        note("N3", "drei.pdf"),
+        note("N4", "vier.pdf"),
+    ]
     store_results(tmp_path / "completed" / "comments" / "T1.json", comments)
     storage.write_bytes_atomic(tmp_path / "attachments" / "N3" / "drei.pdf", b"stored earlier")
     api = serve(FakeApi(files={}), *comments[:2]).answer_file(url("N4", "vier.pdf"), 404)
@@ -660,8 +676,11 @@ def test_log_of_a_run_with_downloads_a_stored_file_and_a_refusal(tmp_path, caplo
         ("DEBUG", "downloading the attachment file of comment N1 from files.todoist.com"),
         ("DEBUG", "downloading the attachment file of comment N2 from files.todoist.com"),
         ("DEBUG", "downloading the attachment file of comment N4 from files.todoist.com"),
-        ("WARNING", "the attachment file of comment N4 was not downloaded: GET files.todoist.com/fake/test/N4/vier.pdf "
-                    "was refused (HTTP 404)"),
+        (
+            "WARNING",
+            "the attachment file of comment N4 was not downloaded: GET files.todoist.com/fake/test/N4/vier.pdf "
+            "was refused (HTTP 404)",
+        ),
         ("INFO", "downloaded 2 attachment files (0.5 MB); 1 could not be downloaded"),
     ]
 
@@ -698,8 +717,11 @@ def stored_urls(target: Path) -> list[str]:
     """The URLs of the files that are stored, in the order of `attachments.collect`."""
     root = target / "attachments"
     names = set(os.listdir(root)) if root.is_dir() else set()
-    return [a.url for a in attachments.collect(target)
-            if attachments._holds_file(root, names, storage.encode_key(a.comment_id))]
+    return [
+        a.url
+        for a in attachments.collect(target)
+        if attachments._holds_file(root, names, storage.encode_key(a.comment_id))
+    ]
 
 
 @pytest.fixture(scope="module")

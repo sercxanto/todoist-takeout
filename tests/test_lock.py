@@ -26,9 +26,7 @@ except LockHeld:
 
 
 def _attempt(target):
-    return subprocess.run(
-        [sys.executable, "-c", ATTEMPT, str(target)], stdin=subprocess.DEVNULL, timeout=60
-    ).returncode
+    return subprocess.run([sys.executable, "-c", ATTEMPT, str(target)], stdin=subprocess.DEVNULL, timeout=60).returncode
 
 
 def test_lock_held_by_another_process_until_it_is_killed(tmp_path):

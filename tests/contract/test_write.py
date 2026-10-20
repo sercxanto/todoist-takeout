@@ -90,7 +90,9 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
         # Reorder two of three tasks due today: are incremental day_orders complete, or only the
         # changes? Only a returned entry for the third, unchanged task tells the two apart.
         today = [
-            commands.add("item_add", {"content": f"{PREFIX}: today {n}", "project_id": project, "due": {"string": "today"}})
+            commands.add(
+                "item_add", {"content": f"{PREFIX}: today {n}", "project_id": project, "due": {"string": "today"}}
+            )
             for n in (1, 2, 3)
         ]
         changes = observer.changes()

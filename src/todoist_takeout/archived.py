@@ -61,8 +61,9 @@ class _Backup:
     """One run of this part. The flags of the parts turn off for the rest of the run when the API
     rejects a request as restricted by the plan (design D5)."""
 
-    def __init__(self, target: Path, client: Client, state: dict, moment: datetime, *, completed_tasks: bool,
-                 comments: bool):
+    def __init__(
+        self, target: Path, client: Client, state: dict, moment: datetime, *, completed_tasks: bool, comments: bool
+    ):
         self.target = target
         self.client = client
         self.state = state
@@ -79,8 +80,9 @@ class _Backup:
         try:
             queue = self._list()
         except PlanRestricted:
-            log.warning("the Todoist plan does not allow listing archived projects; they cannot be backed up on "
-                        "this plan")
+            log.warning(
+                "the Todoist plan does not allow listing archived projects; they cannot be backed up on this plan"
+            )
             return
         listed = len(queue)
         handled = {project_id for project_id, _ in queue}
@@ -93,8 +95,9 @@ class _Backup:
                         handled.add(sub_id)
                         queue.append((sub_id, sub))
         except PlanRestricted:
-            log.warning("the Todoist plan does not allow fetching archived projects; they cannot be backed up on "
-                        "this plan")
+            log.warning(
+                "the Todoist plan does not allow fetching archived projects; they cannot be backed up on this plan"
+            )
         finally:
             log.info(
                 "archived projects: %d listed, %d snapshots fetched (%d new, %d again), %d parts filled in; "
@@ -209,18 +212,25 @@ class _Backup:
         try:
             for since, until in self._windows(project):
                 params = {"since": since, "until": until, "project_id": project_id}
-                pages.extend(completed.fetch_pages(self.client, completed.BY_COMPLETION_DATE, params,
-                                         completed.TASKS_PAGE_LIMIT, "items"))
+                pages.extend(
+                    completed.fetch_pages(
+                        self.client, completed.BY_COMPLETION_DATE, params, completed.TASKS_PAGE_LIMIT, "items"
+                    )
+                )
         except PlanRestricted:
-            log.warning("the Todoist plan does not allow fetching completed tasks; the completed tasks of %s cannot "
-                        "be backed up on this plan", OWNER)
+            log.warning(
+                "the Todoist plan does not allow fetching completed tasks; the completed tasks of %s cannot "
+                "be backed up on this plan",
+                OWNER,
+            )
             self.completed_tasks = False
             return None
         return completed.merge_pages(pages, "items", "completed_at")
 
     def _comment_store(self, directory: Path) -> "completed._CommentStore":
-        return completed._CommentStore(directory / COMMENTS_DIR, self.client, enabled=True, owner=OWNER,
-                                       empty_when_gone=True)
+        return completed._CommentStore(
+            directory / COMMENTS_DIR, self.client, enabled=True, owner=OWNER, empty_when_gone=True
+        )
 
     def _count_comments(self, store: "completed._CommentStore") -> None:
         """Take over the plan flag and the count of written files from a comment store."""
@@ -232,11 +242,15 @@ class _Backup:
         if not self.comments:
             return False
         try:
-            pages = completed.fetch_pages(self.client, completed.COMMENTS, {"project_id": project_id},
-                                completed.COMMENTS_PAGE_LIMIT, "results")
+            pages = completed.fetch_pages(
+                self.client, completed.COMMENTS, {"project_id": project_id}, completed.COMMENTS_PAGE_LIMIT, "results"
+            )
         except PlanRestricted:
-            log.warning("the Todoist plan does not allow fetching comments; the comments of %s cannot be backed up "
-                        "on this plan", OWNER)
+            log.warning(
+                "the Todoist plan does not allow fetching comments; the comments of %s cannot be backed up "
+                "on this plan",
+                OWNER,
+            )
             self.comments = False
             return False
         path = directory / PROJECT_COMMENTS_FILE
@@ -329,8 +343,10 @@ def _object_id(value) -> str | None:
 
 def _stored_tasks(directory: Path) -> list:
     """The open and completed tasks stored in a snapshot."""
-    return [*_list_of(_read_object(directory / FULL_FILE), "tasks"),
-            *_list_of(completed.read_stored(directory / COMPLETED_FILE, "items"), "items")]
+    return [
+        *_list_of(_read_object(directory / FULL_FILE), "tasks"),
+        *_list_of(completed.read_stored(directory / COMPLETED_FILE, "items"), "items"),
+    ]
 
 
 def _list_of(response: dict | None, key: str) -> list:

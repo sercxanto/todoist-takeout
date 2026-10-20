@@ -92,8 +92,7 @@ def encode_key(components: str | Sequence[str]) -> str:
         raise StorageError("cannot store an object with an empty key")
     if len(stem) > MAX_NAME_LENGTH:
         raise StorageError(
-            f"key {list(components)!r} encodes to {len(stem)} characters, "
-            f"more than the limit of {MAX_NAME_LENGTH}"
+            f"key {list(components)!r} encodes to {len(stem)} characters, more than the limit of {MAX_NAME_LENGTH}"
         )
     return stem
 
@@ -187,9 +186,7 @@ def _count_write() -> None:
 
 # --- Atomic writes -----------------------------------------------------------
 
-_TEMP_FLAGS = (
-    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOINHERIT", 0)
-)
+_TEMP_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOINHERIT", 0)
 
 
 def read_bytes(path: Path) -> bytes | None:

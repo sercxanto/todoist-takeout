@@ -19,8 +19,9 @@ from todoist_takeout.api import is_todoist_file_url
 
 
 @pytest.mark.parametrize("account", ["read", "write"])
-def test_one_attachment_downloads_with_its_stated_size(account, contract_support, recorder, client_for, tmp_path,
-                                                        write_findings):
+def test_one_attachment_downloads_with_its_stated_size(
+    account, contract_support, recorder, client_for, tmp_path, write_findings
+):
     variable = contract_support.ACCOUNT_VARIABLES[account]
     token = contract_support.env_token(variable)
     if not token:
@@ -36,7 +37,8 @@ def test_one_attachment_downloads_with_its_stated_size(account, contract_support
     if uploads:
         expected = json.loads(recorder.SHAPES.read_bytes())["file_attachments"]
         added, removed = recorder.compare_shapes(
-            expected, recorder.attachment_shape_of(recorder.uploaded_attachments(response)))
+            expected, recorder.attachment_shape_of(recorder.uploaded_attachments(response))
+        )
         findings |= {"shape_sources": expected["sources"], "added": added, "removed": removed}
         for line in removed:
             warnings.warn(f"{account} account: not in the uploads' file_attachment: {line}")

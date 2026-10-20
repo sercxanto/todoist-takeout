@@ -133,9 +133,7 @@ def _left_by_first_run(name: str) -> bool:
     return name == LOCK_FILE or (name.startswith(f".{storage.STATE_FILE}.") and name.endswith(".tmp"))
 
 
-def _apply_pending(
-    target: Path, state: dict, body: bytes, classifier: Classifier, stats: ApplyStats, now
-) -> bool:
+def _apply_pending(target: Path, state: dict, body: bytes, classifier: Classifier, stats: ApplyStats, now) -> bool:
     """Apply the response saved in `pending/`, checkpoint it, then remove it. Return whether it was a full sync."""
     pending = target / PENDING_DIR / PENDING_FILE
     response = _parse_response(pending, body)
@@ -352,9 +350,9 @@ def _stored_live_keys(sync_dir: Path) -> tuple[dict[str, set[str]], dict[str, se
     """
     stored = _stored_live_objects(sync_dir)
     archived = {_id(v, "id") for v in stored.get(PROJECTS, {}).values() if _flag(v, "is_archived")} - {None}
-    left_out_items = {
-        _id(v, "id") for v in stored.get(ITEMS, {}).values() if _left_out(ITEMS, v, archived, set())
-    } - {None}
+    left_out_items = {_id(v, "id") for v in stored.get(ITEMS, {}).values() if _left_out(ITEMS, v, archived, set())} - {
+        None
+    }
 
     live, left_out = {}, {}
     for resource, values in stored.items():

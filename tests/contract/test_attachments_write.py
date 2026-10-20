@@ -60,8 +60,11 @@ def test_attachment_is_downloaded_once(write_client, contract_support, recorder,
         task = add("item_add", {"content": f"{PREFIX}: task", "project_id": project}, "a task")
         uploaded = contract_support.upload_file(token, project, FILE_NAME, CONTENT, "text/plain")
         uploads.append(uploaded["file_url"])
-        note = add("note_add", {"item_id": task, "content": f"{PREFIX}: file", "file_attachment": uploaded},
-                   "a comment with a file")
+        note = add(
+            "note_add",
+            {"item_id": task, "content": f"{PREFIX}: file", "file_attachment": uploaded},
+            "a comment with a file",
+        )
 
         listed = json.loads(client.get(completed.COMMENTS, {"task_id": task}))["results"]
         [attachment] = [a for a in map(attachments.uploaded_file, listed) if a is not None]
@@ -84,7 +87,8 @@ def test_attachment_is_downloaded_once(write_client, contract_support, recorder,
         else:
             expected = json.loads(recorder.SHAPES.read_bytes())["file_attachments"]
             added, removed = recorder.compare_shapes(
-                expected, recorder.attachment_shape_of(recorder.uploaded_attachments(in_sync)))
+                expected, recorder.attachment_shape_of(recorder.uploaded_attachments(in_sync))
+            )
             findings["shape"] = {"added": added, "removed": removed}
             problems += [f"file_attachment has what shapes.json lacks: {line}" for line in added]
 
@@ -120,16 +124,23 @@ def test_attachment_is_downloaded_once(write_client, contract_support, recorder,
         full = json.loads(client.sync("*"))
         listed_archived = json.loads(client.get(archived.ARCHIVED_PROJECTS, {"limit": "200"})).get("results") or []
         cleanup["left_in_sync"] = sum(
-            1 for resource in ("projects", "items", "notes", "project_notes") for obj in full.get(resource) or []
-            if isinstance(obj, dict) and not obj.get("is_deleted") and str(obj.get("id")) in created)
-        cleanup["left_archived"] = sum(1 for p in listed_archived if isinstance(p, dict) and str(p.get("id")) in created)
+            1
+            for resource in ("projects", "items", "notes", "project_notes")
+            for obj in full.get(resource) or []
+            if isinstance(obj, dict) and not obj.get("is_deleted") and str(obj.get("id")) in created
+        )
+        cleanup["left_archived"] = sum(
+            1 for p in listed_archived if isinstance(p, dict) and str(p.get("id")) in created
+        )
         findings["cleanup"] = cleanup
         findings["rejected_commands"] = len(commands.rejected)
         write_findings("attachments-write", findings, token)
 
     assert not cleanup["projects_not_deleted"] and not cleanup["left_in_sync"] and not cleanup["left_archived"], (
-        f"delete the projects named {PREFIX!r} of the test account by hand: {cleanup}")
+        f"delete the projects named {PREFIX!r} of the test account by hand: {cleanup}"
+    )
     # 404: already gone, as after deleting its comment in the probe W9.
     assert all(200 <= status < 300 or status == 404 for status in cleanup["uploads_deleted"]), (
-        f"uploads not deleted: {cleanup}")
+        f"uploads not deleted: {cleanup}"
+    )
     assert not problems, "\n".join(problems)

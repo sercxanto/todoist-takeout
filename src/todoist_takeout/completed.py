@@ -124,7 +124,9 @@ def _fetch_activity(target: Path, client: Client, state: dict, start: datetime, 
         stored = read_stored(path, "results")
         known = {_id_order(e.get("id")) for e in stored["results"] if isinstance(e, dict)} if stored else set()
         new += sum(1 for e in events if not isinstance(e, dict) or _id_order(e.get("id")) not in known)
-        merged = merge_pages([stored, fetched] if stored is not None else [fetched], "results", "event_date", by_id=True)
+        merged = merge_pages(
+            [stored, fetched] if stored is not None else [fetched], "results", "event_date", by_id=True
+        )
         storage.write_bytes_atomic(path, storage.encode_json(merged))
     storage.update_completed_state(target, state, activity_fetched_utc=precise_timestamp(start))
     log.info("completion events: fetched the activity log since %s; %d new events stored", date_from, new)
@@ -216,8 +218,15 @@ def _fetch_months(target: Path, client: Client, state: dict, moment: datetime, *
 class _CommentStore:
     """Fetches the comments of tasks and stores them in `directory`, one file per task (design D8)."""
 
-    def __init__(self, directory: Path, client: Client, *, enabled: bool, owner: str = "completed tasks",
-                 empty_when_gone: bool = False):
+    def __init__(
+        self,
+        directory: Path,
+        client: Client,
+        *,
+        enabled: bool,
+        owner: str = "completed tasks",
+        empty_when_gone: bool = False,
+    ):
         self.directory = directory
         self.client = client
         self.enabled = enabled

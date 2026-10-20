@@ -113,7 +113,9 @@ def layout(request, tmp_path, sync_fixture):
     produce(tmp_path, sync_fixture)
     prefix = request.param
     produced = sorted(
-        path for p in tmp_path.rglob("*") if p.is_file() and (path := p.relative_to(tmp_path).as_posix()).startswith(f"{prefix}/")
+        path
+        for p in tmp_path.rglob("*")
+        if p.is_file() and (path := p.relative_to(tmp_path).as_posix()).startswith(f"{prefix}/")
     )
     documented = _documented_paths(prefix)
     assert len(documented) >= minimum
@@ -161,15 +163,21 @@ def test_description_warns_about_large_event_ids():
 def test_description_names_every_copy_of_a_task_and_the_rule_for_the_current_one():
     [section] = re.findall(r"^## Copies of the same task$(.*?)^## ", _format_description(), re.M | re.S)
     text = " ".join(section.split())
-    for place in ["`sync/items/<task id>.json`", "`completed/<YYYY-MM>.json`", "`archived/<project id>/full.json`",
-                  "`archived/<project id>/completed.json`"]:
+    for place in [
+        "`sync/items/<task id>.json`",
+        "`completed/<YYYY-MM>.json`",
+        "`archived/<project id>/full.json`",
+        "`archived/<project id>/completed.json`",
+    ]:
         assert f"| {place} |" in section, place
     for place in ["`completed/comments/<task id>.json`", "`archived/<project id>/comments/<task id>.json`"]:
         assert place in text, place
     assert "All copies share the task's `id`" in text
-    assert ("The current copy is the one with the newest `updated_at`. If several copies have the same "
-            "`updated_at`, a copy under `archived/` is current, then one under `completed/`, then one under "
-            "`sync/`.") in text
+    assert (
+        "The current copy is the one with the newest `updated_at`. If several copies have the same "
+        "`updated_at`, a copy under `archived/` is current, then one under `completed/`, then one under "
+        "`sync/`."
+    ) in text
 
 
 def _section(heading: str) -> str:
@@ -181,7 +189,10 @@ def test_description_tells_how_to_find_the_file_of_a_comment():
     text = _section("Attachment files")
     assert "The file attached to a stored comment is the only file in `attachments/<comment id>/`" in text
     assert "its original name is the comment's `file_attachment.file_name`" in text
-    assert "A missing `attachments/<comment id>/` directory" in text and "means that the comment's file is not downloaded" in text
+    assert (
+        "A missing `attachments/<comment id>/` directory" in text
+        and "means that the comment's file is not downloaded" in text
+    )
     for part in ["sync/", "completed/comments/", "archived/"]:
         assert f"`{part}`" in text
 
@@ -192,7 +203,10 @@ def test_documented_attachment_names_match_the_rules():
     assert len(examples) == 4
     for name, stored in examples:
         assert storage.attachment_file_name(name) == stored
-    assert f"longer than {storage.MAX_ATTACHMENT_NAME_CHARS} characters or {storage.MAX_ATTACHMENT_NAME_BYTES} bytes" in text
+    assert (
+        f"longer than {storage.MAX_ATTACHMENT_NAME_CHARS} characters or {storage.MAX_ATTACHMENT_NAME_BYTES} bytes"
+        in text
+    )
     assert f"at most {storage.MAX_EXTENSION_LENGTH} characters" in text
     assert f"becomes `{storage.DEFAULT_ATTACHMENT_NAME}`" in text
 

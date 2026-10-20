@@ -39,8 +39,10 @@ def test_completed_endpoints_match_recorded_shapes(account, contract_support, re
         bodies = recorder.record_completed(client, datetime.now(timezone.utc))
     except ApiError as exc:
         if client.path == completed.TASKS_COMPLETED and exc.http_status in completed.GONE_STATUSES:
-            pytest.fail(f"GET /{completed.TASKS_COMPLETED} is gone (HTTP {exc.http_status}); "
-                        f"recurring completions before T0 can no longer be backed up: {exc}")
+            pytest.fail(
+                f"GET /{completed.TASKS_COMPLETED} is gone (HTTP {exc.http_status}); "
+                f"recurring completions before T0 can no longer be backed up: {exc}"
+            )
         if client.path == completed.ACTIVITIES:
             pytest.fail(f"the activity log rejected object_event_types={completed.COMPLETION_EVENTS}: {exc}")
         raise
