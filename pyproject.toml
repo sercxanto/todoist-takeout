@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=7", "ruff>=0.17"]
+dev = ["pytest>=7", "pytest-cov>=7.1", "ruff>=0.17"]
 
 [project.scripts]
 todoist-takeout = "todoist_takeout.cli:main"
@@ -58,3 +58,14 @@ addopts = ["--import-mode=importlib", "-m", "not contract"]
 markers = [
     "contract: runs against the real Todoist API; select with `pytest -m contract`",
 ]
+
+[tool.coverage.run]
+# Selected with `pytest --cov`.
+source = ["todoist_takeout"]
+branch = true
+# Also measures the tests that run the CLI in a child process.
+patch = ["subprocess"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

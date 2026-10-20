@@ -14,13 +14,6 @@ Status: `roh` · `geklärt` · `als Change angelegt` · `verworfen`
 - Offen: Lohnt sich ein neuer Name (und Paketname)? Auswirkungen auf Imports,
   CLI-Befehl und README.
 
-## Richtiger Paketmanager für Python
-
-- Status: roh
-- Favorit: uv
-- Offen: `pyproject.toml` anpassen, Lockfile (`uv.lock`) einchecken, Doku und
-  Workflows auf `uv` umstellen.
-
 ## Changelog anlegen
 
 - Status: roh
@@ -32,8 +25,3 @@ Status: `roh` · `geklärt` · `als Change angelegt` · `verworfen`
 - Status: roh
 - Offen: Versionierung, Tagging, Build und Veröffentlichung (PyPI?),
   Zusammenspiel mit Changelog und Lizenz.
-
-## Code-Coverage messen
-
-- Status: roh
-- Code-Coverage sollte gemessen werden
