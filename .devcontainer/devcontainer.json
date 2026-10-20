@@ -11,6 +11,9 @@
   // (add -o Dir::Etc::sourceparts=/dev/null to apt-get update; a third-party
   // repository in the base image has an unverifiable signature.)
 
+  // uv manages the development environment; pipx comes with the base image.
+  "postCreateCommand": "pipx install uv && uv sync",
+
   "customizations": {
     "vscode": {
       "extensions": [

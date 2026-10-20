@@ -14,12 +14,14 @@ Todoist is a cloud service, so your data is only reachable through it. If the se
 
 ## Installation
 
-todoist-takeout needs Python 3.11 or newer and has no other runtime dependencies. It is not on PyPI yet, so install it from a checkout of this repository:
+todoist-takeout needs Python 3.11 or newer and has no other runtime dependencies. It is not on PyPI yet, so install it from a checkout of this repository with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-pipx install .        # or: python -m pip install .
+uv tool install .
 todoist-takeout --version
 ```
+
+Without uv, `pipx install .` or `python -m pip install .` work as well.
 
 ## Usage
 
@@ -200,15 +202,19 @@ The documented storage schema is part of each step and grows with the backup for
 
 ## Development
 
-- The dev container ([.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)) provides Python 3.12.
+- The dev container ([.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)) provides Python 3.12 and uv, and runs `uv sync` when it is created.
 - Planning uses [OpenSpec](https://github.com/Fission-AI/OpenSpec). Run `openspec list` to see changes in progress.
 
 ### Tests
 
+The project is managed with [uv](https://docs.astral.sh/uv/). `uv sync` creates `.venv/` with the package in editable mode and the development dependencies pinned in [uv.lock](uv.lock):
+
 ```sh
-python -m pip install -e '.[test]'
-pytest
+uv sync
+uv run pytest
 ```
+
+The commands below are written without `uv run`; either prefix them with it or activate `.venv/` first. Without uv, `python -m pip install -e . --group dev` (pip 25.1 or newer) sets up the same environment, apart from the pinned versions.
 
 The default run is fully offline: it uses the fixtures under [tests/fixtures/](tests/fixtures/) and never calls the real API. CI runs it on Linux, macOS and Windows.
 

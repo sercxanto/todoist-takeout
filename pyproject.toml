@@ -19,8 +19,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 
-[project.optional-dependencies]
-test = ["pytest>=7"]
+[dependency-groups]
+dev = ["pytest>=7"]
 
 [project.scripts]
 todoist-takeout = "todoist_takeout.cli:main"
