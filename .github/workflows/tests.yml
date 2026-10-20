@@ -42,4 +42,6 @@ jobs:
         run: uv sync --locked
       - name: Test
         # Offline only: the contract tests are deselected by default and need tokens that CI does not have.
-        run: uv run --locked pytest -rs
+        # The coverage report goes to the log and to the job summary; bash also on Windows, for the variable.
+        shell: bash
+        run: uv run --locked pytest -rs --cov --cov-report=term --cov-report="markdown-append:$GITHUB_STEP_SUMMARY"

@@ -18,6 +18,17 @@ The commands below are written without `uv run`; either prefix them with it or a
 
 The default run is fully offline: it uses the fixtures under [tests/fixtures/](tests/fixtures/) and never calls the real API. CI runs it on Linux, macOS and Windows.
 
+## Coverage
+
+[pytest-cov](https://pytest-cov.readthedocs.io/) measures the line and branch coverage of `src/todoist_takeout/`, also in the tests that run the CLI in a child process. It is off by default; `--cov` turns it on and prints the files that are not fully covered, with their missing lines:
+
+```sh
+pytest --cov
+pytest --cov --cov-report=html       # browsable report in htmlcov/
+```
+
+CI measures it in every job and shows the report in the job summary. A run with `--cov` fails when the total coverage is below 90 %. Coverage differs a little between operating systems, because some code runs on Windows only or everywhere but Windows; the margin to the current level leaves room for that.
+
 ## Linting and formatting
 
 [Ruff](https://docs.astral.sh/ruff/) lints and formats the code; its settings are in [pyproject.toml](pyproject.toml), and uv.lock pins its version. CI fails when either check finds something:
