@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from todoist_takeout import __version__
+from todoist_takeout import __version__, sqlite_view
 from todoist_takeout.api import DEFAULT_MAX_RATE_LIMIT_WAIT, Client, UrllibTransport
 from todoist_takeout.errors import ConfigError, TakeoutError
 from todoist_takeout.sync import run_backup
@@ -45,9 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=f"The personal API token is read from the environment variable {TOKEN_VARIABLE}.",
     )
     backup.add_argument("target", metavar="TARGET", type=Path, help="the backup directory; created if missing")
-    verbosity = backup.add_mutually_exclusive_group()
-    verbosity.add_argument("-q", "--quiet", action="store_true", help="print only warnings and errors")
-    verbosity.add_argument("-v", "--verbose", action="store_true", help="also print debug messages and tracebacks")
+    _add_verbosity(backup)
     backup.add_argument(
         "--max-rate-limit-wait",
         metavar="SECONDS",
@@ -58,7 +56,29 @@ def build_parser() -> argparse.ArgumentParser:
             f"(default: {DEFAULT_MAX_RATE_LIMIT_WAIT:.0f})"
         ),
     )
+
+    database = commands.add_parser(
+        "sqlite",
+        help="build a SQLite database from a backup, for browsing it in Datasette",
+        description=(
+            "Build a SQLite database at DATABASE from the backup in BACKUP, for browsing it, for example "
+            "in Datasette. Works offline, needs no token, and never changes the backup. Messages go to "
+            "stderr. Exit status: 0 when the database is complete (even with warnings), 1 when the build "
+            "failed, 2 for usage or configuration errors."
+        ),
+    )
+    database.add_argument("backup", metavar="BACKUP", type=Path, help="the backup directory")
+    database.add_argument(
+        "database", metavar="DATABASE", type=Path, help="the database file; created with its parents if missing"
+    )
+    _add_verbosity(database)
     return parser
+
+
+def _add_verbosity(parser: argparse.ArgumentParser) -> None:
+    verbosity = parser.add_mutually_exclusive_group()
+    verbosity.add_argument("-q", "--quiet", action="store_true", help="print only warnings and errors")
+    verbosity.add_argument("-v", "--verbose", action="store_true", help="also print debug messages and tracebacks")
 
 
 def _seconds(text: str) -> float:
@@ -73,10 +93,15 @@ def _seconds(text: str) -> float:
 
 def main(argv: list[str] | None = None, *, client_factory: ClientFactory = default_client) -> int:
     args = build_parser().parse_args(argv)
-    token = os.environ.get(TOKEN_VARIABLE, "").strip()
+    backup = args.command == "backup"
+    # Only the backup command reads the token; the sqlite command works offline (design D1).
+    token = os.environ.get(TOKEN_VARIABLE, "").strip() if backup else ""
     level = logging.WARNING if args.quiet else logging.DEBUG if args.verbose else logging.INFO
     with _Logging(level, token) as counter:
         try:
+            if not backup:
+                sqlite_view.run(args.backup, args.database)
+                return 0
             if not token:
                 raise ConfigError(
                     f"the environment variable {TOKEN_VARIABLE} is not set or empty; "
@@ -88,7 +113,8 @@ def main(argv: list[str] | None = None, *, client_factory: ClientFactory = defau
             _report_failure(str(exc), args.verbose)
             return exc.exit_code
         except KeyboardInterrupt:
-            _report_failure("interrupted; the next run resumes from the last checkpoint", args.verbose)
+            outcome = "the next run resumes from the last checkpoint" if backup else "the database was left unchanged"
+            _report_failure(f"interrupted; {outcome}", args.verbose)
             return 130
         except Exception as exc:
             hint = "" if args.verbose else "; rerun with --verbose for details"
