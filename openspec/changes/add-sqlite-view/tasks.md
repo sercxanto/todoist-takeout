@@ -46,8 +46,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 6. Integration checks
 
-- [ ] 6.1 With the user, open a database built from a real backup in Datasette 0.65 and in the current 1.0 alpha (`uvx --with datasette==1.0a41 ...`), and check that the descriptions, facets, labels and search work in both. Record the result for 1.0 in design.md, Risks; if 1.0 ignores an option, settle with the user whether to also write a `datasette.yaml` before archiving
-- [ ] 6.2 Run `uv run ruff format .`, `uv run ruff check .` and `uv run pytest`, and fix what they report. Verify that all three finish without findings or failures
+- [x] 6.1 With the user, open a database built from a real backup in Datasette 0.65 and in the current 1.0 alpha (`uvx --with datasette==1.0a41 ...`), and check that the descriptions, facets, labels and search work in both. Record the result for 1.0 in design.md, Risks; if 1.0 ignores an option, settle with the user whether to also write a `datasette.yaml` before archiving
+- [x] 6.2 Run `uv run ruff format .`, `uv run ruff check .` and `uv run pytest`, and fix what they report. Verify that all three finish without findings or failures
 
 ## Workflow follow-up
 

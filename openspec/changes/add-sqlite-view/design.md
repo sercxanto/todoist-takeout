@@ -202,7 +202,7 @@ Offline, in a new `tests/test_sqlite_view.py`:
 
 ## Risks / Trade-offs
 
-- [Datasette 1.0 drops table options from the metadata file] -> The test pins 0.65; when 1.0 is released, the tool can write a `datasette.yaml` next to the metadata file. That changes only the metadata requirement.
+- [Datasette 1.0 drops table options from the metadata file] -> The test pins 0.65; when 1.0 is released, the tool can write a `datasette.yaml` next to the metadata file. That changes only the metadata requirement. Checked by hand on 2026-10-20 with a database built from a real backup, in Datasette 0.65.5 and 1.0a41: both read the metadata file without a visible problem. The check was a look over the pages, not of every option; no `datasette.yaml` is written for now.
 - [The copy rule for projects and sections is not in the format description] -> It is the task rule applied to them; the metadata file's table descriptions state it.
 - [The read-only fallback reads without the lock] -> Only when `.lock` cannot be opened for writing, where no backup run can be writing either; it warns.
 - [A deletion the backup never saw] -> A task completed before the first backup and deleted later is still shown, because only `sync/` records deletions. The database cannot know more than the backup.
