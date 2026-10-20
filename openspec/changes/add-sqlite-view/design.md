@@ -169,7 +169,8 @@ The table options are the ones Datasette 0.65 reads from metadata and that 1.0 s
 ### D9: Messages and exit status
 
 - `INFO reading the backup in <backup>`, `INFO building <database>`, warnings as they occur (read-only backup, no full-text search), then
-  `INFO database complete: 24 projects, 9 sections, 7 labels, 113 tasks, 15 comments, 340 completions, 0 warnings` and `INFO view it with: datasette <database> -m <metadata file>`.
+  `INFO view it with: datasette <database> -m <metadata file>` (a path with a space in double quotes) and, last, as the spec requires,
+  `INFO database complete: 24 projects, 9 sections, 7 labels, 113 tasks, 41 task labels, 15 comments, 340 completions, 0 warnings`.
 - Exit 2: argparse errors and `ConfigError` (not a backup, newer format, unusable database or metadata path). Exit 1: `LockHeld`, `StorageError`, and `sqlite3.Error` wrapped as `StorageError` with the database path. Exit 130 on interrupt, as for `backup`, with a message that the database was left unchanged.
 
 ### D10: Full-text search

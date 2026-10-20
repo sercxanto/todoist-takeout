@@ -137,7 +137,7 @@ These are the goals the tool is built against. As each one is implemented, it mo
 
 These will be written up in more detail in the design documents of the corresponding changes.
 
-- **Raw payloads are the source of truth.** API responses are stored unchanged as JSON, so fields the tool does not know about are preserved. A queryable SQLite database may be derived from them later.
+- **Raw payloads are the source of truth.** API responses are stored unchanged as JSON, so fields the tool does not know about are preserved. The `sqlite` command derives a SQLite database from them for browsing; it is rebuilt from the JSON on every run and is never a source of truth.
 - **The backup holds the current state, with tombstones.** Objects deleted in Todoist stay in the backup and are marked as deleted. Older versions are not kept, because a file-based backup of the backup directory provides history.
 - **Layout:** one file per active object at `sync/<type>/<id>.json`, one file per month for completed tasks at `completed/<YYYY-MM>.json`, with month boundaries in UTC, one directory per archived project at `archived/<project id>/`, and one directory per comment with an uploaded file at `attachments/<comment id>/`. The current month is included.
 - **Completed tasks are frozen.** A month of completed tasks is fetched again until 7 days after it ended; changes made later to its tasks are not captured.

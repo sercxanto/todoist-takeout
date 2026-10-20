@@ -1155,3 +1155,111 @@ def test_opened_in_datasette(tmp_path):
     assert list(table["facet_results"]) == ["status", "project_id", "priority", "is_recurring"]
     assert [row["project_id"] for row in table["rows"]] == [{"value": "P1", "label": "Steuern"}] * 2
     assert [row["id"] for row in found["rows"]] == ["T1"]
+
+
+# --- 5.1 messages and exit status ---------------------------------------------------------
+
+
+def test_successful_run(tmp_path, capsys):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/projects/P1.json", project("P1"))
+    put(backup, "sync/items/T1.json", task("T1", labels=["home"]))
+    put(backup, "sync/items/T2.json", task("T2"))
+    database = tmp_path / "todoist.db"
+    assert main(["sqlite", str(backup), str(database)]) == 0
+    assert stderr_lines(capsys) == [
+        f"INFO reading the backup in {backup}",
+        f"INFO building {database}",
+        f"INFO view it with: datasette {database} -m {tmp_path / 'todoist.metadata.json'}",
+        "INFO database complete: 1 project, 0 sections, 0 labels, 2 tasks, 1 task label, 0 comments, "
+        "0 completions, 0 warnings",
+    ]
+
+
+def test_quiet_run(tmp_path, capsys):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/T1.json", task("T1"))
+    assert main(["sqlite", "--quiet", str(backup), str(tmp_path / "todoist.db")]) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_warnings_are_counted(tmp_path, capsys, monkeypatch):
+    backup = new_backup(tmp_path / "backup")
+    real_connect = sqlite3.connect
+    monkeypatch.setattr(sqlite3, "connect", lambda *args, **kwargs: real_connect(*args, factory=_NoFts5, **kwargs))
+    assert main(["sqlite", "--quiet", str(backup), str(tmp_path / "todoist.db")]) == 0
+    lines = stderr_lines(capsys)
+    assert len(lines) == 1 and lines[0].startswith("WARNING ")
+    assert main(["sqlite", str(backup), str(tmp_path / "todoist.db")]) == 0
+    assert stderr_lines(capsys)[-1].endswith(", 1 warning")
+
+
+def test_view_hint_quotes_paths_with_spaces(tmp_path, capsys):
+    backup = new_backup(tmp_path / "backup")
+    database = tmp_path / "my data" / "todoist.db"
+    assert main(["sqlite", str(backup), str(database)]) == 0
+    hint = f'INFO view it with: datasette "{database}" -m "{database.parent / "todoist.metadata.json"}"'
+    assert hint in stderr_lines(capsys)
+
+
+def test_interrupted_while_reading(tmp_path, capsys, monkeypatch):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/T1.json", task("T1"))
+    database = build_db(backup, tmp_path / "todoist.db")
+    before = dump(database)
+
+    def interrupted(backup):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(sqlite_view, "read_backup", interrupted)
+    assert main(["sqlite", str(backup), str(database)]) == 130
+    assert stderr_lines(capsys)[-1] == "ERROR interrupted; the database was left unchanged"
+    assert dump(database) == before
+    # The lock was released.
+    with TargetLock(backup):
+        pass
+
+
+def test_unexpected_error_explains_itself(tmp_path, capsys, monkeypatch):
+    backup = new_backup(tmp_path / "backup")
+
+    def broken(backup):
+        raise ValueError("bad value")
+
+    monkeypatch.setattr(sqlite_view, "read_backup", broken)
+    assert main(["sqlite", str(backup), str(tmp_path / "todoist.db")]) == 1
+    assert stderr_lines(capsys)[-1] == (
+        "ERROR unexpected error: ValueError: bad value; rerun with --verbose for details"
+    )
+    assert not (tmp_path / "todoist.db").exists()
+
+
+# --- 5.2 the whole command ----------------------------------------------------------------
+
+
+def test_whole_command_on_paths_with_spaces_and_non_ascii(tmp_path, capsys):
+    backup = build_backup(tmp_path / "Sicherung März 2026")
+    database = tmp_path / "Datenbank ä" / "todoist ü.db"
+    assert main(["sqlite", str(backup), str(database)]) == 0
+    assert stderr_lines(capsys)[-1] == (
+        "INFO database complete: 5 projects, 3 sections, 2 labels, 13 tasks, 2 task labels, 7 comments, "
+        "3 completions, 0 warnings"
+    )
+    counts = {name: query(database, f"SELECT count(*) FROM {name}")[0][0] for name in TABLE_NAMES}
+    assert counts == {
+        "projects": 5,
+        "sections": 3,
+        "labels": 2,
+        "tasks": 13,
+        "task_labels": 2,
+        "comments": 7,
+        "completions": 3,
+    }
+    paths = [
+        path for (path,) in query(database, "SELECT attachment_path FROM comments WHERE attachment_path IS NOT NULL")
+    ]
+    assert len(paths) == 4
+    for path in paths:
+        assert "\\" not in path and path.startswith("attachments/")
+        assert (backup / path).is_file()
+    assert list(metadata_of(database.parent / "todoist ü.metadata.json")["databases"]) == ["todoist ü"]

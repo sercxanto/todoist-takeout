@@ -40,9 +40,9 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 5. Messages, documentation and the whole command
 
-- [ ] 5.1 Add the messages and exit codes of design D9, with `sqlite3.Error` reported as a storage error naming the database. Verify with CLI tests for the scenarios of the spec requirement "Diagnostic output and exit status", that an interrupt exits 130, and that the last stderr line of a failed run explains it
-- [ ] 5.2 Run the whole command on a backup built by `run_backup` from the existing fixtures, with a backup path and a database path that contain a space and a non-ASCII character (design D13). Verify that the database holds the expected row counts and that `attachment_path` uses `/`
-- [ ] 5.3 Write the README section "Viewing the backup" of design D11: the command, `uvx datasette todoist.db -m todoist.metadata.json`, the tables and their columns in short, the warning against Datasette's `-i`, and roadmap item 5 marked implemented with links to the spec and the archived planning. Update the SQLite line in CONTRIBUTING.md's key decisions. Verify that the documented commands run as written against a test backup
+- [x] 5.1 Add the messages and exit codes of design D9, with `sqlite3.Error` reported as a storage error naming the database. Verify with CLI tests for the scenarios of the spec requirement "Diagnostic output and exit status", that an interrupt exits 130, and that the last stderr line of a failed run explains it
+- [x] 5.2 Run the whole command on a backup built by `run_backup` from the existing fixtures, with a backup path and a database path that contain a space and a non-ASCII character (design D13). Verify that the database holds the expected row counts and that `attachment_path` uses `/`
+- [x] 5.3 Write the README section "Viewing the backup" of design D11: the command, `uvx datasette todoist.db -m todoist.metadata.json`, the tables and their columns in short, the warning against Datasette's `-i`, and roadmap item 5 marked implemented with links to the spec and the archived planning. Update the SQLite line in CONTRIBUTING.md's key decisions. Verify that the documented commands run as written against a test backup
 
 ## 6. Integration checks
 

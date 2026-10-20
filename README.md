@@ -2,7 +2,7 @@
 
 A command-line tool that keeps a complete, long-term readable local backup of a [Todoist](https://www.todoist.com) account.
 
-> **Status:** early. Backing up active data (projects, sections, labels, tasks, comments and the other resources of the sync API), completed tasks, with every completion of recurring tasks and the comments of completed tasks, archived projects, and the files uploaded to comments works. See the [Roadmap](#roadmap) for what comes next.
+> **Status:** early. Backing up active data (projects, sections, labels, tasks, comments and the other resources of the sync API), completed tasks, with every completion of recurring tasks and the comments of completed tasks, archived projects, and the files uploaded to comments works, and so does a SQLite database for browsing the backup in Datasette. See the [Roadmap](#roadmap) for what comes next.
 
 ## Why
 
@@ -140,6 +140,43 @@ and register it to run daily at 03:00:
 schtasks /Create /SC DAILY /ST 03:00 /TN "todoist-takeout" /TR "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\Users\me\todoist-takeout.ps1"
 ```
 
+### Viewing the backup
+
+The `sqlite` command builds a SQLite database from a backup, which [Datasette](https://datasette.io) shows in your web browser, with filters, facets and full-text search:
+
+```sh
+todoist-takeout sqlite ~/Backups/todoist ~/todoist.db
+uvx datasette ~/todoist.db -m ~/todoist.metadata.json
+```
+
+Then open the address that Datasette prints, usually http://127.0.0.1:8001. Datasette is not part of todoist-takeout; `uvx` runs it without installing it, and `pipx run datasette` works as well.
+
+The command works offline, needs no token, and never changes the backup. It holds the backup's lock while it reads, so it stops with "another run is in progress" while a backup is running, and the other way round. Next to the database it writes the Datasette metadata file, named after the database with `.metadata.json` in place of its suffix, which describes every table and column. Both arguments are required. The command refuses to overwrite a file that is not a database or metadata file it wrote itself.
+
+Every run rebuilds the whole database from the backup, so run it again after each backup, for example in the same scheduled job. A running Datasette shows the new content on its next page load; do not start it with `-i` (immutable mode), which assumes the file never changes. If another program keeps the database locked for more than 10 seconds, the run fails and the database keeps its previous content.
+
+The database is a simplified view for browsing, not a copy of the backup: each object appears once, from its current copy; deleted objects are left out; reminders, filters, collaborators, workspaces, settings, view options and statistics are left out. Its tables:
+
+| Table | Holds |
+|---|---|
+| `projects` | Every project, archived ones included: name, description, parent project, archived, favorite, color, creation and update times. |
+| `sections` | Every section, also of archived projects: name, project, archived, creation and archive times. |
+| `labels` | The personal labels: name, color, favorite. |
+| `tasks` | Every task, open and completed: name, description, project, section, parent task, status (`open` or `completed`), priority (`p1` to `p4` as Todoist shows it), due date and whether it recurs, deadline, creation, completion and update times. |
+| `task_labels` | One row per label of a task, with a link to the personal label of that name, if there is one. |
+| `comments` | Every comment of a task or project: text, time, the name of an attached file and its path in the backup (if downloaded), or the URL of an attached link. |
+| `completions` | One row per completion, every completion of a recurring task included, also of tasks deleted since: the task, its name and project at the time, the completion time, and whether it comes from the activity log or from before the first backup. |
+
+Full-text search covers the names and descriptions of tasks and the text of comments. The schema may change with any version of the tool, as the database is always rebuilt; for migration scripts, read the JSON backup, whose format is documented and versioned.
+
+`sqlite` takes `-q`/`--quiet` and `-v`/`--verbose` like `backup`. A successful run ends with a summary line such as:
+
+```
+INFO database complete: 24 projects, 9 sections, 7 labels, 113 tasks, 41 task labels, 15 comments, 340 completions, 0 warnings
+```
+
+It exits with 0 when the database is complete, possibly with warnings; 1 when the build failed after it started, for example because a backup run holds the backup directory or another program keeps the database locked, and the database keeps its previous content; 2 for usage or configuration errors, such as a directory that is not a backup, or a database or metadata file path that holds a file the tool did not write.
+
 ### Platform notes
 
 - **macOS certificates:** Python from python.org ships without CA certificates. If runs fail with `cannot verify the TLS certificate`, run *Install Certificates.command* from the Python folder in Applications, or point `SSL_CERT_FILE` at a CA bundle. The tool never turns certificate verification off.
@@ -152,7 +189,7 @@ schtasks /Create /SC DAILY /ST 03:00 /TN "todoist-takeout" /TR "powershell -NoPr
 2. **Back up completed tasks** *(implemented)*: month files for completed tasks, written incrementally, with every completion of recurring tasks and the comments of completed tasks. The behaviour is specified in [openspec/specs/completed-tasks-backup/](openspec/specs/completed-tasks-backup/); the planning is archived in [openspec/changes/archive/2026-10-18-add-completed-tasks-backup/](openspec/changes/archive/2026-10-18-add-completed-tasks-backup/).
 3. **Back up archived projects** *(implemented)*: a snapshot per archived project with its sections, open and completed tasks, sub-projects and comments, which the sync endpoint does not return. The behaviour is specified in [openspec/specs/archived-projects-backup/](openspec/specs/archived-projects-backup/); the planning is archived in [openspec/changes/archive/2026-10-19-add-archived-projects-backup/](openspec/changes/archive/2026-10-19-add-archived-projects-backup/).
 4. **Download attachment files** *(implemented)*: the file uploaded to each stored comment, downloaded once into `attachments/<comment id>/`, with the token sent only to Todoist's hosts. The behaviour is specified in [openspec/specs/attachment-downloads/](openspec/specs/attachment-downloads/); the planning is archived in [openspec/changes/archive/2026-10-20-add-attachment-downloads/](openspec/changes/archive/2026-10-20-add-attachment-downloads/).
-5. **Derive a SQLite database** from the raw JSON, for queries and migration.
+5. **Derive a SQLite database** *(implemented)*: the `sqlite` command, which builds a simplified SQLite database and a Datasette metadata file from the backup, for browsing and searching it. The behaviour is specified in [openspec/specs/sqlite-view/](openspec/specs/sqlite-view/); the planning is archived in [openspec/changes/archive/2026-10-20-add-sqlite-view/](openspec/changes/archive/2026-10-20-add-sqlite-view/).
 6. **Download Todoist's own backups** (`/api/v1/backups`) as an additional safety net. This is an idea, not yet evaluated.
 
 The documented storage schema is part of each step and grows with the backup format.

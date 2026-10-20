@@ -100,15 +100,15 @@ def main(argv: list[str] | None = None, *, client_factory: ClientFactory = defau
     with _Logging(level, token) as counter:
         try:
             if not backup:
-                sqlite_view.run(args.backup, args.database)
-                return 0
-            if not token:
+                built = sqlite_view.run(args.backup, args.database)
+            elif not token:
                 raise ConfigError(
                     f"the environment variable {TOKEN_VARIABLE} is not set or empty; "
                     "set it to your Todoist personal API token"
                 )
-            client = client_factory(token, args.max_rate_limit_wait)
-            stats = run_backup(args.target, client)
+            else:
+                client = client_factory(token, args.max_rate_limit_wait)
+                stats = run_backup(args.target, client)
         except TakeoutError as exc:
             _report_failure(str(exc), args.verbose)
             return exc.exit_code
@@ -120,6 +120,15 @@ def main(argv: list[str] | None = None, *, client_factory: ClientFactory = defau
             hint = "" if args.verbose else "; rerun with --verbose for details"
             _report_failure(f"unexpected error: {type(exc).__name__}: {exc}{hint}", args.verbose)
             return 1
+        if not backup:
+            log.info(
+                "view it with: datasette %s -m %s",
+                _argument(args.database),
+                _argument(sqlite_view.metadata_file(args.database)),
+            )
+            rows = [_plural(count, table.replace("_", " ")[:-1]) for table, count in built.rows.items()]
+            log.info("database complete: %s, %s", ", ".join(rows), _plural(counter.warnings, "warning"))
+            return 0
         log.info(
             "backup complete: %d objects written, %d unchanged, %d marked deleted, %s",
             stats.written,
@@ -134,6 +143,11 @@ def _report_failure(message: str, verbose: bool) -> None:
     if verbose:
         log.debug("traceback of the failure:", exc_info=True)
     log.error("%s", message)  # always the last line on stderr
+
+
+def _argument(path: Path) -> str:
+    # Double quotes keep a path with spaces one argument in the shells of Windows, macOS and Linux.
+    return f'"{path}"' if " " in str(path) else str(path)
 
 
 def _plural(count: int, noun: str) -> str:
