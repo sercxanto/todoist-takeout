@@ -6,13 +6,6 @@ gestrichen oder verlinkt.
 
 Status: `roh` · `geklärt` · `als Change angelegt` · `verworfen`
 
-## Lizenz wählen
-
-- Status: roh
-- Präferenz: MIT
-- Offen: `LICENSE`-Datei anlegen und in `pyproject.toml` eintragen. Kann
-  eventuell direkt in einer Session erledigt werden.
-
 ## Umbenennung des Repos passend zu Datasette
 
 - Status: roh

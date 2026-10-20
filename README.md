@@ -269,3 +269,7 @@ python scripts/record_fixtures.py shapes                   # regenerate shapes.j
 ```
 
 Review the recorded files for personal data before you commit them.
+
+## License
+
+[MIT](LICENSE)
