@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [project]
 name = "todoist-takeout"
@@ -25,14 +25,17 @@ test = ["pytest>=7"]
 [project.scripts]
 todoist-takeout = "todoist_takeout.cli:main"
 
-[tool.setuptools.dynamic]
-version = { attr = "todoist_takeout.__version__" }
+[tool.hatch.version]
+path = "src/todoist_takeout/__init__.py"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/todoist_takeout"]
 
-[tool.setuptools.package-data]
-todoist_takeout = ["storage_format.md"]
+[tool.hatch.build.targets.sdist]
+# The whole test suite with its fixtures and the fixture recorder it loads, so tests run from an
+# unpacked sdist.
+include = ["src/", "tests/", "scripts/", "README.md", "LICENSE"]
+exclude = ["tests/contract/findings/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
