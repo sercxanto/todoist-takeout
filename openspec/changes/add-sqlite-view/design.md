@@ -112,7 +112,7 @@ con.execute("BEGIN IMMEDIATE")
 con.execute("COMMIT")
 ```
 
-SQLite's DDL is transactional, so dropping and recreating the schema is part of the same atomic commit. The default rollback journal (`journal_mode=DELETE`) is kept: it leaves no extra files next to the database after the commit and works on network file systems. A new database is created with `PRAGMA auto_vacuum = FULL` before its first table, so the file shrinks again after a rebuild with fewer rows; no `VACUUM` is needed.
+SQLite's DDL is transactional, so dropping and recreating the schema is part of the same atomic commit. The default rollback journal (`journal_mode=DELETE`) is kept: it leaves no extra files next to the database after the commit and works on network file systems. A new database is created with `PRAGMA auto_vacuum = FULL` before its first table, so the file shrinks again after a rebuild with fewer rows; no `VACUUM` is needed. For a new (missing or empty) file the transaction therefore starts with a deferred `BEGIN` and that pragma as its first statement: inside `BEGIN IMMEDIATE` SQLite ignores it, and outside a transaction it writes a header without the `application_id` at once, which a failed first run would leave behind for D7 to refuse. SQLite's own tables (`sqlite_sequence`, `sqlite_stat1`) are not dropped, which SQLite does not allow for all of them; dropping the tables empties their rows.
 
 `isolation_level=None` makes the Python module leave transaction control to the explicit statements, which behaves the same on Python 3.11 to 3.13. The busy timeout of 10 seconds covers a reader that is in the middle of a query; a reader that keeps a transaction open beyond that fails the run with `StorageError` (exit 1), and the rollback leaves the previous content.
 
