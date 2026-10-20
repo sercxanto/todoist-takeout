@@ -1,4 +1,6 @@
+import asyncio
 import errno
+import json
 import os
 import sqlite3
 import subprocess
@@ -830,13 +832,15 @@ def test_failed_build_keeps_the_previous_content(tmp_path, monkeypatch, capsys, 
     put(backup, "sync/items/T1.json", task("T1"))
     database = build_db(backup, tmp_path / "todoist.db")
     before = dump(database)
+    metadata = (tmp_path / "todoist.metadata.json").read_bytes()
     put(backup, "sync/items/T2.json", task("T2"))
     put(backup, "sync/labels/L.json", {"id": "L", "name": "new"})
     fail_after_tasks(monkeypatch, error)
     assert main(["sqlite", str(backup), str(database)]) == code
     assert stderr_lines(capsys)[-1].startswith("ERROR ")
     assert dump(database) == before
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["backup", "todoist.db"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["backup", "todoist.db", "todoist.metadata.json"]
+    assert (tmp_path / "todoist.metadata.json").read_bytes() == metadata
 
 
 def test_failed_first_build_leaves_no_tables(tmp_path, monkeypatch):
@@ -998,3 +1002,156 @@ def test_other_errors_of_the_search_tables_fail_the_build(tmp_path, monkeypatch,
     monkeypatch.setattr(sqlite3, "connect", lambda *args, **kwargs: real_connect(*args, factory=Broken, **kwargs))
     assert main(["sqlite", str(backup), str(tmp_path / "todoist.db")]) == 1
     assert "disk I/O error" in stderr_lines(capsys)[-1]
+
+
+# --- 4.1 the metadata file ----------------------------------------------------------------
+
+
+def metadata_of(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("name", ["todoist.db", "todoist", "todoist.sqlite"])
+def test_name_of_the_metadata_file(tmp_path, name):
+    backup = new_backup(tmp_path / "backup")
+    build_db(backup, tmp_path / name)
+    assert sorted(p.name for p in tmp_path.iterdir()) == sorted({"backup", name, "todoist.metadata.json"})
+    assert list(metadata_of(tmp_path / "todoist.metadata.json")["databases"]) == ["todoist"]
+
+
+@pytest.mark.parametrize("kind", ["text", "other json", "json list", "directory"])
+def test_foreign_metadata_file(tmp_path, capsys, monkeypatch, kind):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/T1.json", task("T1"))
+    database = build_db(backup, tmp_path / "todoist.db")
+    path = tmp_path / "todoist.metadata.json"
+    path.unlink()
+    if kind == "text":
+        path.write_bytes(b"my notes\n")
+    elif kind == "other json":
+        path.write_bytes(b'{"title": "mine", "source": "me"}\n')
+    elif kind == "json list":
+        path.write_bytes(b'["todoist-takeout"]\n')
+    else:
+        path.mkdir()
+        (path / "inside.txt").write_bytes(b"mine\n")
+    put(backup, "sync/items/T2.json", task("T2"))
+    before = snapshot_of(tmp_path)
+    connects = []
+    monkeypatch.setattr(sqlite3, "connect", lambda *args, **kwargs: connects.append(args))
+    assert main(["sqlite", str(backup), str(database)]) == 2
+    last = stderr_lines(capsys)[-1]
+    assert last.startswith("ERROR ") and str(path) in last
+    assert snapshot_of(tmp_path) == before
+    assert connects == []
+
+
+def test_foreign_metadata_file_before_a_new_database(tmp_path, capsys):
+    backup = new_backup(tmp_path / "backup")
+    (tmp_path / "todoist.metadata.json").write_bytes(b"{}\n")
+    assert main(["sqlite", str(backup), str(tmp_path / "todoist.db")]) == 2
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["backup", "todoist.metadata.json"]
+
+
+def test_every_table_and_column_is_described(tmp_path):
+    database = build_db(build_backup(tmp_path / "backup"), tmp_path / "todoist.db")
+    tables = metadata_of(tmp_path / "todoist.metadata.json")["databases"]["todoist"]["tables"]
+    assert sorted(tables) == TABLE_NAMES == tables_of(database)
+    for name, options in tables.items():
+        assert options["description"]
+        columns = [row[1] for row in query(database, f"PRAGMA table_info({name})")]
+        assert list(options["columns"]) == columns
+        assert all(options["columns"].values())
+
+
+def test_datasette_options(tmp_path):
+    backup = new_backup(tmp_path / "backup")
+    storage.write_state(backup, {**storage.new_state(), "last_successful_run_utc": "2026-10-18T10:00:05Z"})
+    build_db(backup, tmp_path / "todoist.db")
+    value = metadata_of(tmp_path / "todoist.metadata.json")
+    assert value["source"] == "todoist-takeout"
+    assert str(backup) in value["description"] and "2026-10-18T10:00:05Z" in value["description"]
+    tables = value["databases"]["todoist"]["tables"]
+    assert tables["tasks"]["facets"] == ["status", "project_id", "priority", "is_recurring"]
+    assert tables["tasks"]["sort_desc"] == "updated_at"
+    assert tables["completions"]["facets"] == ["source", "project_id"]
+    assert tables["completions"]["sort_desc"] == "completed_at"
+    assert tables["comments"]["sort_desc"] == "posted_at"
+    labels = {name: options.get("label_column") for name, options in tables.items()}
+    assert labels == {name: None for name in TABLE_NAMES} | {
+        "projects": "name",
+        "sections": "name",
+        "labels": "name",
+        "tasks": "content",
+    }
+    search = {name: options.get("fts_table") for name, options in tables.items()}
+    assert search == {name: None for name in TABLE_NAMES} | {"tasks": "tasks_fts", "comments": "comments_fts"}
+
+
+def test_metadata_without_full_text_search(tmp_path, monkeypatch):
+    backup = new_backup(tmp_path / "backup")
+    real_connect = sqlite3.connect
+    monkeypatch.setattr(sqlite3, "connect", lambda *args, **kwargs: real_connect(*args, factory=_NoFts5, **kwargs))
+    build_db(backup, tmp_path / "todoist.db")
+    tables = metadata_of(tmp_path / "todoist.metadata.json")["databases"]["todoist"]["tables"]
+    assert all("fts_table" not in options for options in tables.values())
+
+
+def test_metadata_is_the_same_on_two_runs(tmp_path):
+    backup = build_backup(tmp_path / "backup")
+    path = tmp_path / "todoist.metadata.json"
+    build_db(backup, tmp_path / "todoist.db")
+    first = path.read_bytes()
+    build_db(backup, tmp_path / "todoist.db")
+    assert path.read_bytes() == first
+
+
+def test_failed_metadata_write_is_repeated_by_the_next_run(tmp_path, monkeypatch, capsys):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/T1.json", task("T1"))
+    database = tmp_path / "todoist.db"
+
+    def failing(path, data, **kwargs):
+        raise StorageError(f"cannot write {path}: No space left on device")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(storage, "write_bytes_atomic", failing)
+        assert main(["sqlite", str(backup), str(database)]) == 1
+    assert "todoist.metadata.json" in stderr_lines(capsys)[-1]
+    assert query(database, "SELECT id FROM tasks") == [("T1",)]
+    build_db(backup, database)
+    assert metadata_of(tmp_path / "todoist.metadata.json")["source"] == "todoist-takeout"
+
+
+# --- 4.2 Datasette ------------------------------------------------------------------------
+
+
+def test_opened_in_datasette(tmp_path):
+    from datasette.app import Datasette
+
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/projects/P1.json", project("P1", name="Steuern"))
+    put(backup, "sync/items/T1.json", task("T1", project_id="P1", description="Termin beim Steuerberater"))
+    put(backup, "sync/items/T2.json", task("T2", project_id="P1", description="Zahnarzt"))
+    database = build_db(backup, tmp_path / "todoist.db")
+
+    async def get(ds, path):
+        response = await ds.client.get(path)
+        assert response.status_code == 200, path
+        return response
+
+    async def browse():
+        ds = Datasette(files=[str(database)], metadata=metadata_of(tmp_path / "todoist.metadata.json"))
+        await ds.invoke_startup()
+        page = (await get(ds, "/todoist/tasks")).text
+        table = (await get(ds, "/todoist/tasks.json?_labels=on&_shape=objects")).json()
+        found = (await get(ds, "/todoist/tasks.json?_search=Steuerberater&_shape=objects")).json()
+        return page, table, found
+
+    page, table, found = asyncio.run(browse())
+    tasks = next(t for t in TABLES if t.name == "tasks")
+    assert tasks.description in page
+    assert 'data-column-description="open or completed."' in page
+    assert list(table["facet_results"]) == ["status", "project_id", "priority", "is_recurring"]
+    assert [row["project_id"] for row in table["rows"]] == [{"value": "P1", "label": "Steuern"}] * 2
+    assert [row["id"] for row in found["rows"]] == ["T1"]

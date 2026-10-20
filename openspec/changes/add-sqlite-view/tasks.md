@@ -35,8 +35,8 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 4. Datasette metadata file
 
-- [ ] 4.1 Generate the metadata file of design D8 from the same table definitions as the schema, with descriptions of every table and column, facets, sort orders, label columns and `fts_table` (left out without FTS5), and write it atomically after the commit. Verify with tests for the scenarios "Name of the metadata file" and "Foreign metadata file" (checked before the database is touched), that every table and column of the database has a description, and that the file is byte-identical on two runs over the same backup
-- [ ] 4.2 Add `datasette>=0.65.5,<0.66` to the `dev` dependency group and update `uv.lock`, then add the in-process Datasette test of design D12 for the scenario "Opened in Datasette": descriptions shown, facets offered on `tasks`, the project's name in place of `project_id`, and a search over `tasks` that finds a word of a description. Verify that `uv sync --locked` succeeds and the test passes
+- [x] 4.1 Generate the metadata file of design D8 from the same table definitions as the schema, with descriptions of every table and column, facets, sort orders, label columns and `fts_table` (left out without FTS5), and write it atomically after the commit. Verify with tests for the scenarios "Name of the metadata file" and "Foreign metadata file" (checked before the database is touched), that every table and column of the database has a description, and that the file is byte-identical on two runs over the same backup
+- [x] 4.2 Add `datasette>=0.65.5,<0.66` to the `dev` dependency group and update `uv.lock`, then add the in-process Datasette test of design D12 for the scenario "Opened in Datasette": descriptions shown, facets offered on `tasks`, the project's name in place of `project_id`, and a search over `tasks` that finds a word of a description. Verify that `uv sync --locked` succeeds and the test passes
 
 ## 5. Messages, documentation and the whole command
 

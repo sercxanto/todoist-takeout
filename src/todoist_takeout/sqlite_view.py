@@ -6,6 +6,7 @@ count as deleted (design D4). Completions are taken from the completion records 
 database is then rebuilt in one transaction in the existing file (design D5, D6).
 """
 
+import json
 import logging
 import re
 import sqlite3
@@ -39,15 +40,19 @@ _MONTH_FILE = re.compile(r"\d{4}-\d{2}\.json")
 
 
 def run(backup: Path, database: Path) -> "Built":
-    """Build the database at `database` from the backup in `backup` (design D2)."""
+    """Build the database at `database` and its metadata file from the backup in `backup` (design D2)."""
     backup, database = Path(backup), Path(database)
-    check_backup(backup)
+    state = check_backup(backup)
     check_database(database)
+    metadata_path = metadata_file(database)
+    check_metadata(metadata_path)
     log.info("reading the backup in %s", backup)
     with _locked(backup):
         content = read_backup(backup)
     log.info("building %s", database)
-    return build(database, content)
+    built = build(database, content)
+    storage.write_bytes_atomic(metadata_path, storage.encode_json(metadata(database, backup, state, built.search)))
+    return built
 
 
 def check_backup(backup: Path) -> dict:
@@ -394,6 +399,10 @@ class Table:
     rows: Callable[["Content"], Iterable[tuple]]  # the rows, in column order and in order of the key
     primary_key: tuple[str, ...] = ("id",)
     search: tuple[str, ...] = ()  # the columns of the full-text search table `<name>_fts` (design D10)
+    # Datasette's table options in the metadata file (design D8).
+    facets: tuple[str, ...] = ()
+    sort_desc: str | None = None
+    label_column: str | None = None
 
     def create_statement(self) -> str:
         columns = [
@@ -534,6 +543,7 @@ TABLES = (
             Column("updated_at", "TEXT", "When the project last changed, in UTC."),
         ),
         _project_rows,
+        label_column="name",
     ),
     Table(
         "sections",
@@ -547,6 +557,7 @@ TABLES = (
             Column("archived_at", "TEXT", "When the section was archived, in UTC."),
         ),
         _section_rows,
+        label_column="name",
     ),
     Table(
         "labels",
@@ -558,6 +569,7 @@ TABLES = (
             Column("is_favorite", "INTEGER", "1 if the label is a favorite, else 0."),
         ),
         _label_rows,
+        label_column="name",
     ),
     Table(
         "tasks",
@@ -581,6 +593,9 @@ TABLES = (
         ),
         _task_rows,
         search=("content", "description"),
+        facets=("status", "project_id", "priority", "is_recurring"),
+        sort_desc="updated_at",
+        label_column="content",
     ),
     Table(
         "task_labels",
@@ -612,6 +627,7 @@ TABLES = (
         ),
         _comment_rows,
         search=("content",),
+        sort_desc="posted_at",
     ),
     Table(
         "completions",
@@ -629,6 +645,8 @@ TABLES = (
             ),
         ),
         _completion_rows,
+        facets=("source", "project_id"),
+        sort_desc="completed_at",
     ),
 )
 
@@ -736,3 +754,68 @@ def _create_search(con: sqlite3.Connection) -> bool:
 
 def _quote(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
+
+
+# --- The Datasette metadata file (design D8) ----------------------------------------------------
+
+# The `source` that marks a metadata file as the tool's own.
+METADATA_SOURCE = "todoist-takeout"
+METADATA_SUFFIX = ".metadata.json"
+SOURCE_URL = "https://github.com/sercxanto/todoist-takeout"
+
+
+def metadata_file(database: Path) -> Path:
+    """The metadata file of `database`: its name with the last suffix replaced, or appended."""
+    return database.with_suffix(METADATA_SUFFIX)
+
+
+def check_metadata(path: Path) -> None:
+    """Raise ConfigError unless `path` is missing or a metadata file the tool wrote."""
+    if path.is_dir():
+        raise ConfigError(f"the metadata file path {path} is a directory")
+    try:
+        data = storage.read_bytes(path)
+    except StorageError as exc:
+        raise ConfigError(str(exc)) from exc
+    if data is None:
+        return
+    try:
+        value = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        value = None
+    if not isinstance(value, dict) or value.get("source") != METADATA_SOURCE:
+        raise ConfigError(
+            f"{path} exists and was not written by todoist-takeout; it and the database were left unchanged. "
+            "Choose another database path"
+        )
+
+
+def metadata(database: Path, backup: Path, state: dict, search: bool) -> dict:
+    """Datasette's metadata of the database, from the table definitions (design D8).
+
+    `fts_table` is set only if the database has full-text search.
+    """
+    description = f"Built by todoist-takeout from the backup in {backup}"
+    last_run = state.get("last_successful_run_utc")
+    if isinstance(last_run, str):
+        description += f", last backed up {last_run}"
+    tables = {}
+    for table in TABLES:
+        options: dict = {"description": table.description, "columns": {c.name: c.description for c in table.columns}}
+        if table.facets:
+            options["facets"] = list(table.facets)
+        if table.sort_desc:
+            options["sort_desc"] = table.sort_desc
+        if table.label_column:
+            options["label_column"] = table.label_column
+        if search and table.search:
+            options["fts_table"] = table.search_table
+        tables[table.name] = options
+    return {
+        "title": "Todoist backup",
+        "description": description + ".",
+        "source": METADATA_SOURCE,
+        "source_url": SOURCE_URL,
+        # Datasette names a database after its file name without the suffix.
+        "databases": {database.stem: {"tables": tables}},
+    }
