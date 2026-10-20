@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  # The actions in .github/workflows/, pinned by commit hash.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # A release is proposed only once it is a week old, so a compromised release that is pulled again
+    # within days never reaches CI.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # The development dependencies in pyproject.toml and uv.lock; the package itself has none.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      dev-dependencies:
+        patterns: ["*"]
