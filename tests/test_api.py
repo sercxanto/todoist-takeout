@@ -1,19 +1,27 @@
+import email.message
 import gzip
+import http.client
+import io
 import json
 import logging
 import threading
+import urllib.error
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from todoist_takeout import __version__, api
+from todoist_takeout import __version__, api, storage
 from todoist_takeout.errors import (
     ApiError,
+    AttachmentRefused,
+    AttachmentUnusable,
     AuthError,
     NetworkError,
     PlanRestricted,
     RateLimitExhausted,
+    SizeMismatch,
+    UnexpectedHost,
 )
 
 TOKEN = "0123456789abcdef0123456789abcdef01234567"
@@ -503,3 +511,488 @@ def test_pages_keep_large_integers_exact():
     event_id = 2**127 + 12345
     pages, _requests = _cursor_walk((200, {}, f'{{"results": [{{"id": {event_id}}}]}}'.encode()))
     assert pages[0]["results"][0]["id"] == event_id
+
+
+# --- Attachment files: host check (add-attachment-downloads 3.1) ---------------
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://todoist.com/file.pdf",
+        "https://files.todoist.com/a/b/file.pdf",
+        "https://FILES.Todoist.COM/a/b/file.pdf",
+        "https://files.todoist.com:443/a/b/file.pdf",
+        "https://a.b.todoist.com/x",
+    ],
+)
+def test_todoist_file_urls_are_allowed(url):
+    assert api.is_todoist_file_url(url)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://files.todoist.com/a/b/file.pdf",
+        "https://todoist.com.example.net/file.pdf",
+        "https://evil-todoist.com/file.pdf",
+        "https://user@files.todoist.com/file.pdf",
+        "https://user:secret@files.todoist.com/file.pdf",
+        "https://files.todoist.com:8443/file.pdf",
+        "https://files.todoist.com:notaport/file.pdf",
+        "https://.todoist.com/file.pdf",
+        "https://files.todoist.com./file.pdf",
+        "https://files.todoist.com\\@example.net/file.pdf",
+        "https://example.com/files.todoist.com/file.pdf",
+        "https://example.com/?u=https://files.todoist.com/",
+        "ftp://files.todoist.com/file.pdf",
+        "//files.todoist.com/file.pdf",
+        "files.todoist.com/file.pdf",
+        "",
+        None,
+        42,
+    ],
+)
+def test_other_urls_are_rejected(url):
+    assert not api.is_todoist_file_url(url)
+
+
+# --- Attachment files: transport (add-attachment-downloads 3.2) ----------------
+
+FILE_URL = "https://files.todoist.com/app/n1/preise.pdf"
+SIGNED_URL = "https://d1abc.cloudfront.net/app/n1/preise.pdf?Expires=1&Signature=s3cr3t&Key-Pair-Id=K"
+
+
+class _StubResponse(io.BytesIO):
+    def __init__(self, status, headers, body, fail_after=None):
+        super().__init__(body)
+        self.status = status
+        self.headers = headers
+        self._fail_after = fail_after
+
+    def read(self, size=-1):
+        if self._fail_after is not None and self.tell() >= self._fail_after:
+            raise TimeoutError("timed out")
+        return super().read(size)
+
+
+class _StubOpener:
+    """Answers like the transport's real opener, which never follows redirects: non-2xx raise HTTPError."""
+
+    def __init__(self, routes):
+        self.routes = routes
+        self.requests = []
+
+    def open(self, request, timeout):
+        self.requests.append((request.full_url, request.get_header("Authorization"), request.get_header("Accept-encoding")))
+        route = self.routes[request.full_url]
+        if isinstance(route, Exception):
+            raise route
+        status, headers, body, *fail_after = route
+        message = email.message.Message()
+        for name, value in headers.items():
+            message[name] = value
+        if 200 <= status < 300:
+            return _StubResponse(status, message, body, *fail_after)
+        raise urllib.error.HTTPError(request.full_url, status, "stub", message, io.BytesIO(body))
+
+
+def _stub_transport(routes):
+    transport = api.UrllibTransport(TOKEN)
+    transport._opener = _StubOpener(routes)
+    return transport, transport._opener
+
+
+def _collect(chunks):
+    return b"".join(chunks)
+
+
+def test_download_sends_the_token_to_a_todoist_host():
+    transport, opener = _stub_transport({FILE_URL: (200, {}, b"%PDF-1.7")})
+    status, _headers, body = transport.download(FILE_URL, _collect)
+    assert (status, body) == (200, b"%PDF-1.7")
+    assert opener.requests == [(FILE_URL, f"Bearer {TOKEN}", "identity")]
+
+
+def test_download_follows_a_redirect_to_a_storage_host_without_the_token():
+    transport, opener = _stub_transport(
+        {
+            FILE_URL: (302, {"Location": SIGNED_URL}, b""),
+            SIGNED_URL: (200, {"Content-Length": "8"}, b"%PDF-1.7"),
+        }
+    )
+    assert transport.download(FILE_URL, _collect)[2] == b"%PDF-1.7"
+    assert opener.requests == [(FILE_URL, f"Bearer {TOKEN}", "identity"), (SIGNED_URL, None, "identity")]
+
+
+def test_download_sends_no_token_on_a_redirect_back_to_a_todoist_host():
+    other = "https://files.todoist.com/app/n1/other.pdf"
+    transport, opener = _stub_transport({FILE_URL: (301, {"Location": other}, b""), other: (200, {}, b"x")})
+    transport.download(FILE_URL, _collect)
+    assert [auth for _url, auth, _enc in opener.requests] == [f"Bearer {TOKEN}", None]
+
+
+def test_download_resolves_a_relative_location():
+    transport, opener = _stub_transport(
+        {FILE_URL: (307, {"Location": "/moved/preise.pdf"}, b""), "https://files.todoist.com/moved/preise.pdf": (200, {}, b"x")}
+    )
+    assert transport.download(FILE_URL, _collect)[2] == b"x"
+    assert opener.requests[1][:2] == ("https://files.todoist.com/moved/preise.pdf", None)
+
+
+@pytest.mark.parametrize("location", ["http://storage.example.net/preise.pdf", "ftp://files.todoist.com/x", "http://files.todoist.com/x"])
+def test_download_does_not_follow_a_redirect_that_is_not_https(location):
+    transport, opener = _stub_transport({FILE_URL: (302, {"Location": location}, b"")})
+    with pytest.raises(api.RedirectNotFollowed, match="not HTTPS") as info:
+        transport.download(FILE_URL, _collect)
+    assert info.value.http_status == 302
+    assert len(opener.requests) == 1
+
+
+def _redirect_chain(hops):
+    urls = [FILE_URL] + [f"https://hop{i}.example.net/f" for i in range(1, hops + 1)]
+    routes = {url: (302, {"Location": nxt}, b"") for url, nxt in zip(urls, urls[1:])}
+    routes[urls[-1]] = (200, {}, b"done")
+    return routes
+
+
+def test_download_follows_five_redirects():
+    transport, opener = _stub_transport(_redirect_chain(5))
+    assert transport.download(FILE_URL, _collect)[2] == b"done"
+    assert len(opener.requests) == 6
+    assert [auth for _url, auth, _enc in opener.requests] == [f"Bearer {TOKEN}"] + [None] * 5
+
+
+def test_download_stops_at_the_sixth_redirect():
+    transport, opener = _stub_transport(_redirect_chain(6))
+    with pytest.raises(api.RedirectNotFollowed, match="after 5 redirects"):
+        transport.download(FILE_URL, _collect)
+    assert len(opener.requests) == 6
+
+
+@pytest.mark.parametrize("status, headers", [(302, {}), (300, {"Location": SIGNED_URL}), (304, {})])
+def test_download_does_not_follow_other_3xx(status, headers):
+    transport, opener = _stub_transport({FILE_URL: (status, headers, b"")})
+    with pytest.raises(api.RedirectNotFollowed):
+        transport.download(FILE_URL, _collect)
+    assert len(opener.requests) == 1
+
+
+def test_download_sends_no_token_to_a_foreign_first_url():
+    url = "https://example.com/preise.pdf"
+    transport, opener = _stub_transport({url: (200, {}, b"x")})
+    transport.download(url, _collect)
+    assert opener.requests == [(url, None, "identity")]
+
+
+def test_download_returns_error_statuses_with_the_start_of_the_body():
+    transport, _opener = _stub_transport({FILE_URL: (404, {}, b"Not Found")})
+    status, _headers, body = transport.download(FILE_URL, lambda chunks: pytest.fail("write called"))
+    assert (status, body) == (404, b"Not Found")
+
+
+def test_download_streams_in_blocks():
+    body = bytes(range(256)) * 1024  # 256 KiB
+    transport, _opener = _stub_transport({FILE_URL: (200, {}, body)})
+    sizes = []
+
+    def write(chunks):
+        data = b""
+        for chunk in chunks:
+            sizes.append(len(chunk))
+            data += chunk
+        return data
+
+    assert transport.download(FILE_URL, write)[2] == body
+    assert sizes == [api.CHUNK_SIZE] * 4
+
+
+@pytest.mark.parametrize("encoding", ["gzip", "x-gzip", "GZIP"])
+def test_download_decodes_gzip_sent_anyway(encoding):
+    payload = "Größe 🍎\n".encode("utf-8") * 10000
+    transport, _opener = _stub_transport({FILE_URL: (200, {"Content-Encoding": encoding}, gzip.compress(payload))})
+    assert transport.download(FILE_URL, _collect)[2] == payload
+
+
+def test_download_rejects_a_cut_off_gzip_body():
+    data = gzip.compress(b"x" * 100000)
+    transport, _opener = _stub_transport({FILE_URL: (200, {"Content-Encoding": "gzip"}, data[: len(data) // 2])})
+    with pytest.raises(api.TransportError, match="cut off") as info:
+        transport.download(FILE_URL, _collect)
+    assert info.value.retryable
+
+
+def test_download_rejects_a_body_shorter_than_its_content_length():
+    transport, _opener = _stub_transport({FILE_URL: (200, {"Content-Length": "20480"}, b"x" * 10240)})
+    with pytest.raises(api.TransportError, match="cut off after 10240 of 20480 bytes") as info:
+        transport.download(FILE_URL, _collect)
+    assert info.value.retryable
+
+
+def test_download_rejects_an_unsupported_encoding_as_unusable():
+    transport, _opener = _stub_transport({FILE_URL: (200, {"Content-Encoding": "br"}, b"...")})
+    with pytest.raises(api.FileUnusable, match="'br'"):
+        transport.download(FILE_URL, _collect)
+
+
+@pytest.mark.parametrize("chunk_size", [api.CHUNK_SIZE, "first member"])
+def test_download_decodes_every_gzip_member(monkeypatch, chunk_size):
+    first, second = gzip.compress(b"first part, "), gzip.compress(b"second part" * 10000)
+    if chunk_size == "first member":
+        monkeypatch.setattr(api, "CHUNK_SIZE", len(first))  # a block ends exactly where the member ends
+    transport, _opener = _stub_transport({FILE_URL: (200, {"Content-Encoding": "gzip"}, first + second)})
+    assert transport.download(FILE_URL, _collect)[2] == b"first part, " + b"second part" * 10000
+
+
+@pytest.mark.parametrize(
+    "url, sent",
+    [
+        ("https://files.todoist.com/app/n1/Rechnung März 2026.pdf",
+         "https://files.todoist.com/app/n1/Rechnung%20M%C3%A4rz%202026.pdf"),
+        ("https://files.todoist.com/app/n1/Rechnung%20M%C3%A4rz.pdf", "https://files.todoist.com/app/n1/Rechnung%20M%C3%A4rz.pdf"),
+        ("https://files.todoist.com/app/n1/a\tb.pdf?x=ä y", "https://files.todoist.com/app/n1/a%09b.pdf?x=%C3%A4%20y"),
+        (FILE_URL, FILE_URL),
+        (SIGNED_URL, SIGNED_URL),
+    ],
+)
+def test_download_percent_encodes_what_http_client_refuses(url, sent):
+    transport, opener = _stub_transport({sent: (200, {}, b"x")})
+    assert transport.download(url, _collect)[2] == b"x"
+    assert [request[0] for request in opener.requests] == [sent]
+
+
+def test_download_percent_encodes_a_redirect_target():
+    target = "https://d1abc.cloudfront.net/app/n1/März.pdf?Signature=s"
+    transport, opener = _stub_transport({FILE_URL: (302, {"Location": target}, b""),
+                                         "https://d1abc.cloudfront.net/app/n1/M%C3%A4rz.pdf?Signature=s": (200, {}, b"x")})
+    assert transport.download(FILE_URL, _collect)[2] == b"x"
+    assert opener.requests[1][1] is None
+
+
+@pytest.mark.parametrize("error", [http.client.InvalidURL("control character in host"),
+                                   UnicodeEncodeError("ascii", "ä", 0, 1, "not ASCII")])
+def test_download_turns_a_url_that_cannot_be_sent_into_unusable(error):
+    transport, _opener = _stub_transport({FILE_URL: error})
+    with pytest.raises(api.FileUnusable, match=type(error).__name__):
+        transport.download(FILE_URL, _collect)
+
+
+def test_download_of_a_url_with_a_control_character_in_the_host_is_unusable():
+    # The real opener: http.client refuses the host before it connects.
+    with pytest.raises(api.FileUnusable):
+        api.UrllibTransport(TOKEN).download("https://files.todoist.com\x01/x.pdf", _collect)
+
+
+def test_download_wraps_errors_while_reading_the_body():
+    transport, _opener = _stub_transport({FILE_URL: (200, {}, b"x" * 200000, 70000)})
+    with pytest.raises(api.TransportError, match="TimeoutError") as info:
+        transport.download(FILE_URL, _collect)
+    assert info.value.retryable
+
+
+def test_download_wraps_connection_errors():
+    transport, _opener = _stub_transport({FILE_URL: urllib.error.URLError(ConnectionRefusedError(111, "refused"))})
+    with pytest.raises(api.TransportError, match="cannot reach files.todoist.com") as info:
+        transport.download(FILE_URL, _collect)
+    assert info.value.retryable
+
+
+def test_download_logs_neither_the_token_nor_a_query_string(caplog):
+    transport, _opener = _stub_transport({FILE_URL: (302, {"Location": SIGNED_URL}, b""), SIGNED_URL: (200, {}, b"x")})
+    client = api.Client(transport, sleep=lambda s: None)
+    with caplog.at_level(logging.DEBUG):
+        client.download(FILE_URL, _collect)
+    messages = [r.getMessage() for r in caplog.records]
+    assert "GET files.todoist.com/app/n1/preise.pdf" in messages
+    assert "HTTP 302 redirect to d1abc.cloudfront.net/app/n1/preise.pdf" in messages
+    for message in messages:
+        assert TOKEN not in message
+        assert "?" not in message and "Signature" not in message and "s3cr3t" not in message
+
+
+def test_download_errors_hold_neither_the_token_nor_a_query_string():
+    transport, _opener = _stub_transport(
+        {FILE_URL: (302, {"Location": SIGNED_URL}, b""), SIGNED_URL: (302, {"Location": "http://x.example.net/?sig=s3cr3t"}, b"")}
+    )
+    with pytest.raises(AttachmentRefused) as info:
+        api.Client(transport, sleep=lambda s: None).download(FILE_URL, _collect)
+    assert TOKEN not in str(info.value) and "s3cr3t" not in str(info.value) and "?" not in str(info.value)
+
+
+def test_download_against_a_local_server(server):
+    # Plain HTTP and not a Todoist host: the transport sends no token, streams, and asks for identity.
+    _httpd, base_url = server
+    body = bytes(range(256)) * 600
+    _Handler.response = (200, {"Content-Type": "application/pdf"}, body)
+    status, headers, data = api.UrllibTransport(TOKEN).download(base_url + "file.pdf", _collect)
+    assert (status, data) == (200, body)
+    [(method, path, sent, _raw)] = _Handler.received
+    assert (method, path) == ("GET", "/api/v1/file.pdf")
+    assert "Authorization" not in sent
+    assert sent["Accept-Encoding"] == "identity"
+    assert sent["User-Agent"] == f"todoist-takeout/{__version__}"
+
+
+def test_download_of_a_cut_off_body_from_a_local_server(server):
+    _httpd, base_url = server
+    _Handler.response = (200, {"X-Test-Truncate": "1000"}, b"x" * 5000)
+    with pytest.raises(api.TransportError) as info:
+        api.UrllibTransport(TOKEN).download(base_url + "file.pdf", _collect)
+    assert info.value.retryable
+
+
+def test_download_does_not_let_urllib_follow_redirects(server):
+    # With the real opener, a redirect to plain HTTP is refused before any request goes there.
+    _httpd, base_url = server
+    _Handler.response = (302, {"Location": "http://example.invalid/steal"}, b"")
+    with pytest.raises(api.RedirectNotFollowed):
+        api.UrllibTransport(TOKEN).download(base_url + "file.pdf", _collect)
+    assert len(_Handler.received) == 1
+
+
+# --- Attachment files: client (add-attachment-downloads 3.3) -------------------
+
+
+class FakeFileTransport:
+    """Replays a script of file responses. A 2xx body is a list of chunks; an exception in it is raised mid-body."""
+
+    def __init__(self, *script):
+        self.script = list(script)
+        self.urls = []
+
+    def send(self, method, path, params):
+        return 200, {}, b"{}"
+
+    def download(self, url, write):
+        self.urls.append(url)
+        step = self.script.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        status, headers, body = step
+        if 200 <= status < 300:
+            return status, headers, write(_replay(body))
+        return status, headers, body
+
+
+def _replay(chunks):
+    for chunk in chunks:
+        if isinstance(chunk, Exception):
+            raise chunk
+        yield chunk
+
+
+def test_client_download_returns_what_write_returns():
+    client, sleeps = _client(FakeFileTransport((200, {}, [b"ab", b"cd"])))
+    assert client.download(FILE_URL, _collect) == b"abcd"
+    assert sleeps == []
+
+
+def test_client_download_waits_for_429_and_counts_toward_the_cap():
+    transport = FakeFileTransport((429, {"Retry-After": "12"}, b""), (200, {}, [b"x"]))
+    client, sleeps = _client(transport)
+    assert client.download(FILE_URL, _collect) == b"x"
+    assert sleeps == [12]
+    assert client.rate_limit_waited == 12
+    assert transport.urls == [FILE_URL, FILE_URL]
+
+
+def test_client_download_shares_the_rate_limit_cap_with_api_requests():
+    transport = FakeTransport(_error(429, extra={"retry_after": 500}), OK)
+    client, _sleeps = _client(transport, max_rate_limit_wait=900)
+    client.post("sync", {})
+    client._transport = FakeFileTransport((429, {"Retry-After": "500"}, b""))
+    with pytest.raises(RateLimitExhausted, match="files.todoist.com/app/n1/preise.pdf"):
+        client.download(FILE_URL, _collect)
+
+
+def test_client_download_retries_5xx():
+    client, sleeps = _client(FakeFileTransport((503, {}, b""), (502, {}, b""), (200, {}, [b"x"])))
+    assert client.download(FILE_URL, _collect) == b"x"
+    assert sleeps == [1, 2]
+
+
+def test_client_download_persistent_5xx_fails_the_run():
+    client, _sleeps = _client(FakeFileTransport(*[(500, {}, b"")] * 5))
+    with pytest.raises(ApiError) as info:
+        client.download(FILE_URL, _collect)
+    assert not isinstance(info.value, AttachmentRefused)
+    assert info.value.http_status == 500
+    assert "gave up after 5 attempts" in str(info.value)
+
+
+def test_client_download_persistent_network_errors_fail_the_run():
+    client, sleeps = _client(FakeFileTransport(*[api.TransportError("cannot reach files.todoist.com: refused")] * 5))
+    with pytest.raises(NetworkError, match="gave up after 5 attempts"):
+        client.download(FILE_URL, _collect)
+    assert sleeps == [1, 2, 4, 8]
+
+
+def test_client_download_restarts_the_file_after_a_network_error_in_the_body(tmp_path):
+    transport = FakeFileTransport(
+        (200, {}, [b"first half ", api.TransportError("request failed while reading the file: timed out")]),
+        (200, {}, [b"first half ", b"second half"]),
+    )
+    client, sleeps = _client(transport)
+    path = tmp_path / "attachments" / "N1" / "preise.pdf"
+    size = client.download(FILE_URL, lambda chunks: storage.write_stream_atomic(path, chunks, 22))
+    assert size == 22
+    assert path.read_bytes() == b"first half second half"
+    assert sleeps == [1]
+    assert list(path.parent.iterdir()) == [path]
+
+
+def test_client_download_does_not_retry_a_size_mismatch(tmp_path):
+    transport = FakeFileTransport((200, {}, [b"short"]))
+    client, _sleeps = _client(transport)
+    path = tmp_path / "attachments" / "N1" / "preise.pdf"
+    with pytest.raises(SizeMismatch):
+        client.download(FILE_URL, lambda chunks: storage.write_stream_atomic(path, chunks, 20480))
+    assert len(transport.urls) == 1
+    assert list(path.parent.iterdir()) == []
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 410])
+def test_client_download_4xx_is_a_refusal_not_an_auth_error(status):
+    transport = FakeFileTransport((status, {}, b'{"error": "Unauthorized", "error_tag": "AUTH_INVALID_TOKEN"}'))
+    client, sleeps = _client(transport)
+    with pytest.raises(AttachmentRefused) as info:
+        client.download(FILE_URL, _collect)
+    assert not isinstance(info.value, ApiError)
+    assert info.value.http_status == status
+    assert f"HTTP {status}" in str(info.value)
+    assert "TODOIST_API_TOKEN" not in str(info.value)
+    assert sleeps == [] and len(transport.urls) == 1
+
+
+def test_client_download_unusable_file_is_skipped_without_retrying():
+    client, sleeps = _client(FakeFileTransport(api.FileUnusable("the file host sent an unsupported Content-Encoding 'br'")))
+    with pytest.raises(AttachmentUnusable, match=r"GET files.todoist.com/app/n1/preise.pdf cannot be used: .*'br'"):
+        client.download(FILE_URL, _collect)
+    assert sleeps == []
+
+
+def test_client_download_unfollowed_redirect_is_a_refusal():
+    client, _sleeps = _client(FakeFileTransport(api.RedirectNotFollowed("HTTP 302 redirect to a URL that is not HTTPS", http_status=302)))
+    with pytest.raises(AttachmentRefused, match="not HTTPS") as info:
+        client.download(FILE_URL, _collect)
+    assert info.value.http_status == 302
+
+
+@pytest.mark.parametrize(
+    "url, host, reason",
+    [
+        ("https://example.com/preise.pdf", "example.com", "example.com is not a Todoist host"),
+        ("http://files.todoist.com/preise.pdf", "files.todoist.com", "does not use HTTPS"),
+        ("https://files.todoist.com:8443/preise.pdf", "files.todoist.com", "its URL names the port 8443"),
+        ("https://user@files.todoist.com/preise.pdf", "files.todoist.com", "its URL holds user information"),
+        ("https://files.todoist.com:99999/preise.pdf", "files.todoist.com", "its URL is not valid"),
+        (None, None, "does not use HTTPS"),
+    ],
+)
+def test_client_download_makes_no_request_to_an_unexpected_host(url, host, reason):
+    transport = FakeFileTransport()
+    client, _sleeps = _client(transport)
+    with pytest.raises(UnexpectedHost, match=reason) as info:
+        client.download(url, _collect)
+    assert info.value.host == host
+    assert transport.urls == []

@@ -269,8 +269,8 @@ def test_missing_plan_information_does_not_warn(tmp_path, caplog):
 # pending response, 30 objects, README.md, state.json and the pending removal, then for the
 # follow-up the pending response, the edited task, state.json and the pending removal, then for the
 # completed tasks state.json with T0, the months 2026-08 and 2026-09 each with state.json closing
-# it, and the open month 2026-10, and finally state.json.
-FIRST_RUN_WRITES = 54
+# it, and the open month 2026-10, then the attachment file of the task comment, and finally state.json.
+FIRST_RUN_WRITES = 55
 # For each request of the first run, the number of writes after which its response is saved in
 # `pending/`. From then on, it must never be requested again.
 RESPONSE_SAVED_AFTER = {"*": 2, "FULL-1": 36}

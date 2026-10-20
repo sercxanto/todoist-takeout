@@ -9,6 +9,10 @@ from pathlib import Path
 import pytest
 
 from todoist_takeout.api import Client
+from todoist_takeout.attachments import Attachment
+from todoist_takeout.errors import SizeMismatch
+
+from fake_api import FakeApi, file_body
 
 ROOT = Path(__file__).parent.parent
 READ = "read-token-0123456789abcdef0123456789abcd"
@@ -89,7 +93,7 @@ def test_contract_tests_skip_without_the_variables(tmp_path):
         timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "9 skipped" in result.stdout, result.stdout
+    assert "12 skipped" in result.stdout, result.stdout
     assert "passed" not in result.stdout and "failed" not in result.stdout
     assert "TODOIST_CONTRACT_TOKEN is not set" in result.stdout
     assert "TODOIST_CONTRACT_WRITE_TOKEN is not set" in result.stdout
@@ -102,6 +106,7 @@ def test_write_tests_skip_without_the_allow_flag(tmp_path):
         [
             sys.executable, "-m", "pytest", "-m", "contract", "-q", "-rs", "-p", "no:cacheprovider",
             "tests/contract/test_write.py", "tests/contract/test_archived_write.py",
+            "tests/contract/test_attachments_write.py",
         ],
         cwd=ROOT,
         env=env,
@@ -111,4 +116,48 @@ def test_write_tests_skip_without_the_allow_flag(tmp_path):
         timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "3 skipped" in result.stdout and "TODOIST_CONTRACT_ALLOW_WRITES is not 1" in result.stdout
+    assert "4 skipped" in result.stdout and "TODOIST_CONTRACT_ALLOW_WRITES is not 1" in result.stdout
+
+
+# --- Uploads and attachment downloads ----------------------------------------
+
+
+def test_multipart_body_holds_the_fields_and_the_file(contract_support):
+    body, header = contract_support.multipart({"file_name": "a: b.txt", "project_id": "P1"}, "file", "a: b.txt",
+                                              b"bytes\r\n", "text/plain")
+    boundary = header.removeprefix("multipart/form-data; boundary=")
+    assert header != boundary and boundary.startswith("todoist-takeout-")
+    assert body.split(f"--{boundary}".encode()) == [
+        b"",
+        b'\r\nContent-Disposition: form-data; name="file_name"\r\n\r\na: b.txt\r\n',
+        b'\r\nContent-Disposition: form-data; name="project_id"\r\n\r\nP1\r\n',
+        b'\r\nContent-Disposition: form-data; name="file"; filename="a: b.txt"\r\nContent-Type: text/plain\r\n\r\n'
+        b"bytes\r\n\r\n",
+        b"--\r\n",
+    ]
+
+
+URL = "https://files.todoist.com/fake/support/N1/notiz.txt"
+
+
+def test_check_download_stores_through_the_tool_and_leaves_nothing(contract_support, tmp_path):
+    transport = contract_support.CountingTransport(FakeApi(files={URL: file_body("notiz.txt", 300)}))
+    result = contract_support.check_download(Client(transport), Attachment("N1", URL, "a: b.txt", 300),
+                                             tmp_path / "check")
+    assert result == {"bytes": 300, "size_stated": True, "size_matches": True}
+    assert transport.file_requests == [URL]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_check_download_of_another_size_raises_and_leaves_nothing(contract_support, tmp_path):
+    transport = contract_support.CountingTransport(FakeApi(files={URL: file_body("notiz.txt", 200)}))
+    with pytest.raises(SizeMismatch):
+        contract_support.check_download(Client(transport), Attachment("N1", URL, "notiz.txt", 300), tmp_path / "check")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_counting_transport_passes_api_requests_on(contract_support):
+    api = FakeApi({"*": b'{"sync_token": "S1"}'})
+    transport = contract_support.CountingTransport(api)
+    assert Client(transport).sync("*") == b'{"sync_token": "S1"}'
+    assert api.requests == ["*"] and transport.file_requests == []

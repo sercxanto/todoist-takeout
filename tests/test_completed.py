@@ -993,9 +993,10 @@ def snapshot(target):
 # tests/test_run.py), then state.json with T0, the activity month 2026-10 and state.json with its
 # fetch time, 2026-08 and state.json closing it, the comments file, 2026-09 and state.json closing
 # it, the open month 2026-10, the backfill months 2026-08 to 2026-10 each followed by state.json,
-# state.json with the complete backfill, and finally state.json.
+# state.json with the complete backfill, the attachment files of the comments in the sync and in
+# the comments file, and finally state.json.
 SYNC_WRITES = 39
-FIRST_RUN_WRITES = 56
+FIRST_RUN_WRITES = 58
 
 
 @pytest.fixture(scope="module")

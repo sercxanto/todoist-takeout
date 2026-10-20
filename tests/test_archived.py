@@ -881,9 +881,10 @@ def tree(target):
 # Writes of an uninterrupted first run with three_projects(): 53 for the sync and the completed-tasks
 # part, then this part in the order of design D3: PARENT (comments of TILES, project_comments.json,
 # completed.json, full.json, project.json), TRIP (the last four), GARDEN (like PARENT), CHILD (like
-# TRIP), and finally state.json.
+# TRIP), the attachment files of the comment in the sync, of the comment of TILES and of PARENT's
+# project comment, and finally state.json.
 ARCHIVED_START = 53
-FIRST_RUN_WRITES = 72
+FIRST_RUN_WRITES = 75
 
 
 @pytest.fixture(scope="module")

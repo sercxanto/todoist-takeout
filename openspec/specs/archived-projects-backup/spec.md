@@ -59,12 +59,12 @@ The tool SHALL fetch an archived project's completed tasks from `GET /api/v1/tas
 - **WHEN** an archived project's payload has no parseable `created_at`
 - **THEN** the windows start at the account's first month of completed tasks
 
-### Requirement: Attachments are not downloaded
-Comments in a snapshot SHALL keep their attachment metadata as it appears in the payload. The tool SHALL NOT download attachment files.
+### Requirement: Attachment metadata in snapshots
+Comments in a snapshot SHALL keep their attachment metadata as it appears in the payload. Their uploaded files are downloaded as the `attachment-downloads` capability describes, and are not part of the snapshot directory.
 
 #### Scenario: Comment with attachment
 - **WHEN** a comment of an archived project's task carries a `file_attachment` object
-- **THEN** the stored comment contains that object unchanged and no attachment file is downloaded
+- **THEN** the stored comment contains that object unchanged, and its file, once downloaded, is under `attachments/` and not under `archived/`
 
 ### Requirement: Snapshots are fetched once
 The tool SHALL NOT fetch a project's snapshot again while the payload in the list of archived projects equals the stored one. Changes made to the content of an archived project after its snapshot was stored are not captured.

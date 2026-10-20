@@ -12,6 +12,9 @@ scrubbed together before they are written to `tests/fixtures/recorded/<account>/
 of the account is committed: strings become placeholders, IDs random pseudonyms and numbers zero
 (see Scrubber). Field names, booleans and enum-like values stay.
 
+shapes.json also describes the `file_attachment` of uploaded files (see attachment_shape_of), from
+the recordings that hold one, or else from the hand-written `tests/fixtures/attachments/uploads.json`.
+
 The contract tests import this module for `Scrubber`, `shape_of` and `compare_shapes`.
 """
 
@@ -28,7 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from todoist_takeout import archived, completed, resources, storage  # noqa: E402
+from todoist_takeout import archived, attachments, completed, resources, storage  # noqa: E402
 from todoist_takeout.api import Client, UrllibTransport  # noqa: E402
 
 FIXTURES = ROOT / "tests" / "fixtures"
@@ -57,6 +60,10 @@ HAND_WRITTEN_DIRECTORIES = {
     **{name: FIXTURES / "archived" for name in ARCHIVED_ENDPOINTS},
 }
 RECORDING_FILES = SYNC_FILES + tuple(ENDPOINTS)
+# Comments with an uploaded text file and image, with the fields the probe W9 saw (add-attachment-
+# downloads, proposal). They stand in for the shape of uploaded files as long as no recording holds one.
+UPLOADS_HAND_WRITTEN = FIXTURES / "attachments" / "uploads.json"
+ATTACHMENT_FIELD = "file_attachment"
 # Smaller than the tool's page sizes, to keep the recordings small; the shape is the same.
 RECORD_PAGE_LIMIT = 50
 # How many months before the current one record_completed searches for completed tasks.
@@ -89,6 +96,7 @@ ENUM_FIELDS = frozenset(
         "sort_order",
         "filtered_by",
         "resource_type",
+        "upload_state",
         "notification_type",
         "event_type",
         "object_type",
@@ -325,6 +333,35 @@ def _fields(objects: list[dict]) -> dict:
     return {field: sorted(types) for field, types in sorted(fields.items())}
 
 
+def uploaded_attachments(value) -> list[dict]:
+    """The `file_attachment` of each comment in a response that describes an uploaded file, by the
+    rule of the download step (`attachments.uploaded_file`), so links and pending uploads are left out."""
+    found = []
+    if isinstance(value, dict):
+        if attachments.uploaded_file(value) is not None:
+            found.append(value[ATTACHMENT_FIELD])
+        values = value.values()
+    elif isinstance(value, list):
+        values = value
+    else:
+        return found
+    for item in values:
+        found.extend(uploaded_attachments(item))
+    return found
+
+
+def attachment_shape_of(uploads: list[dict]) -> dict:
+    """The fields and types of the `file_attachment` objects of uploaded files, with their
+    `resource_type` as the kind, so that compare_shapes reports a new field or a new type of upload."""
+    shapes = []
+    for upload in uploads:
+        kind = upload.get("resource_type")
+        entry = {"kind": kind if isinstance(kind, str) else "unclassified", "types": [json_type(upload)],
+                 "fields": _fields([upload])}
+        shapes.append({"keys": {ATTACHMENT_FIELD: entry}})
+    return merge_shapes(shapes)
+
+
 def merge_shapes(shapes: list[dict]) -> dict:
     keys: dict[str, dict] = {}
     for shape in shapes:
@@ -364,9 +401,17 @@ def endpoint_shape_sources() -> dict[str, list[Path]]:
     return sources
 
 
-def generate_shapes(sources: list[Path] | None = None, endpoint_sources: dict[str, list[Path]] | None = None) -> dict:
+def attachment_shape_sources() -> list[Path]:
+    """The recordings that hold an uploaded file, or the hand-written uploads."""
+    recorded = sorted(path for path in RECORDED.glob("*/*.json") if uploaded_attachments(json.loads(path.read_bytes())))
+    return recorded or [UPLOADS_HAND_WRITTEN]
+
+
+def generate_shapes(sources: list[Path] | None = None, endpoint_sources: dict[str, list[Path]] | None = None,
+                    attachment_sources: list[Path] | None = None) -> dict:
     sources = shape_sources() if sources is None else sources
     endpoint_sources = endpoint_shape_sources() if endpoint_sources is None else endpoint_sources
+    attachment_sources = attachment_shape_sources() if attachment_sources is None else attachment_sources
     shapes = merge_shapes([shape_of(json.loads(path.read_bytes())) for path in sources])
     endpoints = {
         name: {
@@ -375,7 +420,13 @@ def generate_shapes(sources: list[Path] | None = None, endpoint_sources: dict[st
         }
         for name, paths in endpoint_sources.items()
     }
-    return {"sources": [path.relative_to(FIXTURES).as_posix() for path in sources], **shapes, "endpoints": endpoints}
+    uploads = [upload for path in attachment_sources for upload in uploaded_attachments(json.loads(path.read_bytes()))]
+    file_attachments = {
+        "sources": [path.relative_to(FIXTURES).as_posix() for path in attachment_sources],
+        **attachment_shape_of(uploads),
+    }
+    return {"sources": [path.relative_to(FIXTURES).as_posix() for path in sources], **shapes, "endpoints": endpoints,
+            "file_attachments": file_attachments}
 
 
 def compare_shapes(expected: dict, actual: dict) -> tuple[list[str], list[str]]:
@@ -395,8 +446,8 @@ def compare_shapes(expected: dict, actual: dict) -> tuple[list[str], list[str]]:
             removed.append(f"key {key!r}")
     for key in sorted(have.keys() & want.keys()):
         old, new = want[key], have[key]
-        if new["kind"] not in old["kind"].split("|"):
-            added.append(f"kind {new['kind']!r} of {key!r} (expected {old['kind']!r})")
+        for kind in sorted(set(new["kind"].split("|")) - set(old["kind"].split("|"))):
+            added.append(f"kind {kind!r} of {key!r} (expected {old['kind']!r})")
         for type_ in sorted(set(new["types"]) - set(old["types"])):
             added.append(f"type {type_} of {key!r}")
         old_fields, new_fields = old.get("fields", {}), new.get("fields", {})

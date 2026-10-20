@@ -2,7 +2,7 @@
 
 A command-line tool that keeps a complete, long-term readable local backup of a [Todoist](https://www.todoist.com) account.
 
-> **Status:** early. Backing up active data (projects, sections, labels, tasks, comments and the other resources of the sync API), completed tasks, with every completion of recurring tasks and the comments of completed tasks, and archived projects works. Attachment files are not downloaded yet; see the [Roadmap](#roadmap).
+> **Status:** early. Backing up active data (projects, sections, labels, tasks, comments and the other resources of the sync API), completed tasks, with every completion of recurring tasks and the comments of completed tasks, archived projects, and the files uploaded to comments works. See the [Roadmap](#roadmap) for what comes next.
 
 ## Why
 
@@ -25,7 +25,7 @@ todoist-takeout --version
 
 ### Token
 
-The tool authenticates with your personal API token, which you find in Todoist under *Settings → Integrations → Developer*. It reads the token only from the environment variable `TODOIST_API_TOKEN`; there is no command-line option for it, and the tool never writes it to its output or into the backup.
+The tool authenticates with your personal API token, which you find in Todoist under *Settings → Integrations → Developer*. It reads the token only from the environment variable `TODOIST_API_TOKEN`; there is no command-line option for it, and the tool never writes it to its output or into the backup. The token is sent only over HTTPS to Todoist's own hosts; when the file host redirects the download of an attachment file to a storage host, the tool follows the redirect without the token.
 
 ```sh
 export TODOIST_API_TOKEN=0123456789abcdef0123456789abcdef01234567
@@ -48,14 +48,17 @@ The backup contains a `README.md` that describes its format; the same descriptio
 - **Active data** under `sync/`: one file per project, section, label, task, comment and every other object the sync API returns. Objects deleted in Todoist stay, marked as deleted.
 - **Completed tasks** under `completed/`, one file per month (UTC). A month is fetched again on every run until 7 days after it ended, then it is frozen: later changes to its tasks, and completions backdated into it, are not captured.
 - **One event per completion**, including every completion of a recurring task, which the completed tasks do not show. Completions from the first run on come from the activity log; earlier ones are fetched once, on the first runs.
-- **Comments of completed tasks**, with the metadata of their attachments. Attachment files are not downloaded yet.
+- **Comments of completed tasks**, with the metadata of their attachments.
 - **Archived projects** under `archived/`, one directory per project with its open and completed tasks, its sections, its archived sub-projects, and the comments of the project and of its tasks. A project is fetched once, when it first shows up as archived; later changes to its content are not captured, unless it is unarchived and archived again. A snapshot stays in the backup after the project is unarchived or deleted.
+- **Attachment files** under `attachments/`: the file uploaded to each stored comment, in `attachments/<comment id>/` under its original name, cleaned up only as far as Windows, macOS and Linux need. Each file is downloaded once and checked against the size Todoist reports. Attachments that link to other websites are not downloaded. A file the server refuses, for example because its comment was deleted, produces a warning and is tried again on every run.
 
-Not included: sections that were archived before the first backup, because the API cannot list them. The summary line counts the objects under `sync/`; separate `INFO` lines report the completed tasks and the archived projects.
+Not included: sections that were archived before the first backup, because the API cannot list them. The summary line counts the objects under `sync/`; separate `INFO` lines report the completed tasks, the archived projects and the attachment files.
 
 **The same task can be stored more than once,** for example in `sync/items/`, in a month file under `completed/` and in the snapshot of its archived project. All copies share the task's `id`. The current copy is the one with the newest `updated_at`; on equal values, the copy under `archived/` is current, then the one under `completed/`, then the one under `sync/`. The [format description](src/todoist_takeout/storage_format.md#copies-of-the-same-task) lists every place.
 
 **The first run on a large account** makes a few requests per month since the account was created, and one per completed task that has comments. Each archived project adds one request for the project, one per three months since it was created, one per task with comments and one for the project's comments, so an account with 50 archived projects needs a few hundred more; later runs fetch only newly archived projects. The first run can therefore reach the API's rate limit, and stops with exit status 1 once waiting would exceed `--max-rate-limit-wait`. Simply run it again, as often as needed: each run continues where the previous one stopped, and does not fetch the archived projects it already stored. Or allow a longer wait for the first run, for example `--max-rate-limit-wait 3600`.
+
+**Accounts with many attachments.** The first run downloads every file uploaded to the stored comments, one at a time, after all other data; later runs download only new ones. On an account with years of attachments this can take hours and as much disk space as the files take in Todoist, so check the free space of the target first. A run that stops, because of the network or because you cancel it, keeps every file it completed; run it again to download the rest. Files already stored are never downloaded again.
 
 **On the Free plan,** the activity log keeps only 7 days. Run the backup at least weekly; otherwise the completions of recurring tasks in the gap may be lost, and the tool warns about it.
 
@@ -139,7 +142,7 @@ schtasks /Create /SC DAILY /ST 03:00 /TN "todoist-takeout" /TR "powershell -NoPr
 
 - **macOS certificates:** Python from python.org ships without CA certificates. If runs fail with `cannot verify the TLS certificate`, run *Install Certificates.command* from the Python folder in Applications, or point `SSL_CERT_FILE` at a CA bundle. The tool never turns certificate verification off.
 - **Keep the target on a local disk.** The lock that prevents overlapping runs may not work on network file systems. If the target must live on one, make sure runs never overlap. Folders that a sync client such as OneDrive or Dropbox watches work, but a local directory that your regular file backup covers is the better choice.
-- **Windows long paths:** file names in the backup stay short, but a deeply nested target directory can exceed Windows' 260-character path limit. Use a short target path, or enable long path support (`LongPathsEnabled` in the registry or group policy).
+- **Windows long paths:** file names in the backup stay short (an attachment file name has at most 100 characters), but a deeply nested target directory can exceed Windows' 260-character path limit. Use a short target path, or enable long path support (`LongPathsEnabled` in the registry or group policy).
 
 ## Requirements
 
@@ -180,7 +183,7 @@ These will be written up in more detail in the design documents of the correspon
 
 - **Raw payloads are the source of truth.** API responses are stored unchanged as JSON, so fields the tool does not know about are preserved. A queryable SQLite database may be derived from them later.
 - **The backup holds the current state, with tombstones.** Objects deleted in Todoist stay in the backup and are marked as deleted. Older versions are not kept, because a file-based backup of the backup directory provides history.
-- **Layout:** one file per active object at `sync/<type>/<id>.json`, one file per month for completed tasks at `completed/<YYYY-MM>.json`, with month boundaries in UTC, and one directory per archived project at `archived/<project id>/`. The current month is included.
+- **Layout:** one file per active object at `sync/<type>/<id>.json`, one file per month for completed tasks at `completed/<YYYY-MM>.json`, with month boundaries in UTC, one directory per archived project at `archived/<project id>/`, and one directory per comment with an uploaded file at `attachments/<comment id>/`. The current month is included.
 - **Completed tasks are frozen.** A month of completed tasks is fetched again until 7 days after it ended; changes made later to its tasks are not captured.
 - **Archived projects are snapshots.** An archived project is fetched once, and again only when its listed payload changes, for example after it was unarchived and archived again. Nothing is removed from `sync/` once a snapshot holds it.
 
@@ -189,7 +192,7 @@ These will be written up in more detail in the design documents of the correspon
 1. **Sync active data** *(implemented)*: a full sync, then incremental syncs, with checkpointing and tombstones. The format is described in [storage_format.md](src/todoist_takeout/storage_format.md). The behaviour is specified in [openspec/specs/](openspec/specs/); the planning is archived in [openspec/changes/archive/2026-10-18-add-active-data-sync/](openspec/changes/archive/2026-10-18-add-active-data-sync/).
 2. **Back up completed tasks** *(implemented)*: month files for completed tasks, written incrementally, with every completion of recurring tasks and the comments of completed tasks. The behaviour is specified in [openspec/specs/completed-tasks-backup/](openspec/specs/completed-tasks-backup/); the planning is archived in [openspec/changes/archive/2026-10-18-add-completed-tasks-backup/](openspec/changes/archive/2026-10-18-add-completed-tasks-backup/).
 3. **Back up archived projects** *(implemented)*: a snapshot per archived project with its sections, open and completed tasks, sub-projects and comments, which the sync endpoint does not return. The behaviour is specified in [openspec/specs/archived-projects-backup/](openspec/specs/archived-projects-backup/); the planning is archived in [openspec/changes/archive/2026-10-19-add-archived-projects-backup/](openspec/changes/archive/2026-10-19-add-archived-projects-backup/).
-4. **Download attachment files.**
+4. **Download attachment files** *(implemented)*: the file uploaded to each stored comment, downloaded once into `attachments/<comment id>/`, with the token sent only to Todoist's hosts. The behaviour is specified in [openspec/specs/attachment-downloads/](openspec/specs/attachment-downloads/); the planning is archived in [openspec/changes/archive/2026-10-20-add-attachment-downloads/](openspec/changes/archive/2026-10-20-add-attachment-downloads/).
 5. **Derive a SQLite database** from the raw JSON, for queries and migration.
 6. **Download Todoist's own backups** (`/api/v1/backups`) as an additional safety net. This is an idea, not yet evaluated.
 
@@ -233,6 +236,10 @@ pytest -m contract tests/contract/test_completed_read.py
 # Read-only: the first page of archived projects and the /full of up to all of them, compared with tests/fixtures/shapes.json.
 pytest -m contract tests/contract/test_archived_read.py
 
+# Read-only: downloads one uploaded file of the synced comments into a temporary directory, checks its size, and
+# deletes it again. Skips when the comments hold no uploaded file.
+pytest -m contract tests/contract/test_attachments_read.py
+
 # Write: creates, deletes, restores and archives temporary projects in the test account, then removes them.
 # Its second test completes a recurring task twice and a task with a comment, and checks completed/.
 TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_write.py
@@ -240,6 +247,10 @@ TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_write.py
 # Write: archives a temporary project with a sub-project, checks both snapshots under archived/ and that a
 # forced full sync counts none of their objects as missing, then removes them.
 TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_archived_write.py
+
+# Write: uploads a small file to a comment of a temporary task, checks it under attachments/, then completes the
+# task, archives the project and checks that the next run downloads nothing; removes the project and the upload.
+TODOIST_CONTRACT_ALLOW_WRITES=1 pytest -m contract tests/contract/test_attachments_write.py
 ```
 
 `test_completed_read.py` fails on keys, fields or types that `shapes.json` lacks, and also when `GET /tasks/completed` is gone or the activity log rejects the completion filter: either means that recurring completions can no longer be backed up. The completed-tasks write test reruns the backup for up to two minutes, until the new completion events appear in the activity log.
@@ -248,7 +259,7 @@ Findings, such as the shape of deletion payloads, rejected commands and the plan
 
 ### Recording fixtures
 
-[scripts/record_fixtures.py](scripts/record_fixtures.py) records a full and an incremental sync from a real account and writes them to `tests/fixtures/recorded/<account>/`, together with one page of each completed-tasks endpoint: `by_completion_date.json` and `tasks_completed.json` for the latest month with completed tasks in the past year, `activities.json` with the latest completion events, `comments.json` with the comments of one completed task (not written if no completed task in that year has comments), `projects_archived.json` with the first page of archived projects, and `project_full.json` with the `/full` of one of them: of those on the page, the first with tasks and sections, or else the one with the most content (not written without an archived project). Recording is read-only. Nothing of the account is kept: strings become placeholders (except enum-like values such as colours), IDs become random pseudonyms that still match each other within a recording, and numbers become `0` (except plan limits). Then the script regenerates `tests/fixtures/shapes.json`, which the contract tests compare against. Its `endpoints` section describes the completed-tasks and archived-projects endpoints; as long as an endpoint has no recording, it is taken from the hand-written fixtures in [tests/fixtures/completed/](tests/fixtures/completed/) and [tests/fixtures/archived/](tests/fixtures/archived/).
+[scripts/record_fixtures.py](scripts/record_fixtures.py) records a full and an incremental sync from a real account and writes them to `tests/fixtures/recorded/<account>/`, together with one page of each completed-tasks endpoint: `by_completion_date.json` and `tasks_completed.json` for the latest month with completed tasks in the past year, `activities.json` with the latest completion events, `comments.json` with the comments of one completed task (not written if no completed task in that year has comments), `projects_archived.json` with the first page of archived projects, and `project_full.json` with the `/full` of one of them: of those on the page, the first with tasks and sections, or else the one with the most content (not written without an archived project). Recording is read-only. Nothing of the account is kept: strings become placeholders (except enum-like values such as colours), IDs become random pseudonyms that still match each other within a recording, and numbers become `0` (except plan limits). Then the script regenerates `tests/fixtures/shapes.json`, which the contract tests compare against. Its `endpoints` section describes the completed-tasks and archived-projects endpoints; as long as an endpoint has no recording, it is taken from the hand-written fixtures in [tests/fixtures/completed/](tests/fixtures/completed/) and [tests/fixtures/archived/](tests/fixtures/archived/). Its `file_attachments` section describes the `file_attachment` of uploaded files, from the recordings that hold one, or else from [tests/fixtures/attachments/uploads.json](tests/fixtures/attachments/uploads.json); file names and URLs are scrubbed like all other strings.
 
 ```sh
 python scripts/record_fixtures.py record --account read    # uses TODOIST_CONTRACT_TOKEN

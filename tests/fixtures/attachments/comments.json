@@ -1,0 +1,57 @@
+{
+  "results": [
+    {
+      "id": "6Xd4Lm8Qr2Vt6Zb1",
+      "posted_uid": "2671355",
+      "item_id": "6Xd3Kn7Pq1Us5Ya9",
+      "content": "See the manual",
+      "file_attachment": {
+        "resource_type": "url",
+        "url": "https://www.example.org/manual",
+        "title": "Manual",
+        "upload_state": "completed"
+      },
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2026-09-14T08:00:00.000000Z",
+      "reactions": {}
+    },
+    {
+      "id": "6Xd4Ln9Rs3Wu7Ac2",
+      "posted_uid": "2671355",
+      "item_id": "6Xd3Kn7Pq1Us5Ya9",
+      "content": "Scan still uploading",
+      "file_attachment": {
+        "resource_type": "file",
+        "file_name": "scan.pdf",
+        "file_size": 4096,
+        "file_type": "application/pdf",
+        "file_url": "https://files.todoist.com/fake/attachments/6Xd4Ln9Rs3Wu7Ac2/scan.pdf",
+        "upload_state": "pending"
+      },
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2026-09-14T08:05:00.000000Z",
+      "reactions": {}
+    },
+    {
+      "id": "6Xd4Lp2St4Xv8Bd3",
+      "posted_uid": "2671355",
+      "item_id": "6Xd3Kn7Pq1Us5Ya9",
+      "content": "Photo of the receipt",
+      "file_attachment": {
+        "resource_type": "image",
+        "file_name": "beleg.png",
+        "file_size": 2048,
+        "file_type": "image/png",
+        "file_url": "https://example.com/fake/attachments/6Xd4Lp2St4Xv8Bd3/beleg.png",
+        "upload_state": "completed"
+      },
+      "uids_to_notify": [],
+      "is_deleted": false,
+      "posted_at": "2026-09-14T08:10:00.000000Z",
+      "reactions": {}
+    }
+  ],
+  "next_cursor": null
+}

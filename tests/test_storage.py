@@ -4,7 +4,7 @@ import os
 import pytest
 
 from todoist_takeout import storage
-from todoist_takeout.errors import StorageError
+from todoist_takeout.errors import SizeMismatch, StorageError
 
 
 @pytest.fixture(autouse=True)
@@ -295,6 +295,17 @@ def test_remove_temp_files(tmp_path):
     assert all(p.exists() for p in keep)
 
 
+def test_temp_name_rule_matches_the_temp_files_that_writes_create(tmp_path, monkeypatch):
+    # The download step uses the rule to tell a stored attachment from a leftover temp file.
+    created = []
+    real = storage._create_temp
+    monkeypatch.setattr(storage, "_create_temp", lambda path: created.append(real(path)) or created[-1])
+    storage.write_bytes_atomic(tmp_path / "preise.pdf", b"x")
+    storage.write_stream_atomic(tmp_path / ".env", [b"y"], None)
+    assert len(created) == 2 and all(storage.is_temp_name(tmp.name) for _fd, tmp in created)
+    assert not any(storage.is_temp_name(name) for name in ["preise.pdf", ".env", "notes.tmp", ".lock"])
+
+
 # --- 2.4 Fault injection -----------------------------------------------------
 
 
@@ -359,3 +370,223 @@ def test_remove_file_retries_sharing_violations_on_windows(tmp_path, monkeypatch
     assert storage.remove_file(path) is True
     assert len(calls) == 3
     assert not path.exists()
+
+
+# --- Attachment file names (add-attachment-downloads 2.1) ---------------------
+
+
+@pytest.mark.parametrize(
+    ("file_name", "stored"),
+    [
+        # Spec scenarios of "Attachment file names".
+        ("Preise 2024.pdf", "Preise 2024.pdf"),
+        ("Rechnung: März/April.pdf", "Rechnung_ März_April.pdf"),
+        ("con.txt", "_con.txt"),
+        (".env", "_env"),
+        ("bericht.pdf.", "bericht.pdf"),
+        ("Grün.txt", "Grün.txt"),
+        (None, "attachment"),
+        ("", "attachment"),
+        (42, "attachment"),
+        # Further cases of design D8.
+        ("CONIN$", "_CONIN$"),
+        ("conout$.log", "_conout$.log"),
+        ("COM¹", "_COM¹"),
+        ("lpt³.txt", "_lpt³.txt"),
+        ("con .txt", "_con .txt"),
+        ("NUL", "_NUL"),
+        ("CONX.txt", "CONX.txt"),
+        ("COM10.txt", "COM10.txt"),
+        ("...", "attachment"),
+        (".", "attachment"),
+        ("..x", "_.x"),
+        ("a<b>c\"d\\e|f?g*h", "a_b_c_d_e_f_g_h"),
+        ("tab\there\nnew\x7f.txt", "tab_here_new_.txt"),
+        ("trailing .  . ", "trailing"),
+        ("  leading spaces.txt", "  leading spaces.txt"),
+        ("a\ud800b.txt", "a_b.txt"),
+        ("Größe 🍎.jpg", "Größe 🍎.jpg"),
+    ],
+)
+def test_attachment_file_name(file_name, stored):
+    assert storage.attachment_file_name(file_name) == stored
+
+
+def test_attachment_file_name_is_nfc():
+    name = storage.attachment_file_name("Müller.pdf")
+    assert name == "Müller.pdf"
+    assert "̈" not in name
+
+
+def test_long_ascii_name_keeps_extension():
+    name = storage.attachment_file_name("a" * 176 + ".pdf")
+    assert len(name) == 100
+    assert name == "a" * 96 + ".pdf"
+
+
+def test_long_multibyte_name_stays_within_200_bytes():
+    name = storage.attachment_file_name("🍎" * 150 + ".pdf")
+    encoded = name.encode("utf-8")
+    assert len(encoded) <= 200
+    assert name.endswith(".pdf")
+    assert encoded.decode("utf-8") == name
+    assert name == "🍎" * 49 + ".pdf"
+
+
+def test_long_name_with_three_byte_characters_hits_the_byte_limit_first():
+    # 196 bytes are left for the stem: 65 characters of 3 bytes, far below 96 characters.
+    name = storage.attachment_file_name("€" * 120 + ".txt")
+    assert name == "€" * 65 + ".txt"
+    assert len(name.encode("utf-8")) == 199
+
+
+def test_extension_longer_than_16_characters_counts_as_stem():
+    name = storage.attachment_file_name("a" * 90 + "." + "b" * 20)
+    assert name == ("a" * 90 + "." + "b" * 20)[:100]
+    # 16 characters including the dot are still kept.
+    kept = storage.attachment_file_name("a" * 120 + "." + "b" * 15)
+    assert kept == "a" * 84 + "." + "b" * 15
+
+
+def test_cut_stem_loses_trailing_spaces_and_dots():
+    name = storage.attachment_file_name("a" * 95 + " . " + "b" * 50 + ".pdf")
+    assert name == "a" * 95 + ".pdf"
+
+
+def test_cut_stem_that_ends_empty_does_not_produce_a_hidden_file():
+    assert storage.attachment_file_name(" " * 150 + ".pdf") == "_pdf"
+
+
+def test_cut_stem_that_becomes_a_device_name_is_prefixed():
+    assert storage.attachment_file_name("AUX" + " " * 120 + "x.pdf") == "_AUX.pdf"
+
+
+def test_short_name_is_not_cut():
+    name = "b" * 96 + ".pdf"
+    assert storage.attachment_file_name(name) == name
+
+
+ATTACHMENT_NAMES = [
+    "Preise 2024.pdf",
+    "Rechnung: März/April.pdf",
+    "con.txt",
+    "CONIN$",
+    "COM¹",
+    "con .txt",
+    ".env",
+    "bericht.pdf.",
+    "Grün.txt",
+    "...",
+    "a<b>c\"d\\e|f?g*h",
+    "tab\there\x7f.txt",
+    "a\ud800b.txt",
+    "a" * 176 + ".pdf",
+    "🍎" * 150 + ".pdf",
+    "a" * 90 + "." + "b" * 20,
+    " " * 150 + ".pdf",
+    "AUX" + " " * 120 + "x.pdf",
+    None,
+]
+
+
+@pytest.mark.parametrize("file_name", ATTACHMENT_NAMES)
+def test_every_attachment_name_can_be_created(tmp_path, file_name):
+    name = storage.attachment_file_name(file_name)
+    directory = tmp_path / "attachments" / storage.encode_key("6X7rfFVQXwRmcvFp")
+    path = directory / name
+    storage.write_bytes_atomic(path, b"x")
+    assert [p.name for p in directory.iterdir()] == [name]
+    assert path.read_bytes() == b"x"
+
+
+# --- Streaming atomic writes (add-attachment-downloads 2.2) -------------------
+
+
+def test_write_stream_writes_chunks_in_order(tmp_path):
+    path = tmp_path / "attachments" / "N1" / "file.bin"
+    chunks = [bytes([i]) * 1000 for i in range(10)]
+    assert storage.write_stream_atomic(path, iter(chunks), 10_000) == 10_000
+    assert path.read_bytes() == b"".join(chunks)
+    assert _temp_files(tmp_path) == []
+
+
+def test_write_stream_empty_file(tmp_path):
+    path = tmp_path / "empty.txt"
+    assert storage.write_stream_atomic(path, iter([]), 0) == 0
+    assert path.read_bytes() == b""
+
+
+@pytest.mark.parametrize("expected", [20480, 5])
+def test_write_stream_size_mismatch_leaves_nothing(tmp_path, expected):
+    path = tmp_path / "attachments" / "N1" / "file.bin"
+    with pytest.raises(SizeMismatch) as info:
+        storage.write_stream_atomic(path, iter([b"x" * 10240]), expected)
+    assert (info.value.expected, info.value.actual) == (expected, 10240)
+    assert str(expected) in str(info.value) and "10240" in str(info.value)
+    assert not path.exists()
+    assert _temp_files(tmp_path) == []
+    assert list(path.parent.iterdir()) == []
+
+
+def test_write_stream_without_expected_size_skips_the_check(tmp_path):
+    path = tmp_path / "file.bin"
+    assert storage.write_stream_atomic(path, iter([b"abc", b"de"]), None) == 5
+    assert path.read_bytes() == b"abcde"
+
+
+class _SourceFailed(Exception):
+    pass
+
+
+def _failing_source():
+    yield b"first"
+    raise _SourceFailed("connection dropped")
+
+
+def test_write_stream_source_error_propagates_and_leaves_nothing(tmp_path):
+    path = tmp_path / "attachments" / "N1" / "file.bin"
+    with pytest.raises(_SourceFailed):
+        storage.write_stream_atomic(path, _failing_source(), None)
+    assert not path.exists()
+    assert _temp_files(tmp_path) == []
+
+
+def test_write_stream_source_os_error_is_not_a_storage_error(tmp_path):
+    def source():
+        yield b"x"
+        raise TimeoutError("timed out")
+
+    with pytest.raises(TimeoutError):
+        storage.write_stream_atomic(tmp_path / "file.bin", source(), None)
+    assert _temp_files(tmp_path) == []
+
+
+def test_write_stream_disk_error_is_a_storage_error(tmp_path, monkeypatch):
+    def failing_sync(fd, full_sync):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(storage, "_sync_file", failing_sync)
+    path = tmp_path / "file.bin"
+    with pytest.raises(StorageError, match="file.bin"):
+        storage.write_stream_atomic(path, iter([b"x"]), 1)
+    assert not path.exists()
+    assert _temp_files(tmp_path) == []
+
+
+def test_write_stream_injected_fault_leaves_only_a_temp_file(tmp_path):
+    path = tmp_path / "attachments" / "N1" / "file.bin"
+    storage.set_fault_after(0)
+    with pytest.raises(storage.InjectedFault):
+        storage.write_stream_atomic(path, iter([b"abc"]), 3)
+    assert not path.exists()
+    [temp] = _temp_files(tmp_path)
+    assert temp.parent == path.parent
+    assert storage.remove_temp_files(tmp_path) == 1
+    assert list(path.parent.iterdir()) == []
+
+
+def test_write_stream_counts_as_one_write_for_the_fault_hook(tmp_path):
+    storage.set_fault_after(1)
+    storage.write_stream_atomic(tmp_path / "a.bin", iter([b"a"]), 1)
+    with pytest.raises(storage.InjectedFault):
+        storage.write_bytes_atomic(tmp_path / "b.json", b"{}\n")

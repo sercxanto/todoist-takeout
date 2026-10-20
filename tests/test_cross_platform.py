@@ -6,28 +6,20 @@ CI runs them on Linux, macOS and Windows (.github/workflows/tests.yml).
 import json
 import os
 import shutil
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
-from todoist_takeout import archived, completed, storage, sync
+from todoist_takeout import storage, sync
 from todoist_takeout.api import Client
 from todoist_takeout.cli import main
 from todoist_takeout.errors import StorageError
 from todoist_takeout.lock import LOCK_FILE
 from todoist_takeout.resources import Classifier
 
-from fake_api import (
-    ACTIVITIES,
-    ARCHIVED_PROJECTS,
-    BY_COMPLETION_DATE,
-    COMMENTS,
-    TASKS_COMPLETED,
-    FakeApi,
-    archived_fixture,
-    completed_fixture,
-)
+from fake_api import FakeApi, archived_answers, completed_answers
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EXPECTED_TREE = FIXTURES / "expected_tree"
@@ -70,36 +62,6 @@ def files(root: Path) -> dict[str, bytes]:
     }
 
 
-def completed_answers(api: FakeApi) -> FakeApi:
-    """Completed tasks of 2026-09 in two pages with the comments of one task, the backfill of
-    2026-09, and an event before and one at T0. The other months are empty."""
-    since, until = completed.month_window("2026-09")
-    september = {"since": since, "until": until}
-    pages = [completed_fixture("by_completion_date_1"), completed_fixture("by_completion_date_2")]
-    api.cursor_pages(BY_COMPLETION_DATE, september, pages)
-    api.answer(COMMENTS, {"task_id": "6X8Gq4CfVh9xPm2R"}, completed_fixture("comments"))
-    api.answer(TASKS_COMPLETED, september, completed_fixture("tasks_completed"))
-    before_t0 = completed_fixture("activities_2")["results"][0]
-    at_t0 = {**completed_fixture("activities_1")["results"][0], "event_date": completed.precise_timestamp(NOW)}
-    return api.answer(ACTIVITIES, {}, {"results": [before_t0, at_t0], "next_cursor": None})
-
-
-def archived_answers(api: FakeApi) -> FakeApi:
-    """One archived project in the second of two list pages, with an archived sub-project that only its
-    /full names, completed tasks in two pages of one window, a commented task and a project comment."""
-    parent = archived_fixture("full_parent")
-    project_id = parent["project"]["id"]
-    api.cursor_pages(ARCHIVED_PROJECTS, {}, [{"results": [], "next_cursor": "YXJjaGl2ZWQ6Mg"},
-                                             {"results": [parent["project"]], "next_cursor": None}])
-    for full in (parent, archived_fixture("full_child")):
-        api.answer(archived.full_path(full["project"]["id"]), {}, full)
-    window = {"since": "2024-01-01T00:00:00.000000Z", "until": "2024-03-31T23:59:59.999999Z", "project_id": project_id}
-    api.cursor_pages(BY_COMPLETION_DATE, window, [archived_fixture("completed_1"), archived_fixture("completed_2")])
-    [commented] = [task for task in parent["tasks"] if task["note_count"]]
-    api.answer(COMMENTS, {"task_id": commented["id"]}, archived_fixture("comments_task"))
-    return api.answer(COMMENTS, {"project_id": project_id}, archived_fixture("comments_project"))
-
-
 def test_cli_backup_matches_the_expected_tree(tmp_path, monkeypatch):
     responses = {
         "*": (FIXTURES / "sync" / "full_sync.json").read_bytes(),
@@ -110,7 +72,7 @@ def test_cli_backup_matches_the_expected_tree(tmp_path, monkeypatch):
     target = tmp_path / "backup"
 
     def factory(token, max_rate_limit_wait):
-        return Client(archived_answers(completed_answers(FakeApi(responses))), sleep=lambda delay: None)
+        return Client(archived_answers(completed_answers(FakeApi(responses), NOW)), sleep=lambda delay: None)
 
     assert main(["backup", "--quiet", str(target)], client_factory=factory) == 0
     produced = files(target)
@@ -124,6 +86,9 @@ def test_cli_backup_matches_the_expected_tree(tmp_path, monkeypatch):
     expected = files(EXPECTED_TREE)
 
     hint = f"if the change is intended, regenerate the tree with {UPDATE_VARIABLE}=1 pytest {__file__}"
+    # Some file systems list names decomposed (NFD), for example a macOS directory mounted into a
+    # VM, and git then records them so; the tool writes NFC. Hence the tree's names are ASCII.
+    assert [name for name in expected if not unicodedata.is_normalized("NFC", name)] == [], hint
     assert produced.keys() == expected.keys(), hint
     for name in produced:
         assert produced[name] == expected[name], f"{name} differs; {hint}"

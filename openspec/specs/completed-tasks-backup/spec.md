@@ -130,7 +130,7 @@ When `tasks/completed` is no longer available (HTTP 404 or 410), the tool SHALL 
 - **THEN** it makes no request to `tasks/completed` and prints no warning about it
 
 ### Requirement: Comments of completed tasks
-For each completed task whose payload has a `note_count` greater than 0, the tool SHALL back up its comments with their attachment metadata as it appears in the payload. It SHALL NOT download attachment files. A comment once stored SHALL stay in the backup, even when it is later deleted in Todoist.
+For each completed task whose payload has a `note_count` greater than 0, the tool SHALL back up its comments with their attachment metadata as it appears in the payload. Uploaded attachment files are downloaded as the `attachment-downloads` capability describes. A comment once stored SHALL stay in the backup, even when it is later deleted in Todoist.
 
 #### Scenario: Task with comments
 - **WHEN** a completed task with `note_count: 2` is stored for the first time

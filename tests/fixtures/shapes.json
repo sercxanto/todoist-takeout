@@ -1817,5 +1817,59 @@
         }
       }
     }
+  },
+  "file_attachments": {
+    "sources": [
+      "attachments/uploads.json"
+    ],
+    "keys": {
+      "file_attachment": {
+        "kind": "file|image",
+        "types": [
+          "object"
+        ],
+        "fields": {
+          "file_name": [
+            "string"
+          ],
+          "file_size": [
+            "integer"
+          ],
+          "file_type": [
+            "string"
+          ],
+          "file_url": [
+            "string"
+          ],
+          "image": [
+            "null",
+            "string"
+          ],
+          "image_height": [
+            "integer",
+            "null"
+          ],
+          "image_width": [
+            "integer",
+            "null"
+          ],
+          "resource_type": [
+            "string"
+          ],
+          "tn_l": [
+            "array"
+          ],
+          "tn_m": [
+            "array"
+          ],
+          "tn_s": [
+            "array"
+          ],
+          "upload_state": [
+            "string"
+          ]
+        }
+      }
+    }
   }
 }

@@ -8,11 +8,13 @@ import os
 import re
 import secrets
 import time
-from collections.abc import Sequence
+import unicodedata
+from collections.abc import Iterable, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 
 from todoist_takeout import __version__
-from todoist_takeout.errors import ConfigError, StorageError
+from todoist_takeout.errors import ConfigError, SizeMismatch, StorageError
 
 try:
     import fcntl
@@ -100,6 +102,60 @@ def decode_key(stem: str) -> tuple[str, ...]:
     return tuple(decode_component(part) for part in stem.split(KEY_SEPARATOR))
 
 
+# --- Attachment file names ---------------------------------------------------
+
+DEFAULT_ATTACHMENT_NAME = "attachment"
+MAX_ATTACHMENT_NAME_CHARS = 100
+MAX_ATTACHMENT_NAME_BYTES = 200
+MAX_EXTENSION_LENGTH = 16
+
+# Control characters, the characters Windows rejects, and lone surrogates, which have no UTF-8 form.
+_ATTACHMENT_REPLACED = re.compile('[\x00-\x1f\x7f<>:"/\\\\|?*\ud800-\udfff]')
+_ATTACHMENT_DEVICE_NAMES = _DEVICE_NAMES | {"CONIN$", "CONOUT$"} | {f"{p}{d}" for p in ("COM", "LPT") for d in "¹²³"}
+
+
+def attachment_file_name(file_name) -> str:
+    """Return the name an attachment file is stored under: `file_name`, changed only where needed.
+
+    The result is valid and visible on Windows, macOS and Linux, and at most 100 characters and
+    200 UTF-8 bytes long (design D8). The original name stays in the comment's payload.
+    """
+    if not isinstance(file_name, str) or not file_name:
+        return DEFAULT_ATTACHMENT_NAME
+    name = unicodedata.normalize("NFC", _ATTACHMENT_REPLACED.sub("_", file_name))
+    name = _make_visible(name)
+    if len(name) > MAX_ATTACHMENT_NAME_CHARS or len(name.encode("utf-8")) > MAX_ATTACHMENT_NAME_BYTES:
+        name = _make_visible(_shorten(name))
+    return name or DEFAULT_ATTACHMENT_NAME
+
+
+def _make_visible(name: str) -> str:
+    # Windows drops trailing spaces and dots, and Unix hides names that start with a dot.
+    name = name.rstrip(" .")
+    if name.startswith("."):
+        name = f"_{name[1:]}"
+    if name.split(".", 1)[0].rstrip(" ").upper() in _ATTACHMENT_DEVICE_NAMES:
+        name = f"_{name}"
+    return name
+
+
+def _shorten(name: str) -> str:
+    # Cuts the stem, keeping an extension of up to 16 characters, until both limits hold.
+    dot = name.rfind(".")
+    extension = name[dot:] if dot > 0 and len(name) - dot <= MAX_EXTENSION_LENGTH else ""
+    stem = name[: len(name) - len(extension)]
+    chars = MAX_ATTACHMENT_NAME_CHARS - len(extension)
+    budget = MAX_ATTACHMENT_NAME_BYTES - len(extension.encode("utf-8"))
+    kept = []
+    for char in stem:
+        size = len(char.encode("utf-8"))
+        if len(kept) == chars or size > budget:
+            break
+        kept.append(char)
+        budget -= size
+    return "".join(kept).rstrip(" .") + extension
+
+
 # --- Fault injection (tests only) --------------------------------------------
 
 
@@ -180,6 +236,54 @@ def write_bytes_atomic(path: Path, data: bytes, *, full_sync: bool = False) -> b
     return True
 
 
+def write_stream_atomic(path: Path, chunks: Iterable[bytes], expected_size: int | None) -> int:
+    """Write the chunks to `path` atomically and durably, and return the number of bytes written.
+
+    When `expected_size` is not None and the byte count differs from it, nothing is stored and
+    SizeMismatch is raised. An exception from `chunks` propagates unchanged; it too leaves no file.
+    """
+    path = Path(path)
+    with _storage_errors(path):
+        _ensure_dir(path.parent)
+        fd, tmp = _create_temp(path)
+    size = 0
+    try:
+        with os.fdopen(fd, "wb") as f:
+            # Errors of the source, such as a dropped connection, are not storage errors.
+            for chunk in chunks:
+                with _storage_errors(path):
+                    f.write(chunk)
+                size += len(chunk)
+            with _storage_errors(path):
+                f.flush()
+                _sync_file(f.fileno(), False)
+        if expected_size is not None and size != expected_size:
+            raise SizeMismatch(
+                f"received {size} bytes, but the file has {expected_size} bytes", expected=expected_size, actual=size
+            )
+    except BaseException:
+        _unlink_quietly(tmp)
+        raise
+    # A fault injected here leaves the temp file behind, like a killed process would.
+    _count_write()
+    try:
+        with _storage_errors(path):
+            _replace(tmp, path)
+    except BaseException:
+        _unlink_quietly(tmp)
+        raise
+    _sync_dir(path.parent)
+    return size
+
+
+@contextmanager
+def _storage_errors(path: Path):
+    try:
+        yield
+    except OSError as exc:
+        raise StorageError(f"cannot write {path}: {exc.strerror or exc}") from exc
+
+
 def remove_file(path: Path) -> bool:
     """Remove `path` durably. Return False if it did not exist."""
     path = Path(path)
@@ -202,7 +306,7 @@ def remove_temp_files(root: Path) -> int:
     removed = 0
     for dirpath, _dirnames, filenames in os.walk(root):
         for name in filenames:
-            if name.startswith(".") and name.endswith(".tmp"):
+            if is_temp_name(name):
                 path = Path(dirpath, name)
                 try:
                     path.unlink()
@@ -212,6 +316,11 @@ def remove_temp_files(root: Path) -> int:
                     raise StorageError(f"cannot remove temp file {path}: {exc.strerror or exc}") from exc
                 removed += 1
     return removed
+
+
+def is_temp_name(name: str) -> bool:
+    """Whether `name` is the name of a temp file that `_create_temp` makes (`.<name>.<hex>.tmp`)."""
+    return name.startswith(".") and name.endswith(".tmp")
 
 
 def _create_temp(path: Path) -> tuple[int, Path]:

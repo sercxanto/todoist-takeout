@@ -51,11 +51,13 @@ def test_documented_names_match_the_encoding():
     assert f"at most {storage.MAX_NAME_LENGTH}" in text
 
 
-# --- the documented `sync/`, `completed/` and `archived/` layout ------------------
+# --- the documented `sync/`, `completed/`, `archived/` and `attachments/` layout ---------
 
 
 def _documented_paths(prefix):
-    return sorted(set(re.findall(rf"`({prefix}/[^`]*\.json)`", _format_description())))
+    # Attachment files have any name; every other documented file is JSON. Directories end in `/`.
+    ending = r"[^/`]" if prefix == "attachments" else r"\.json"
+    return sorted(set(re.findall(rf"`({prefix}/[^`]*{ending})`", _format_description())))
 
 
 def _pattern(documented: str) -> re.Pattern:
@@ -99,6 +101,8 @@ LAYOUTS = {
     "sync": (_produced_sync_tree, 8),
     "completed": (_produced_completed_tree, 8),
     "archived": (_produced_archived_tree, 7),
+    # The archived tree holds the files of a comment in the sync and of one in a snapshot.
+    "attachments": (_produced_archived_tree, 2),
 }
 
 
@@ -166,3 +170,35 @@ def test_description_names_every_copy_of_a_task_and_the_rule_for_the_current_one
     assert ("The current copy is the one with the newest `updated_at`. If several copies have the same "
             "`updated_at`, a copy under `archived/` is current, then one under `completed/`, then one under "
             "`sync/`.") in text
+
+
+def _section(heading: str) -> str:
+    [section] = re.findall(rf"^## {heading}$(.*?)^## ", _format_description(), re.M | re.S)
+    return " ".join(section.split())
+
+
+def test_description_tells_how_to_find_the_file_of_a_comment():
+    text = _section("Attachment files")
+    assert "The file attached to a stored comment is the only file in `attachments/<comment id>/`" in text
+    assert "its original name is the comment's `file_attachment.file_name`" in text
+    assert "A missing `attachments/<comment id>/` directory" in text and "means that the comment's file is not downloaded" in text
+    for part in ["sync/", "completed/comments/", "archived/"]:
+        assert f"`{part}`" in text
+
+
+def test_documented_attachment_names_match_the_rules():
+    text = _section("Attachment files")
+    examples = re.findall(r"`([^`]+)` is stored as `([^`]+)`", text)
+    assert len(examples) == 4
+    for name, stored in examples:
+        assert storage.attachment_file_name(name) == stored
+    assert f"longer than {storage.MAX_ATTACHMENT_NAME_CHARS} characters or {storage.MAX_ATTACHMENT_NAME_BYTES} bytes" in text
+    assert f"at most {storage.MAX_EXTENSION_LENGTH} characters" in text
+    assert f"becomes `{storage.DEFAULT_ATTACHMENT_NAME}`" in text
+
+
+def test_comment_sections_point_to_the_attachment_files():
+    text = " ".join(_format_description().split())
+    assert "not downloaded. On a plan" not in text and "files themselves are not downloaded" not in text
+    for heading in ["Active data", "Completed tasks", "Archived projects"]:
+        assert "[Attachment files](#attachment-files)" in _section(heading), heading
