@@ -2,7 +2,7 @@
 
 A command-line tool that keeps a complete, long-term readable local backup of a [Todoist](https://www.todoist.com) account.
 
-> **Status:** early. Backing up active data (projects, sections, labels, tasks, comments and the other resources of the sync API), completed tasks, with every completion of recurring tasks and the comments of completed tasks, archived projects, and the files uploaded to comments works, and so does a SQLite database for browsing the backup in Datasette. See the [Roadmap](#roadmap) for what comes next.
+> **Status:** not released yet. It backs up active data (projects, sections, labels, tasks, comments and the other resources of the sync API), completed tasks, with every completion of recurring tasks and the comments of completed tasks, archived projects, and the files uploaded to comments, and builds a SQLite database for browsing the backup in Datasette.
 
 ## Why
 
@@ -63,6 +63,8 @@ Not included: sections that were archived before the first backup, because the A
 **Accounts with many attachments.** The first run downloads every file uploaded to the stored comments, one at a time, after all other data; later runs download only new ones. On an account with years of attachments this can take hours and as much disk space as the files take in Todoist, so check the free space of the target first. A run that stops, because of the network or because you cancel it, keeps every file it completed; run it again to download the rest. Files already stored are never downloaded again.
 
 **On the Free plan,** the activity log keeps only 7 days. Run the backup at least weekly; otherwise the completions of recurring tasks in the gap may be lost, and the tool warns about it.
+
+**Todoist's own backups are not downloaded.** On paid plans, Todoist keeps up to 21 daily backups under *Settings → Backups* in the web and desktop apps: ZIP files with one CSV file per active project. They hold nothing that this backup lacks: no completed tasks, no archived projects, at most 500 comments per task, and only links to attachments. They do not exist on the Free plan, and when two-factor authentication is on, the API hands them out only with a one-time code from the authenticator app, which rules out unattended runs. They offer one thing this tool does not: a project's CSV file can be imported into Todoist directly (*Import from CSV*), which brings back a deleted project with its active tasks. If you want that option, download them yourself in the app.
 
 Options of `backup`:
 
@@ -182,17 +184,6 @@ It exits with 0 when the database is complete, possibly with warnings; 1 when th
 - **macOS certificates:** Python from python.org ships without CA certificates. If runs fail with `cannot verify the TLS certificate`, run *Install Certificates.command* from the Python folder in Applications, or point `SSL_CERT_FILE` at a CA bundle. The tool never turns certificate verification off.
 - **Keep the target on a local disk.** The lock that prevents overlapping runs may not work on network file systems. If the target must live on one, make sure runs never overlap. Folders that a sync client such as OneDrive or Dropbox watches work, but a local directory that your regular file backup covers is the better choice.
 - **Windows long paths:** file names in the backup stay short (an attachment file name has at most 100 characters), but a deeply nested target directory can exceed Windows' 260-character path limit. Use a short target path, or enable long path support (`LongPathsEnabled` in the registry or group policy).
-
-## Roadmap
-
-1. **Sync active data** *(implemented)*: a full sync, then incremental syncs, with checkpointing and tombstones. The format is described in [storage_format.md](src/todoist_takeout/storage_format.md). The behaviour is specified in [openspec/specs/](openspec/specs/); the planning is archived in [openspec/changes/archive/2026-10-18-add-active-data-sync/](openspec/changes/archive/2026-10-18-add-active-data-sync/).
-2. **Back up completed tasks** *(implemented)*: month files for completed tasks, written incrementally, with every completion of recurring tasks and the comments of completed tasks. The behaviour is specified in [openspec/specs/completed-tasks-backup/](openspec/specs/completed-tasks-backup/); the planning is archived in [openspec/changes/archive/2026-10-18-add-completed-tasks-backup/](openspec/changes/archive/2026-10-18-add-completed-tasks-backup/).
-3. **Back up archived projects** *(implemented)*: a snapshot per archived project with its sections, open and completed tasks, sub-projects and comments, which the sync endpoint does not return. The behaviour is specified in [openspec/specs/archived-projects-backup/](openspec/specs/archived-projects-backup/); the planning is archived in [openspec/changes/archive/2026-10-19-add-archived-projects-backup/](openspec/changes/archive/2026-10-19-add-archived-projects-backup/).
-4. **Download attachment files** *(implemented)*: the file uploaded to each stored comment, downloaded once into `attachments/<comment id>/`, with the token sent only to Todoist's hosts. The behaviour is specified in [openspec/specs/attachment-downloads/](openspec/specs/attachment-downloads/); the planning is archived in [openspec/changes/archive/2026-10-20-add-attachment-downloads/](openspec/changes/archive/2026-10-20-add-attachment-downloads/).
-5. **Derive a SQLite database** *(implemented)*: the `sqlite` command, which builds a simplified SQLite database and a Datasette metadata file from the backup, for browsing and searching it. The behaviour is specified in [openspec/specs/sqlite-view/](openspec/specs/sqlite-view/); the planning is archived in [openspec/changes/archive/2026-10-20-add-sqlite-view/](openspec/changes/archive/2026-10-20-add-sqlite-view/).
-6. **Download Todoist's own backups** (`/api/v1/backups`) as an additional safety net. This is an idea, not yet evaluated.
-
-The documented storage schema is part of each step and grows with the backup format.
 
 ## Contributing
 

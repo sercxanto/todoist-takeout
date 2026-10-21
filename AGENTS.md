@@ -12,6 +12,8 @@ uv run ruff check --fix .
 uv run pytest
 ```
 
+While the repository is private, CI runs only when started by hand (see [.github/workflows/tests.yml](.github/workflows/tests.yml)), so these local checks are the only gate, and they run on Linux only. When a change touches code that behaves differently on Windows or macOS, such as paths, file locking or atomic file replacement, say that it needs a manual CI run before it is merged.
+
 Do not silence a Ruff finding with `# noqa` or a new ignore in `pyproject.toml` unless the rule is wrong for that code, and then say why in a comment.
 
 ## Planning

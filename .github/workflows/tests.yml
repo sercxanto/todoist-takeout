@@ -1,11 +1,17 @@
 name: tests
 
-# Branches other than main are tested through their pull request, so that a push to
-# a branch with an open pull request does not run the jobs twice.
+# Runs only when started by hand (Actions -> tests -> Run workflow), to save the Actions minutes
+# of a private repository, where macOS and Windows jobs count several times. Restore the triggers
+# below before the first release or when the repository becomes public:
+#
+#   # Branches other than main are tested through their pull request, so that a push to
+#   # a branch with an open pull request does not run the jobs twice.
+#   on:
+#     push:
+#       branches: [main]
+#     pull_request:
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
