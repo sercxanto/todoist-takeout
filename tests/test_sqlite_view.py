@@ -6,7 +6,7 @@ import sqlite3
 import subprocess
 import sys
 from contextlib import closing
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -23,6 +23,7 @@ from todoist_takeout.sqlite_view import (
     BACKFILL,
     SCHEMA_VERSION,
     TABLES,
+    VIEWS,
     Completion,
     read_backup,
 )
@@ -513,6 +514,7 @@ def test_other_event_types_are_left_out(tmp_path):
 # --- 3.1 the database target --------------------------------------------------------------
 
 TABLE_NAMES = ["comments", "completions", "labels", "projects", "sections", "task_labels", "tasks"]
+VIEW_NAMES = [view.name for view in VIEWS]
 
 
 def query(database: Path, sql: str, *params) -> list[tuple]:
@@ -879,13 +881,21 @@ def test_older_schema_is_replaced(tmp_path):
     put(backup, "sync/items/T1.json", task("T1"))
     build_db(backup, database)
     names = query(database, "SELECT type, name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND type != 'table'")
-    assert names == []
+    assert names == [("index", "completions_task_id"), *(("view", view.name) for view in VIEWS)]
     assert tables_of(database) == TABLE_NAMES
     assert not query(database, "SELECT name FROM sqlite_master WHERE name LIKE 'old%'")
     # SQLite does not let its own table of AUTOINCREMENT counters be dropped; dropping `old` empties it.
     assert query(database, "SELECT * FROM sqlite_sequence") == []
     assert query(database, "SELECT id FROM tasks") == [("T1",)]
     assert query(database, "PRAGMA user_version") == [(SCHEMA_VERSION,)]
+
+
+def test_index_of_completions_by_task(tmp_path):
+    database = build_db(new_backup(tmp_path / "backup"), tmp_path / "todoist.db")
+    assert query(
+        database, "SELECT tbl_name FROM sqlite_master WHERE type = 'index' AND name = 'completions_task_id'"
+    ) == [("completions",)]
+    assert [row[2] for row in query(database, "PRAGMA index_info(completions_task_id)")] == ["task_id"]
 
 
 def test_same_backup_twice(tmp_path):
@@ -901,7 +911,7 @@ def test_same_backup_twice(tmp_path):
 
 def test_file_shrinks_with_fewer_rows(tmp_path):
     backup = new_backup(tmp_path / "backup")
-    many = [task(f"T{i:05}", description="x" * 200) for i in range(3000)]
+    many = [task(f"T{i:05}", description="x" * 500) for i in range(3000)]
     put(backup, "completed/2026-05.json", {"items": many})
     database = build_db(backup, tmp_path / "todoist.db")
     large = database.stat().st_size
@@ -1053,10 +1063,14 @@ def test_foreign_metadata_file_before_a_new_database(tmp_path, capsys):
     assert sorted(p.name for p in tmp_path.iterdir()) == ["backup", "todoist.metadata.json"]
 
 
-def test_every_table_and_column_is_described(tmp_path):
+def test_every_table_view_and_column_is_described(tmp_path):
     database = build_db(build_backup(tmp_path / "backup"), tmp_path / "todoist.db")
     tables = metadata_of(tmp_path / "todoist.metadata.json")["databases"]["todoist"]["tables"]
-    assert sorted(tables) == TABLE_NAMES == tables_of(database)
+    assert sorted(tables) == sorted(TABLE_NAMES + VIEW_NAMES)
+    assert tables_of(database) == TABLE_NAMES
+    assert sorted(name for (name,) in query(database, "SELECT name FROM sqlite_master WHERE type = 'view'")) == sorted(
+        VIEW_NAMES
+    )
     for name, options in tables.items():
         assert options["description"]
         columns = [row[1] for row in query(database, f"PRAGMA table_info({name})")]
@@ -1078,14 +1092,20 @@ def test_datasette_options(tmp_path):
     assert tables["completions"]["sort_desc"] == "completed_at"
     assert tables["comments"]["sort_desc"] == "posted_at"
     labels = {name: options.get("label_column") for name, options in tables.items()}
-    assert labels == {name: None for name in TABLE_NAMES} | {
+    assert labels == {name: None for name in TABLE_NAMES + VIEW_NAMES} | {
         "projects": "name",
         "sections": "name",
         "labels": "name",
         "tasks": "content",
     }
     search = {name: options.get("fts_table") for name, options in tables.items()}
-    assert search == {name: None for name in TABLE_NAMES} | {"tasks": "tasks_fts", "comments": "comments_fts"}
+    assert search == {name: None for name in TABLE_NAMES + VIEW_NAMES} | {
+        "tasks": "tasks_fts",
+        "comments": "comments_fts",
+    }
+    for view in VIEWS:
+        assert tables[view.name]["facets"] == list(view.facets)
+        assert not {"sort", "sort_desc", "label_column", "fts_table"} & set(tables[view.name])
 
 
 def test_metadata_without_full_text_search(tmp_path, monkeypatch):
@@ -1263,3 +1283,140 @@ def test_whole_command_on_paths_with_spaces_and_non_ascii(tmp_path, capsys):
         assert "\\" not in path and path.startswith("attachments/")
         assert (backup / path).is_file()
     assert list(metadata_of(database.parent / "todoist ü.metadata.json")["databases"]) == ["todoist ü"]
+
+
+# --- the views ----------------------------------------------------------------------------
+
+
+def view_rows(database: Path, view: str) -> list[dict]:
+    with closing(sqlite3.connect(database)) as con:
+        con.row_factory = sqlite3.Row
+        return [dict(row) for row in con.execute(f"SELECT * FROM {view}")]
+
+
+@pytest.mark.parametrize("view", VIEWS, ids=lambda view: view.name)
+def test_columns_of_a_view_match_its_definition(tmp_path, view):
+    database = build_db(new_backup(tmp_path / "backup"), tmp_path / "todoist.db")
+    assert [row[1] for row in query(database, f"PRAGMA table_info({view.name})")] == [c.name for c in view.columns]
+
+
+def test_failed_rebuild_keeps_the_previous_views(tmp_path, monkeypatch, capsys):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/T1.json", task("T1"))
+    database = build_db(backup, tmp_path / "todoist.db")
+    views = "SELECT name, sql FROM sqlite_master WHERE type = 'view' ORDER BY rowid"
+    before = query(database, views)
+    assert [name for name, _sql in before] == [view.name for view in VIEWS]
+    put(backup, "sync/items/T2.json", task("T2"))
+
+    def failing(con):
+        raise RuntimeError("killed")
+
+    # The search tables come after the views, so the views were dropped and created anew.
+    monkeypatch.setattr(sqlite_view, "_create_search", failing)
+    assert main(["sqlite", "--quiet", str(backup), str(database)]) == 1
+    assert query(database, views) == before
+    assert [row["id"] for row in view_rows(database, "open_tasks")] == ["T1"]
+
+
+# --- the view open_tasks ------------------------------------------------------------------
+
+FAR_FUTURE = "2999-12-31"
+
+
+def due(value, **fields):
+    return {"date": value, "string": value, "is_recurring": False, **fields}
+
+
+def test_open_task_with_names(tmp_path):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/projects/P1.json", project("P1", name="Home"))
+    put(backup, "sync/sections/S1.json", {"id": "S1", "name": "Garden", "project_id": "P1"})
+    put(
+        backup,
+        "sync/items/T1.json",
+        task(
+            "T1",
+            project_id="P1",
+            section_id="S1",
+            labels=["weekend", "errand"],
+            priority=4,
+            due=due(FAR_FUTURE, string="every year", is_recurring=True),
+            deadline={"date": "2999-12-30"},
+            added_at=T1,
+        ),
+    )
+    database = build_db(backup, tmp_path / "todoist.db")
+    assert view_rows(database, "open_tasks") == [
+        {
+            "id": "T1",
+            "content": "task T1",
+            "project_name": "Home",
+            "section_name": "Garden",
+            "labels": "errand, weekend",
+            "priority": "p1",
+            "due_date": FAR_FUTURE,
+            "due_string": "every year",
+            "is_recurring": 1,
+            "deadline_date": "2999-12-30",
+            "overdue": 0,
+            "added_at": T1,
+        }
+    ]
+
+
+def test_open_tasks_leave_out_completed_tasks_and_archived_projects(tmp_path):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/projects/P1.json", project("P1", is_archived=False))
+    put(backup, "archived/P2/project.json", project("P2", is_archived=True))
+    put(backup, "sync/items/T1.json", task("T1", project_id="P1"))
+    put(backup, "completed/2026-05.json", {"items": [task("T2", project_id="P1", checked=True)]})
+    put(backup, "archived/P2/full.json", {"tasks": [task("T3", project_id="P2")]})
+    put(backup, "sync/items/T4.json", task("T4", project_id="P9"))  # a project not in the database
+    database = build_db(backup, tmp_path / "todoist.db")
+    rows = [(row["id"], row["project_name"]) for row in view_rows(database, "open_tasks")]
+    assert rows == [("T1", "project P1"), ("T4", None)]
+
+
+def test_order_of_open_tasks(tmp_path):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/A.json", task("A", due=due("2026-10-25"), priority=3))
+    put(backup, "sync/items/B.json", task("B", due=due("2026-10-25"), priority=4))
+    put(backup, "sync/items/C.json", task("C", due=due("2026-10-22"), priority=1))
+    put(backup, "sync/items/D.json", task("D", priority=4))
+    # A due time on the same day: the priority decides before the time.
+    put(backup, "sync/items/E.json", task("E", due=due("2026-10-25T08:00:00"), priority=4))
+    database = build_db(backup, tmp_path / "todoist.db")
+    assert [row["id"] for row in view_rows(database, "open_tasks")] == ["C", "B", "E", "A", "D"]
+
+
+@pytest.mark.parametrize(
+    ("due_date", "overdue"),
+    [
+        (None, 0),
+        ("2000-01-01", 1),
+        (FAR_FUTURE, 0),
+        ("2000-01-01T09:00:00", 1),
+        ("2000-01-01T09:00:00Z", 1),
+        ("2000-01-01T09:00:00.000000Z", 1),
+        ("2999-12-31T09:00:00", 0),
+        ("2999-12-31T09:00:00Z", 0),
+    ],
+)
+def test_overdue(tmp_path, due_date, overdue):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/T.json", task("T", due=due(due_date) if due_date else None))
+    database = build_db(backup, tmp_path / "todoist.db")
+    assert [row["overdue"] for row in view_rows(database, "open_tasks")] == [overdue]
+
+
+def test_overdue_is_computed_when_queried(tmp_path):
+    # SQLite's clock cannot be set from Python, so a day passing is tested by its two halves: the
+    # view computes overdue when it is queried, and a task due yesterday is overdue, one due today not.
+    today = date.today()  # the local date, as SQLite's 'localtime'
+    backup = new_backup(tmp_path / "backup")
+    for name, day in [("T1", today - timedelta(days=1)), ("T2", today), ("T3", today + timedelta(days=1))]:
+        put(backup, f"sync/items/{name}.json", task(name, due=due(day.isoformat())))
+    database = build_db(backup, tmp_path / "todoist.db")
+    assert query(database, "SELECT type FROM sqlite_master WHERE name = 'open_tasks'") == [("view",)]
+    assert {row["id"]: row["overdue"] for row in view_rows(database, "open_tasks")} == {"T1": 1, "T2": 0, "T3": 0}

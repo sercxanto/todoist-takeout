@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import sqlite3
+import textwrap
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -342,7 +343,7 @@ def _text(value) -> str | None:
 # `PRAGMA application_id` of the tool's databases: the ASCII bytes `TdTk`.
 APPLICATION_ID = 0x5464546B
 # `PRAGMA user_version`: the version of the schema below.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 # How long a rebuild waits, in seconds, for another program to release the database (design D6).
 BUSY_TIMEOUT = 10.0
 
@@ -416,6 +417,20 @@ class Table:
     @property
     def search_table(self) -> str:
         return f"{self.name}_fts"
+
+
+@dataclass(frozen=True)
+class View:
+    """A view over the tables (design D2); its columns are those of `select`, in that order."""
+
+    name: str
+    description: str
+    columns: tuple[Column, ...]
+    select: str
+    facets: tuple[str, ...] = ()  # Datasette's facets in the metadata file
+
+    def create_statement(self) -> str:
+        return f"CREATE VIEW {self.name} AS\n{textwrap.dedent(self.select).strip()}"
 
 
 OPEN = "open"
@@ -650,6 +665,57 @@ TABLES = (
     ),
 )
 
+# Created after the tables are filled (design D6).
+INDEXES = ("CREATE INDEX completions_task_id ON completions (task_id)",)
+
+
+# --- The views (design D2) ----------------------------------------------------------------------
+
+# In order of creation: a view may read the views before it.
+VIEWS = (
+    View(
+        "open_tasks",
+        "The open tasks, without those of archived projects, by due date, then priority. Whether a task "
+        "is overdue follows the local time of the computer that runs the query.",
+        (
+            Column("id", "TEXT", "The task's ID."),
+            Column("content", "TEXT", "The task's name."),
+            Column("project_name", "TEXT", "The name of the task's project."),
+            Column("section_name", "TEXT", "The name of the task's section, if any."),
+            Column("labels", "TEXT", "The task's label names, in alphabetical order."),
+            Column("priority", "TEXT", "The priority as Todoist shows it, from p1 (highest) to p4."),
+            Column("due_date", "TEXT", "The due date, or date and time, of the next occurrence."),
+            Column("due_string", "TEXT", "The due date as it was entered, such as every monday."),
+            Column("is_recurring", "INTEGER", "1 if the task recurs, else 0."),
+            Column("deadline_date", "TEXT", "The deadline."),
+            Column("overdue", "INTEGER", "1 if the due date, or due time, has passed, else 0."),
+            Column("added_at", "TEXT", "When the task was created, in UTC."),
+        ),
+        """
+        SELECT t.id, t.content, p.name AS project_name, s.name AS section_name,
+               -- sorted in a subquery: group_concat(... ORDER BY ...) needs SQLite 3.44
+               (SELECT group_concat(label_name, ', ')
+                  FROM (SELECT label_name FROM task_labels WHERE task_id = t.id ORDER BY label_name)) AS labels,
+               t.priority, t.due_date, t.due_string, t.is_recurring, t.deadline_date,
+               -- a due date is overdue from the next day on, a due time once it has passed: a floating
+               -- one by the local clock, one in UTC by the UTC clock; 'now' is read at query time
+               CASE
+                 WHEN t.due_date IS NULL THEN 0
+                 WHEN length(t.due_date) = 10 THEN t.due_date < date('now', 'localtime')
+                 WHEN t.due_date LIKE '%Z' THEN julianday(t.due_date) < julianday('now')
+                 ELSE julianday(t.due_date) < julianday('now', 'localtime')
+               END AS overdue,
+               t.added_at
+          FROM tasks t
+          LEFT JOIN projects p ON p.id = t.project_id
+          LEFT JOIN sections s ON s.id = t.section_id
+         WHERE t.status = 'open' AND coalesce(p.is_archived, 0) = 0
+         ORDER BY t.due_date IS NULL, substr(t.due_date, 1, 10), t.priority, t.due_date, t.id
+        """,
+        facets=("project_name", "priority", "overdue", "is_recurring"),
+    ),
+)
+
 
 # --- The rebuild (design D6, D10) ---------------------------------------------------------------
 
@@ -704,6 +770,10 @@ def _rebuild(con: sqlite3.Connection, content: Content, new: bool) -> Built:
     for table in TABLES:
         con.execute(table.create_statement())
         rows[table.name] = _insert(con, table, table.rows(content))
+    for statement in INDEXES:
+        con.execute(statement)
+    for view in VIEWS:
+        con.execute(view.create_statement())
     search = _create_search(con)
     con.execute(f"PRAGMA application_id = {APPLICATION_ID}")
     con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -791,7 +861,7 @@ def check_metadata(path: Path) -> None:
 
 
 def metadata(database: Path, backup: Path, state: dict, search: bool) -> dict:
-    """Datasette's metadata of the database, from the table definitions (design D8).
+    """Datasette's metadata of the database, from the table and view definitions (design D8).
 
     `fts_table` is set only if the database has full-text search.
     """
@@ -811,6 +881,12 @@ def metadata(database: Path, backup: Path, state: dict, search: bool) -> dict:
         if search and table.search:
             options["fts_table"] = table.search_table
         tables[table.name] = options
+    # Datasette reads the options of a view under `tables` too.
+    for view in VIEWS:
+        options = {"description": view.description, "columns": {c.name: c.description for c in view.columns}}
+        if view.facets:
+            options["facets"] = list(view.facets)
+        tables[view.name] = options
     return {
         "title": "Todoist backup",
         "description": description + ".",

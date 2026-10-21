@@ -10,12 +10,12 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 1. View framework
 
-- [ ] 1.1 Add the `View` dataclass and an empty `VIEWS` tuple to `sqlite_view.py`, create the views and the index `completions_task_id` in `_rebuild` after the tables and before the search tables, add the views to `metadata()` with description, columns and facets, and raise `SCHEMA_VERSION` to 2 (design D2, D6). Verify that the existing tests of `tests/test_sqlite_view.py` pass, adjusted only where they assert the schema version, and that a test finds the index in `sqlite_master`
-- [ ] 1.2 Add a test that compares the columns of every view (`PRAGMA table_info`) with its `View` definition, and one that checks that a failed rebuild keeps the previous views (design D2, D9). Verify that both tests pass once the first view exists (task 2.1)
+- [x] 1.1 Add the `View` dataclass and an empty `VIEWS` tuple to `sqlite_view.py`, create the views and the index `completions_task_id` in `_rebuild` after the tables and before the search tables, add the views to `metadata()` with description, columns and facets, and raise `SCHEMA_VERSION` to 2 (design D2, D6). Verify that the existing tests of `tests/test_sqlite_view.py` pass, adjusted only where they assert the schema version, and that a test finds the index in `sqlite_master`
+- [x] 1.2 Add a test that compares the columns of every view (`PRAGMA table_info`) with its `View` definition, and one that checks that a failed rebuild keeps the previous views (design D2, D9). Verify that both tests pass once the first view exists (task 2.1)
 
 ## 2. Views
 
-- [ ] 2.1 Add `open_tasks` with the overdue expression (design D3, D4). Verify with tests for every scenario of the spec requirements "Open tasks view", "Overdue tasks" and "Values computed at query time", using dates far in the past and future and, for "A day passes", Python's local date
+- [x] 2.1 Add `open_tasks` with the overdue expression (design D3, D4). Verify with tests for every scenario of the spec requirements "Open tasks view", "Overdue tasks" and "Values computed at query time", using dates far in the past and future and, for "A day passes", Python's local date
 - [ ] 2.2 Add `done_log` (design D5). Verify with tests for every scenario of the spec requirement "Completion log view", including "Task completed again", the order across both sources with differing fractional seconds, and `completed_local` against Python's `astimezone()`
 - [ ] 2.3 Add `recurring_stats` over `done_log` (design D8). Verify with tests for every scenario of the spec requirement "Recurring tasks view"
 - [ ] 2.4 Extend the in-process Datasette test to open each view and check its description, column descriptions, facets and the order of its first rows (spec "Views in Datasette", design D7). Verify that the test passes against the pinned Datasette 0.65
