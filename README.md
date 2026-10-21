@@ -153,7 +153,7 @@ uvx datasette ~/todoist.db -m ~/todoist.metadata.json
 
 Then open the address that Datasette prints, usually http://127.0.0.1:8001. Datasette is not part of todoist-takeout; `uvx` runs it without installing it, and `pipx run datasette` works as well.
 
-The command works offline, needs no token, and never changes the backup. It holds the backup's lock while it reads, so it stops with "another run is in progress" while a backup is running, and the other way round. Next to the database it writes the Datasette metadata file, named after the database with `.metadata.json` in place of its suffix, which describes every table and column. Both arguments are required. The command refuses to overwrite a file that is not a database or metadata file it wrote itself.
+The command works offline, needs no token, and never changes the backup. It holds the backup's lock while it reads, so it stops with "another run is in progress" while a backup is running, and the other way round. Next to the database it writes the Datasette metadata file, named after the database with `.metadata.json` in place of its suffix, which describes every table, view and column. Both arguments are required. The command refuses to overwrite a file that is not a database or metadata file it wrote itself.
 
 Every run rebuilds the whole database from the backup, so run it again after each backup, for example in the same scheduled job. A running Datasette shows the new content on its next page load; do not start it with `-i` (immutable mode), which assumes the file never changes. If another program keeps the database locked for more than 10 seconds, the run fails and the database keeps its previous content.
 
@@ -168,6 +168,16 @@ The database is a simplified view for browsing, not a copy of the backup: each o
 | `task_labels` | One row per label of a task, with a link to the personal label of that name, if there is one. |
 | `comments` | Every comment of a task or project: text, time, the name of an attached file and its path in the backup (if downloaded), or the URL of an attached link. |
 | `completions` | One row per completion, every completion of a recurring task included, also of tasks deleted since: the task, its name and project at the time, the completion time, and whether it comes from the activity log or from before the first backup. |
+
+Three views combine the tables for everyday questions, with names in place of IDs:
+
+| View | Shows |
+|---|---|
+| `open_tasks` | The open tasks, without those of archived projects, by due date, then priority: ID and name, project, section and label names, priority, due date and whether it recurs, deadline, creation time, and whether the task is overdue. |
+| `done_log` | One row per completion, newest first: every row of `completions`, plus each completed task that no completion record covers: the task, its name, project ID and name, the completion time in UTC and in local time, its source (`activity`, `backfill` or `task`), and whether the task is still in `tasks`. |
+| `recurring_stats` | One row per recurring task: ID, name, status, project name and due date as entered, the number of its completions, the first and last one, the average number of days between them, and the days since the last one. |
+
+Whether a task is overdue, and the days since the last completion, are computed each time a view is queried, so they stay current between rebuilds. They use the local time of the computer that runs the query, which is the one running Datasette. A task due today without a time counts as overdue from tomorrow, as in Todoist.
 
 Full-text search covers the names and descriptions of tasks and the text of comments. The schema may change with any version of the tool, as the database is always rebuilt; for migration scripts, read the JSON backup, whose format is documented and versioned.
 
