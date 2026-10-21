@@ -5,6 +5,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import time
 from contextlib import closing
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -1177,6 +1178,51 @@ def test_opened_in_datasette(tmp_path):
     assert [row["id"] for row in found["rows"]] == ["T1"]
 
 
+def test_views_in_datasette(tmp_path):
+    from datasette.app import Datasette
+    from markupsafe import escape
+
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/projects/P1.json", project("P1", name="Home"))
+    weekly = {"string": "every week", "is_recurring": True}
+    put(backup, "sync/items/A.json", task("A", project_id="P1", priority=3, due=due("2026-10-25")))
+    put(backup, "sync/items/B.json", task("B", project_id="P1", due=due("2026-10-22")))
+    put(backup, "sync/items/C.json", task("C", project_id="P1", due=due("2026-10-23", **weekly)))
+    put(backup, "sync/items/R.json", task("R", project_id="P1", due=due("2026-10-24", **weekly)))
+    done = task("D", project_id="P1", checked=True, completed_at="2026-10-07T12:00:00Z")
+    put(backup, "completed/2026-10.json", {"items": [done]})
+    events = [
+        event(1, "C", "2026-10-02T12:00:00Z"),
+        event(2, "C", "2026-10-09T12:00:00Z"),
+        event(3, "R", "2026-10-05T12:00:00Z"),
+    ]
+    put(backup, "completed/activity/2026-10.json", {"results": events})
+    database = build_db(backup, tmp_path / "todoist.db")
+
+    async def browse():
+        ds = Datasette(files=[str(database)], metadata=metadata_of(tmp_path / "todoist.metadata.json"))
+        await ds.invoke_startup()
+        pages = {}
+        for view in VIEWS:
+            page = await ds.client.get(f"/todoist/{view.name}")
+            table = await ds.client.get(f"/todoist/{view.name}.json?_shape=objects")
+            assert page.status_code == table.status_code == 200, view.name
+            pages[view.name] = (page.text, table.json())
+        return pages
+
+    pages = asyncio.run(browse())
+    first_column = {"open_tasks": "id", "done_log": "task_id", "recurring_stats": "id"}
+    expected = {"open_tasks": ["B", "C", "R", "A"], "done_log": ["C", "D", "R", "C"], "recurring_stats": ["C", "R"]}
+    for view in VIEWS:
+        page, table = pages[view.name]
+        assert str(escape(view.description)) in page
+        for column in view.columns:
+            assert f'data-column-description="{escape(column.description)}"' in page, (view.name, column.name)
+        assert list(table["facet_results"]) == list(view.facets)
+        assert [row[first_column[view.name]] for row in table["rows"]] == expected[view.name]
+        assert table["rows"] == view_rows(database, view.name)
+
+
 # --- 5.1 messages and exit status ---------------------------------------------------------
 
 
@@ -1286,6 +1332,24 @@ def test_whole_command_on_paths_with_spaces_and_non_ascii(tmp_path, capsys):
 
 
 # --- the views ----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def local_zone(monkeypatch):
+    """A local time zone of UTC+05:30, so that local times differ from UTC; Windows keeps its own."""
+    if not hasattr(time, "tzset"):
+        yield
+        return
+    with monkeypatch.context() as patch:
+        patch.setenv("TZ", "XYZ-05:30")
+        time.tzset()
+        yield
+    time.tzset()
+
+
+def local(utc: str) -> str:
+    """The local time of a UTC time as SQLite's datetime(..., 'localtime') writes it."""
+    return datetime.fromisoformat(utc).astimezone().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def view_rows(database: Path, view: str) -> list[dict]:
@@ -1410,7 +1474,7 @@ def test_overdue(tmp_path, due_date, overdue):
     assert [row["overdue"] for row in view_rows(database, "open_tasks")] == [overdue]
 
 
-def test_overdue_is_computed_when_queried(tmp_path):
+def test_overdue_is_computed_when_queried(tmp_path, local_zone):
     # SQLite's clock cannot be set from Python, so a day passing is tested by its two halves: the
     # view computes overdue when it is queried, and a task due yesterday is overdue, one due today not.
     today = date.today()  # the local date, as SQLite's 'localtime'
@@ -1420,3 +1484,181 @@ def test_overdue_is_computed_when_queried(tmp_path):
     database = build_db(backup, tmp_path / "todoist.db")
     assert query(database, "SELECT type FROM sqlite_master WHERE name = 'open_tasks'") == [("view",)]
     assert {row["id"]: row["overdue"] for row in view_rows(database, "open_tasks")} == {"T1": 1, "T2": 0, "T3": 0}
+
+
+# --- the view done_log --------------------------------------------------------------------
+
+
+def test_completion_recorded(tmp_path, local_zone):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/projects/P1.json", project("P1", name="Home"))
+    put(backup, "completed/2026-10.json", {"items": [task("T1", checked=True, completed_at="2026-10-01T20:00:05Z")]})
+    recorded = event(1, "T1", "2026-10-01T20:00:00.000000Z", content="Water the plants", project_id="P1")
+    put(backup, "completed/activity/2026-10.json", {"results": [recorded]})
+    database = build_db(backup, tmp_path / "todoist.db")
+    assert view_rows(database, "done_log") == [
+        {
+            "task_id": "T1",
+            "content": "Water the plants",
+            "project_id": "P1",
+            "project_name": "Home",
+            "completed_at": "2026-10-01T20:00:00.000000Z",
+            "completed_local": local("2026-10-01T20:00:00Z"),
+            "source": "activity",
+            "task_exists": 1,
+        }
+    ]
+    if hasattr(time, "tzset"):
+        assert local("2026-10-01T20:00:00Z") == "2026-10-02 01:30:00"
+
+
+def test_completion_not_recorded(tmp_path, local_zone):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/projects/P1.json", project("P1", name="Home"))
+    done = task("T2", content="Pay rent", project_id="P1", checked=True, completed_at="2026-10-02T08:00:00.000000Z")
+    put(backup, "completed/2026-10.json", {"items": [done]})
+    database = build_db(backup, tmp_path / "todoist.db")
+    assert view_rows(database, "done_log") == [
+        {
+            "task_id": "T2",
+            "content": "Pay rent",
+            "project_id": "P1",
+            "project_name": "Home",
+            "completed_at": "2026-10-02T08:00:00.000000Z",
+            "completed_local": local("2026-10-02T08:00:00Z"),
+            "source": "task",
+            "task_exists": 1,
+        }
+    ]
+
+
+def test_recurring_task_in_the_completion_log(tmp_path):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/T3.json", task("T3", due=due("2026-10-08", is_recurring=True)))
+    events = [event(i, "T3", f"2026-10-0{i}T08:00:00Z") for i in range(1, 4)]
+    put(backup, "completed/activity/2026-10.json", {"results": events})
+    database = build_db(backup, tmp_path / "todoist.db")
+    rows = [(row["task_id"], row["completed_at"], row["source"]) for row in view_rows(database, "done_log")]
+    assert rows == [("T3", f"2026-10-0{i}T08:00:00Z", "activity") for i in [3, 2, 1]]
+
+
+def test_completion_of_a_task_deleted_since(tmp_path):
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/items/T4.deleted.json", {"id": "T4", "is_deleted": True})
+    entry = {"id": "b-1", "task_id": "T4", "content": "Old", "project_id": "P9", "completed_at": T1}
+    put(backup, "completed/backfill/2026-05.json", {"items": [entry]})
+    database = build_db(backup, tmp_path / "todoist.db")
+    rows = [
+        (row["task_id"], row["source"], row["project_name"], row["task_exists"])
+        for row in view_rows(database, "done_log")
+    ]
+    assert rows == [("T4", "backfill", None, 0)]
+
+
+def test_task_completed_again(tmp_path):
+    # Completed, uncompleted and completed again, and only the first completion is recorded: any
+    # completion record of a task covers its completion in tasks (design D5).
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "completed/2026-10.json", {"items": [task("T5", checked=True, completed_at="2026-10-09T08:00:00Z")]})
+    put(backup, "completed/activity/2026-10.json", {"results": [event(1, "T5", "2026-10-01T08:00:00Z")]})
+    database = build_db(backup, tmp_path / "todoist.db")
+    rows = [(row["task_id"], row["completed_at"], row["source"]) for row in view_rows(database, "done_log")]
+    assert rows == [("T5", "2026-10-01T08:00:00Z", "activity")]
+
+
+def test_order_of_the_completion_log(tmp_path):
+    backup = new_backup(tmp_path / "backup")
+    # As text, 08:00:00.500000Z sorts before 08:00:00Z, although it is the later instant.
+    tasks = [
+        task("A", checked=True, completed_at="2026-10-01T08:00:00.500000Z"),
+        task("C", checked=True, completed_at="2026-09-30T08:00:00Z"),
+    ]
+    put(backup, "completed/2026-10.json", {"items": tasks})
+    entry = {"id": "b-1", "task_id": "D", "completed_at": "2026-10-02T08:00:00.000000Z"}
+    put(backup, "completed/backfill/2026-10.json", {"items": [entry]})
+    put(backup, "completed/activity/2026-10.json", {"results": [event(1, "B", "2026-10-01T08:00:00Z")]})
+    database = build_db(backup, tmp_path / "todoist.db")
+    rows = [(row["task_id"], row["source"]) for row in view_rows(database, "done_log")]
+    assert rows == [("D", "backfill"), ("A", "task"), ("B", "activity"), ("C", "task")]
+
+
+# --- the view recurring_stats -------------------------------------------------------------
+
+
+def recurring_stats(tmp_path) -> dict[str, dict]:
+    """The rows of recurring_stats by task ID, of a backup with one task per scenario."""
+    backup = new_backup(tmp_path / "backup")
+    put(backup, "sync/projects/P1.json", project("P1", name="Home"))
+    every_week = due("2026-10-22", string="every thursday", is_recurring=True)
+    for task_id in ["T1", "T2", "T3"]:
+        put(backup, f"sync/items/{task_id}.json", task(task_id, project_id="P1", due=every_week))
+    put(backup, "sync/items/T4.json", task("T4", due=due("2026-10-22")))
+    # Completed for good, with no completion record: its row in tasks counts.
+    put(
+        backup,
+        "completed/2026-10.json",
+        {"items": [task("T5", checked=True, completed_at="2026-10-20T12:00:00Z", due=every_week)]},
+    )
+    events = [
+        event(1, "T1", "2026-10-01T12:00:00Z"),
+        event(2, "T1", "2026-10-15T12:00:00.000000Z"),
+        event(3, "T1", "2026-10-08T12:00:00Z"),
+        event(4, "T3", "2026-10-10T12:00:00Z"),
+        event(5, "T4", "2026-10-10T12:00:00Z"),
+    ]
+    put(backup, "completed/activity/2026-10.json", {"results": events})
+    database = build_db(backup, tmp_path / "todoist.db")
+    rows = view_rows(database, "recurring_stats")
+    assert [row["id"] for row in rows] == ["T5", "T1", "T3", "T2"]
+    return {row["id"]: row for row in rows}
+
+
+def days_since(utc: str, before: datetime, after: datetime) -> set[int]:
+    last = datetime.fromisoformat(utc)
+    return {(before - last).days, (after - last).days}
+
+
+def test_recurring_stats_of_a_task_completed_three_times(tmp_path, local_zone):
+    before = datetime.now(UTC)
+    rows = recurring_stats(tmp_path)
+    after = datetime.now(UTC)
+    row = rows["T1"]
+    assert row["days_since_last"] in days_since("2026-10-15T12:00:00Z", before, after)
+    assert row == {
+        "id": "T1",
+        "content": "task T1",
+        "status": "open",
+        "project_name": "Home",
+        "due_string": "every thursday",
+        "completions": 3,
+        "first_completed_local": local("2026-10-01T12:00:00Z"),
+        "last_completed_local": local("2026-10-15T12:00:00Z"),
+        "avg_days_between": 7.0,
+        "days_since_last": row["days_since_last"],
+    }
+
+
+def test_recurring_task_never_completed(tmp_path):
+    row = recurring_stats(tmp_path)["T2"]
+    assert row["completions"] == 0
+    assert [row[name] for name in ["first_completed_local", "last_completed_local", "avg_days_between"]] == [None] * 3
+    assert row["days_since_last"] is None
+
+
+def test_recurring_task_completed_once(tmp_path):
+    row = recurring_stats(tmp_path)["T3"]
+    assert row["completions"] == 1 and row["avg_days_between"] is None
+    assert row["first_completed_local"] == row["last_completed_local"] == local("2026-10-10T12:00:00Z")
+
+
+def test_recurring_task_completed_for_good_without_a_record(tmp_path):
+    row = recurring_stats(tmp_path)["T5"]
+    assert (row["status"], row["completions"], row["last_completed_local"]) == (
+        "completed",
+        1,
+        local("2026-10-20T12:00:00Z"),
+    )
+
+
+def test_task_that_does_not_recur(tmp_path):
+    assert "T4" not in recurring_stats(tmp_path)

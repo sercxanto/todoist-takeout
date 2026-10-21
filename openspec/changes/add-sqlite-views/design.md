@@ -82,22 +82,24 @@ END
 ### D5: `done_log`
 
 ```sql
-SELECT c.task_id, c.content, c.project_id, p.name AS project_name, c.completed_at,
-       datetime(c.completed_at, 'localtime') AS completed_local, c.source,
-       EXISTS (SELECT 1 FROM tasks WHERE id = c.task_id) AS task_exists
-  FROM completions c LEFT JOIN projects p ON p.id = c.project_id
-UNION ALL
-SELECT t.id, t.content, t.project_id, p.name, t.completed_at,
-       datetime(t.completed_at, 'localtime'), 'task', 1
-  FROM tasks t LEFT JOIN projects p ON p.id = t.project_id
- WHERE t.status = 'completed'
-   AND NOT EXISTS (SELECT 1 FROM completions WHERE task_id = t.id)
+SELECT * FROM (
+  SELECT c.task_id, c.content, c.project_id, p.name AS project_name, c.completed_at,
+         datetime(c.completed_at, 'localtime') AS completed_local, c.source,
+         EXISTS (SELECT 1 FROM tasks WHERE id = c.task_id) AS task_exists
+    FROM completions c LEFT JOIN projects p ON p.id = c.project_id
+  UNION ALL
+  SELECT t.id, t.content, t.project_id, p.name, t.completed_at,
+         datetime(t.completed_at, 'localtime'), 'task', 1
+    FROM tasks t LEFT JOIN projects p ON p.id = t.project_id
+   WHERE t.status = 'completed'
+     AND NOT EXISTS (SELECT 1 FROM completions WHERE task_id = t.id)
+)
 ORDER BY julianday(completed_at) DESC, task_id
 ```
 
 - **Coverage by task ID only**, as settled with the user: any completion record of a task covers its row in `tasks`. Matching on the completion time as well would need a tolerance, because the activity log's `event_date` and the task's `completed_at` need not be equal. The cost is the spec's "Task completed again" scenario: a task completed, uncompleted and completed again, of which only the first completion is recorded, shows only that one. That happens only with a gap in the activity log.
 - Content and project of a recorded completion are the ones at the time of completion, as `completions` holds them; the project name is the project's current name.
-- The order uses `julianday` because the timestamps of the two sources can differ in their fractional seconds, which would break a text comparison. `completed_local` is `YYYY-MM-DD HH:MM:SS` in local time.
+- The order uses `julianday` because the timestamps of the two sources can differ in their fractional seconds, which would break a text comparison. SQLite accepts an expression in the `ORDER BY` of a compound `SELECT` only around a subquery, hence the outer `SELECT *`. `completed_local` is `YYYY-MM-DD HH:MM:SS` in local time.
 
 ### D6: Index on `completions.task_id`
 

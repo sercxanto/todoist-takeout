@@ -387,7 +387,7 @@ def check_database(database: Path) -> bool:
 @dataclass(frozen=True)
 class Column:
     name: str
-    type: str  # TEXT or INTEGER
+    type: str  # TEXT or INTEGER; REAL for a view's column
     description: str
     references: str | None = None  # the table whose `id` the column refers to
 
@@ -713,6 +713,90 @@ VIEWS = (
          ORDER BY t.due_date IS NULL, substr(t.due_date, 1, 10), t.priority, t.due_date, t.id
         """,
         facets=("project_name", "priority", "overdue", "is_recurring"),
+    ),
+    View(
+        "done_log",
+        "One row per completion of a task, newest first: every completion record, plus each completed "
+        "task that no completion record covers.",
+        (
+            Column("task_id", "TEXT", "The completed task."),
+            Column("content", "TEXT", "The task's name when it was completed; for the source task, its current name."),
+            Column(
+                "project_id",
+                "TEXT",
+                "The task's project when it was completed; for the source task, its current project.",
+            ),
+            Column("project_name", "TEXT", "The project's current name."),
+            Column("completed_at", "TEXT", "When the task was completed, in UTC."),
+            Column(
+                "completed_local",
+                "TEXT",
+                "When the task was completed, in the local time of the computer that runs the query.",
+            ),
+            Column(
+                "source",
+                "TEXT",
+                "activity for the activity log, backfill for the completions from before the first backup, "
+                "task for a completed task that no completion record covers.",
+            ),
+            Column("task_exists", "INTEGER", "1 if the task is still in tasks, else 0."),
+        ),
+        """
+        SELECT * FROM (
+          SELECT c.task_id, c.content, c.project_id, p.name AS project_name, c.completed_at,
+                 datetime(c.completed_at, 'localtime') AS completed_local, c.source,
+                 EXISTS (SELECT 1 FROM tasks WHERE id = c.task_id) AS task_exists
+            FROM completions c
+            LEFT JOIN projects p ON p.id = c.project_id
+          UNION ALL
+          -- a completion record of a task covers its completion in tasks, whatever its time
+          SELECT t.id, t.content, t.project_id, p.name, t.completed_at,
+                 datetime(t.completed_at, 'localtime'), 'task', 1
+            FROM tasks t
+            LEFT JOIN projects p ON p.id = t.project_id
+           WHERE t.status = 'completed'
+             AND NOT EXISTS (SELECT 1 FROM completions WHERE task_id = t.id)
+        )
+        -- as instants: the two sources can differ in their fractional seconds
+        ORDER BY julianday(completed_at) DESC, task_id
+        """,
+        facets=("source", "project_name", "task_exists"),
+    ),
+    View(
+        "recurring_stats",
+        "One row per recurring task, with its completions from done_log, most recently completed first. "
+        "The days since the last completion follow the clock of the computer that runs the query.",
+        (
+            Column("id", "TEXT", "The task's ID."),
+            Column("content", "TEXT", "The task's name."),
+            Column("status", "TEXT", "open, or completed for a recurring task completed for good."),
+            Column("project_name", "TEXT", "The name of the task's project."),
+            Column("due_string", "TEXT", "The due date as it was entered, such as every monday."),
+            Column("completions", "INTEGER", "How often the task was completed."),
+            Column("first_completed_local", "TEXT", "The first completion, in local time."),
+            Column("last_completed_local", "TEXT", "The last completion, in local time."),
+            Column("avg_days_between", "REAL", "The average number of days between two completions."),
+            Column("days_since_last", "INTEGER", "Whole days since the last completion."),
+        ),
+        """
+        SELECT t.id, t.content, t.status, p.name AS project_name, t.due_string,
+               count(d.task_id) AS completions,
+               datetime(min(julianday(d.completed_at)), 'localtime') AS first_completed_local,
+               datetime(max(julianday(d.completed_at)), 'localtime') AS last_completed_local,
+               -- the span divided by the number of gaps, the mean of the intervals
+               CASE WHEN count(d.task_id) > 1
+                    THEN round((max(julianday(d.completed_at)) - min(julianday(d.completed_at)))
+                               / (count(d.task_id) - 1), 1)
+               END AS avg_days_between,
+               CAST(julianday('now') - max(julianday(d.completed_at)) AS INTEGER) AS days_since_last
+          FROM tasks t
+          LEFT JOIN projects p ON p.id = t.project_id
+          LEFT JOIN done_log d ON d.task_id = t.id
+         WHERE t.is_recurring = 1
+         GROUP BY t.id
+         ORDER BY max(julianday(d.completed_at)) IS NULL, max(julianday(d.completed_at)) DESC, t.id
+        """,
+        facets=("project_name", "status"),
     ),
 )
 
