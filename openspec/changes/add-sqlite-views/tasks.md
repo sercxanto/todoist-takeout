@@ -26,7 +26,7 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 4. Integration
 
-- [ ] 4.1 Build a database from a real backup and open it with `uvx datasette`, in 0.65.5 and in the current 1.0 alpha; check that the three views load in well under a second, show their descriptions and facets, and keep their order (design D7, D8 risks). Verify by the user looking at the pages in a browser; note the result in design.md's Risks section
+- [x] 4.1 Build a database from a real backup and open it with `uvx datasette`, in 0.65.5 and in the current 1.0 alpha; check that the three views load in well under a second, show their descriptions and facets, and keep their order (design D7, D8 risks). Verify by the user looking at the pages in a browser; note the result in design.md's Risks section
 - [x] 4.2 Run `uv run ruff format .`, `uv run ruff check .` and `uv run pytest`, and fix what they report. Verify that all three finish without findings or failures
 
 ## Workflow follow-up

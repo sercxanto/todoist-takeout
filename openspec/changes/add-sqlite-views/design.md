@@ -159,6 +159,10 @@ Nothing new on the file side: the views are created in the same in-place transac
 - [Local time of a server] -> If Datasette runs on a computer in another time zone, overdue and local times follow that computer. The README says so.
 - [A task completed again with only the first completion recorded] -> Shows only the first completion (D5). Accepted with the user; the spec states it as a scenario.
 
+Checked by hand (task 4.1, 2026-10-21): the user built a database from a real backup, opened the three views in Datasette as task 4.1 describes, and found them working.
+
+Not checked: the manual CI run on Windows and macOS (D11) was left out, as the CI minutes of the private repository are used up. The local-time tests run on Linux only; on Windows they would run in the computer's own time zone.
+
 ## Migration Plan
 
 None. The next run of the `sqlite` command rebuilds any older database with schema version 2. A database of version 2 opened by an older version of the tool is rebuilt with version 1 and loses the views, as before.
