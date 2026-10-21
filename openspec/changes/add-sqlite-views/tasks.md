@@ -22,7 +22,7 @@ Not tracked. This section is guidance for whoever starts the implementation sess
 
 ## 3. Documentation
 
-- [ ] 3.1 Add the views to the "Viewing the backup" section of `README.md`: a short table of the three views, and that overdue and the days since the last completion use the local time of the computer running the query and stay current between rebuilds (design D10). Verify that the section names every view and column group the spec requires and that the example summary line is unchanged
+- [x] 3.1 Add the views to the "Viewing the backup" section of `README.md`: a short table of the three views, and that overdue and the days since the last completion use the local time of the computer running the query and stay current between rebuilds (design D10). Verify that the section names every view and column group the spec requires and that the example summary line is unchanged
 
 ## 4. Integration
 
