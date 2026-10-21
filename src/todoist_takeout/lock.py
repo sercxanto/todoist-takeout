@@ -9,9 +9,12 @@ import errno
 import os
 from pathlib import Path
 
-from todoist_takeout.errors import LockHeld, StorageError
+from todoist_takeout.errors import LockHeld, ReadOnlyTarget, StorageError
 
 LOCK_FILE = ".lock"
+
+# The errors of opening the lock file that mean the file system or the directory is read-only.
+_READ_ONLY_ERRNOS = {errno.EROFS, errno.EACCES, errno.EPERM}
 
 _OPEN_FLAGS = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOINHERIT", 0)
 
@@ -41,7 +44,11 @@ else:
 
 
 class TargetLock:
-    """Use as a context manager, or call acquire() and release()."""
+    """Use as a context manager, or call acquire() and release().
+
+    acquire() raises LockHeld if another run holds the lock, ReadOnlyTarget if the lock file cannot
+    be opened because the target is read-only, and StorageError for other failures.
+    """
 
     def __init__(self, target: Path):
         self.target = Path(target)
@@ -52,7 +59,8 @@ class TargetLock:
         try:
             fd = os.open(self.path, _OPEN_FLAGS, 0o666)
         except OSError as exc:
-            raise StorageError(f"cannot open lock file {self.path}: {exc.strerror or exc}") from exc
+            error = ReadOnlyTarget if exc.errno in _READ_ONLY_ERRNOS else StorageError
+            raise error(f"cannot open lock file {self.path}: {exc.strerror or exc}") from exc
         try:
             _try_lock(fd)
         except OSError as exc:

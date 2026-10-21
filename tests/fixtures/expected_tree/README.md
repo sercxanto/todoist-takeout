@@ -488,6 +488,12 @@ the same backup stops instead of interfering. The lock ends with the process, ev
 The file itself is empty and is never deleted. Locks may not work on network file systems; keep the
 backup on a local disk, or make sure runs do not overlap.
 
+The `sqlite` command, which builds a database from the backup, holds the same lock while it reads
+the backup, so that it never reads a backup that a run is changing; a run started meanwhile stops.
+It changes no file of the backup, apart from creating `.lock` if it is missing. If the backup is on
+a read-only file system, where `.lock` cannot be opened for writing, it reads the backup without
+the lock and warns.
+
 ## Temporary files
 
 Every file is replaced atomically: the new content is written to a temporary file named

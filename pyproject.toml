@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=7", "pytest-cov>=7.1", "ruff>=0.17"]
+dev = ["datasette>=0.65.5,<0.66", "pytest>=7", "pytest-cov>=7.1", "ruff>=0.17"]
 
 [project.scripts]
 todoist-takeout = "todoist_takeout.cli:main"

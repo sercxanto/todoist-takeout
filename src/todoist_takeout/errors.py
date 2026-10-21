@@ -29,6 +29,10 @@ class StorageError(RunError):
     """A file in the target directory could not be written or would be overwritten wrongly."""
 
 
+class ReadOnlyTarget(StorageError):
+    """The lock file cannot be opened for writing because the target directory is read-only."""
+
+
 class LockHeld(RunError):
     """Another run holds the lock on the target directory."""
 
