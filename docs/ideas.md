@@ -25,3 +25,10 @@ Status: `roh` · `geklärt` · `als Change angelegt` · `verworfen`
 - Status: roh
 - Offen: Versionierung, Tagging, Build und Veröffentlichung (PyPI?),
   Zusammenspiel mit Changelog und Lizenz.
+
+## Schönes README.md bauen
+
+- Status: Roh
+- Offen: Ein README bauen, was animiert das Tool einzusetzen
+- z.B. mit Screenshost
+- z.B. mit Badges bzgl. der Codequalität etc.
