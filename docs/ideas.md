@@ -6,14 +6,6 @@ gestrichen oder verlinkt.
 
 Status: `roh` · `geklärt` · `als Change angelegt` · `verworfen`
 
-## Umbenennung des Repos passend zu Datasette
-
-- Status: roh
-- Motivation: Die Ablage in einer SQLite-DB legt die Verwendung von Datasette
-  nahe.
-- Offen: Lohnt sich ein neuer Name (und Paketname)? Auswirkungen auf Imports,
-  CLI-Befehl und README.
-
 ## Changelog anlegen
 
 - Status: roh
