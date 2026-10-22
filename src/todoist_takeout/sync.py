@@ -112,11 +112,24 @@ def prepare_target(target: Path) -> None:
 
     A directory that is rejected is left unchanged. Raises ConfigError.
     """
+    check_target(target)
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ConfigError(f"cannot use the target directory {target}: {exc.strerror or exc}") from exc
+    # Before any other file, so that the directory is recognized as a backup from now on.
+    storage.load_or_create_state(target)
+
+
+def check_target(target: Path) -> None:
+    """Raise ConfigError unless `target` is missing, empty, or a backup in a supported format version.
+
+    Only reads.
+    """
     if target.exists() and not target.is_dir():
         raise ConfigError(f"the target {target} is not a directory")
     try:
-        target.mkdir(parents=True, exist_ok=True)
-        names = [p.name for p in target.iterdir()]
+        names = [p.name for p in target.iterdir()] if target.exists() else []
     except OSError as exc:
         raise ConfigError(f"cannot use the target directory {target}: {exc.strerror or exc}") from exc
     if storage.STATE_FILE not in names and not all(_left_by_first_run(name) for name in names):
@@ -124,8 +137,7 @@ def prepare_target(target: Path) -> None:
             f"the target directory {target} is not empty and is not a todoist-takeout backup "
             f"(it has no {storage.STATE_FILE}); choose a new or empty directory"
         )
-    # Before any other file, so that the directory is recognized as a backup from now on.
-    storage.load_or_create_state(target)
+    storage.read_state(target)
 
 
 def _left_by_first_run(name: str) -> bool:

@@ -90,14 +90,73 @@ Features your Todoist plan does not include, such as comments on some plans, pro
 | 1 | The run failed after it started: network or API error, invalid token, persistent rate limit, a storage error, or another run holds the target directory. The last line on stderr explains why. The backup stays consistent; the next run resumes. |
 | 2 | Usage or configuration error, detected before any request: invalid arguments, missing token, a target that is a file or a foreign directory, or a backup written by a newer version of the tool. Nothing was changed. |
 
+### Backup and database in one directory
+
+The `backup-and-sqlite` command runs a backup and then builds the SQLite database for [viewing the backup](#viewing-the-backup) from it, in one directory:
+
+```sh
+todoist-takeout backup-and-sqlite ~/Backups/todoist
+# the same:
+python -m todoist_takeout backup-and-sqlite ~/Backups/todoist
+# view the result:
+uvx datasette ~/Backups/todoist
+```
+
+The directory has a fixed layout, which keeps the database out of the directory that holds the JSON files:
+
+| Path | Holds |
+|---|---|
+| `json/` | The backup, in the same format as one written by `backup`. `todoist-takeout backup ~/Backups/todoist/json` continues it. |
+| `todoist.db` | The database, as `todoist-takeout sqlite ~/Backups/todoist/json ~/Backups/todoist/todoist.db` builds it. |
+| `metadata.json` | The Datasette metadata file of the database. |
+| `.lock` | The lock that lets only one `backup-and-sqlite` run at a time use the directory. |
+
+`uvx datasette ~/Backups/todoist` uses Datasette's configuration directory mode: it opens the database files at the top level of the directory, here `todoist.db`, and loads `metadata.json` from there, so no `-m` is needed. It does not look into `json/`. A `.db` file or Datasette configuration (`settings.json`, `templates/`, `plugins/`) that you add to the directory is picked up as well.
+
+The directory and `json/` are created if they do not exist. The command refuses a directory that is not empty and has no `json/` subdirectory, and a `json/` that is not a todoist-takeout backup. Every check that needs no request to Todoist, including those of the database and its metadata file, runs before the backup starts, so a configuration error never costs a backup run.
+
+`--database PATH` builds the database at `PATH` instead of `todoist.db`, with its metadata file next to it, named as by `sqlite`: `--database ~/todoist.db` writes `~/todoist.db` and `~/todoist.metadata.json`, and no `metadata.json` in the directory; open it with `uvx datasette ~/todoist.db -m ~/todoist.metadata.json`. Any path that `sqlite` accepts works, also one inside `json/`.
+
+The database is rebuilt only after a complete backup, and after every one, also when nothing changed. If the backup fails, the database is not rebuilt and keeps its previous content. If the rebuild fails, for example because another program keeps the database locked, the backup stays complete, and the next run rebuilds the database. An interrupted run is simply started again, as for `backup`.
+
+The command takes `-q`/`--quiet`, `-v`/`--verbose` and `--max-rate-limit-wait` like `backup`, and reads the token like `backup`. A successful run ends with the summary line of the backup, the command to open the database in Datasette, and the summary line of the database, which counts the warnings of the whole run:
+
+```
+INFO backup complete: 31 objects written, 0 unchanged, 0 marked deleted, 1 warning
+INFO view it with: datasette /home/me/Backups/todoist
+INFO database complete: 24 projects, 9 sections, 7 labels, 113 tasks, 41 task labels, 15 comments, 340 completions, 1 warning
+```
+
+It exits with 0 when the backup and the database are complete, possibly with warnings; 1 when the run failed after it started, for example because of the network, because another run holds the directory or `json/`, or because the rebuild failed; 2 for usage or configuration errors, which change nothing.
+
+**Moving an existing backup into the layout.** A directory that holds a backup itself, with `state.json` at its top, is refused. Move the backup into a subdirectory `json`, while no backup runs, on Linux and macOS with:
+
+```sh
+mv ~/Backups/todoist ~/Backups/todoist-json
+mkdir ~/Backups/todoist
+mv ~/Backups/todoist-json ~/Backups/todoist/json
+```
+
+and on Windows, in PowerShell, with:
+
+```powershell
+Rename-Item "$env:USERPROFILE\Backups\todoist" todoist-json
+New-Item -ItemType Directory "$env:USERPROFILE\Backups\todoist" | Out-Null
+Move-Item "$env:USERPROFILE\Backups\todoist-json" "$env:USERPROFILE\Backups\todoist\json"
+```
+
+The backup holds no absolute paths, so it works unchanged at its new place. Keep an existing database where it is with `--database`, or move it into the directory as `todoist.db`; the next run writes its metadata file as `metadata.json`, so delete the old `.metadata.json` file.
+
+`backup` and `sqlite` remain for other layouts, such as a backup and a database in unrelated places.
+
 ### Scheduling
 
-The tool needs no terminal and never asks for input, so it runs unattended. Keep the token in a file that only you can read, for example `~/.config/todoist-takeout/token` with mode `600`, and set the variable from it.
+The tool needs no terminal and never asks for input, so it runs unattended. The examples run `backup-and-sqlite`, which keeps the backup and the database current; replace it with `backup` to keep only the backup. Keep the token in a file that only you can read, for example `~/.config/todoist-takeout/token` with mode `600`, and set the variable from it.
 
 **cron** (Linux, macOS), daily at 03:00, with `crontab -e`:
 
 ```
-0 3 * * * TODOIST_API_TOKEN="$(cat "$HOME/.config/todoist-takeout/token")" "$HOME/.local/bin/todoist-takeout" backup --quiet "$HOME/Backups/todoist"
+0 3 * * * TODOIST_API_TOKEN="$(cat "$HOME/.config/todoist-takeout/token")" "$HOME/.local/bin/todoist-takeout" backup-and-sqlite --quiet "$HOME/Backups/todoist"
 ```
 
 **launchd** (macOS): save as `~/Library/LaunchAgents/com.example.todoist-takeout.plist`, replace `/Users/me`, and load it with `launchctl load ~/Library/LaunchAgents/com.example.todoist-takeout.plist`:
@@ -113,7 +172,7 @@ The tool needs no terminal and never asks for input, so it runs unattended. Keep
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>TODOIST_API_TOKEN="$(cat /Users/me/.config/todoist-takeout/token)" exec /Users/me/.local/bin/todoist-takeout backup --quiet /Users/me/Backups/todoist</string>
+    <string>TODOIST_API_TOKEN="$(cat /Users/me/.config/todoist-takeout/token)" exec /Users/me/.local/bin/todoist-takeout backup-and-sqlite --quiet /Users/me/Backups/todoist</string>
   </array>
   <key>StartCalendarInterval</key>
   <dict>
@@ -132,7 +191,7 @@ The tool needs no terminal and never asks for input, so it runs unattended. Keep
 
 ```powershell
 $env:TODOIST_API_TOKEN = Get-Content "$env:USERPROFILE\.config\todoist-takeout\token" -Raw
-todoist-takeout backup --quiet "$env:USERPROFILE\Backups\todoist"
+todoist-takeout backup-and-sqlite --quiet "$env:USERPROFILE\Backups\todoist"
 exit $LASTEXITCODE
 ```
 
@@ -155,7 +214,7 @@ Then open the address that Datasette prints, usually http://127.0.0.1:8001. Data
 
 The command works offline, needs no token, and never changes the backup. It holds the backup's lock while it reads, so it stops with "another run is in progress" while a backup is running, and the other way round. Next to the database it writes the Datasette metadata file, named after the database with `.metadata.json` in place of its suffix, which describes every table, view and column. Both arguments are required. The command refuses to overwrite a file that is not a database or metadata file it wrote itself.
 
-Every run rebuilds the whole database from the backup, so run it again after each backup, for example in the same scheduled job. A running Datasette shows the new content on its next page load; do not start it with `-i` (immutable mode), which assumes the file never changes. If another program keeps the database locked for more than 10 seconds, the run fails and the database keeps its previous content.
+Every run rebuilds the whole database from the backup, so run it again after each backup, or use [`backup-and-sqlite`](#backup-and-database-in-one-directory), which does both. A running Datasette shows the new content on its next page load; do not start it with `-i` (immutable mode), which assumes the file never changes. If another program keeps the database locked for more than 10 seconds, the run fails and the database keeps its previous content.
 
 The database is a simplified view for browsing, not a copy of the backup: each object appears once, from its current copy; deleted objects are left out; reminders, filters, collaborators, workspaces, settings, view options and statistics are left out. Its tables:
 

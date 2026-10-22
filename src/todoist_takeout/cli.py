@@ -7,13 +7,23 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from todoist_takeout import __version__, sqlite_view
+from todoist_takeout import __version__, backup_and_sqlite, sqlite_view
 from todoist_takeout.api import DEFAULT_MAX_RATE_LIMIT_WAIT, Client, UrllibTransport
 from todoist_takeout.errors import ConfigError, TakeoutError
-from todoist_takeout.sync import run_backup
+from todoist_takeout.sync import ApplyStats, run_backup
 
 PROG = "todoist-takeout"
 TOKEN_VARIABLE = "TODOIST_API_TOKEN"
+BACKUP = "backup"
+SQLITE = "sqlite"
+BACKUP_AND_SQLITE = "backup-and-sqlite"
+
+# What an interrupted run leaves behind, by command.
+INTERRUPTED = {
+    BACKUP: "the next run resumes from the last checkpoint",
+    SQLITE: "the database was left unchanged",
+    BACKUP_AND_SQLITE: "the next run resumes from the last checkpoint, and the database keeps its previous content",
+}
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", metavar="COMMAND", required=True)
 
     backup = commands.add_parser(
-        "backup",
+        BACKUP,
         help="back up the account into a target directory",
         description=(
             "Back up the Todoist account into TARGET. The first run makes a full sync; later runs "
@@ -46,19 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     backup.add_argument("target", metavar="TARGET", type=Path, help="the backup directory; created if missing")
     _add_verbosity(backup)
-    backup.add_argument(
-        "--max-rate-limit-wait",
-        metavar="SECONDS",
-        type=_seconds,
-        default=DEFAULT_MAX_RATE_LIMIT_WAIT,
-        help=(
-            "give up when waiting for the API's rate limit would take longer than this in total "
-            f"(default: {DEFAULT_MAX_RATE_LIMIT_WAIT:.0f})"
-        ),
-    )
+    _add_max_rate_limit_wait(backup)
 
     database = commands.add_parser(
-        "sqlite",
+        SQLITE,
         help="build a SQLite database from a backup, for browsing it in Datasette",
         description=(
             "Build a SQLite database at DATABASE from the backup in BACKUP, for browsing it, for example "
@@ -72,6 +73,38 @@ def build_parser() -> argparse.ArgumentParser:
         "database", metavar="DATABASE", type=Path, help="the database file; created with its parents if missing"
     )
     _add_verbosity(database)
+
+    combined = commands.add_parser(
+        BACKUP_AND_SQLITE,
+        help="back up the account and build the SQLite database from it, in one directory",
+        description=(
+            f"Back up the Todoist account into TARGET/{backup_and_sqlite.BACKUP_DIR}, then build the SQLite "
+            f"database TARGET/{backup_and_sqlite.DATABASE_FILE} from it. The database is built only after a "
+            "complete backup. Messages go to stderr. Exit status: 0 when the backup and the database are "
+            "complete (even with warnings), 1 when the run failed, 2 for usage or configuration errors."
+        ),
+        epilog=f"The personal API token is read from the environment variable {TOKEN_VARIABLE}.",
+    )
+    combined.add_argument(
+        "target",
+        metavar="TARGET",
+        type=Path,
+        help=(
+            f"the directory that holds the backup in {backup_and_sqlite.BACKUP_DIR}/ and the database; "
+            "created if missing"
+        ),
+    )
+    combined.add_argument(
+        "--database",
+        metavar="PATH",
+        type=Path,
+        help=(
+            f"build the database at PATH instead of TARGET/{backup_and_sqlite.DATABASE_FILE}; "
+            "its metadata file goes next to it"
+        ),
+    )
+    _add_verbosity(combined)
+    _add_max_rate_limit_wait(combined)
     return parser
 
 
@@ -79,6 +112,19 @@ def _add_verbosity(parser: argparse.ArgumentParser) -> None:
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument("-q", "--quiet", action="store_true", help="print only warnings and errors")
     verbosity.add_argument("-v", "--verbose", action="store_true", help="also print debug messages and tracebacks")
+
+
+def _add_max_rate_limit_wait(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--max-rate-limit-wait",
+        metavar="SECONDS",
+        type=_seconds,
+        default=DEFAULT_MAX_RATE_LIMIT_WAIT,
+        help=(
+            "give up when waiting for the API's rate limit would take longer than this in total "
+            f"(default: {DEFAULT_MAX_RATE_LIMIT_WAIT:.0f})"
+        ),
+    )
 
 
 def _seconds(text: str) -> float:
@@ -93,56 +139,79 @@ def _seconds(text: str) -> float:
 
 def main(argv: list[str] | None = None, *, client_factory: ClientFactory = default_client) -> int:
     args = build_parser().parse_args(argv)
-    backup = args.command == "backup"
-    # Only the backup command reads the token; the sqlite command works offline (design D1).
-    token = os.environ.get(TOKEN_VARIABLE, "").strip() if backup else ""
+    command = args.command
+    # The sqlite command works offline and does not read the token (design D1).
+    token = os.environ.get(TOKEN_VARIABLE, "").strip() if command != SQLITE else ""
     level = logging.WARNING if args.quiet else logging.DEBUG if args.verbose else logging.INFO
     with _Logging(level, token) as counter:
         try:
-            if not backup:
+            if command == SQLITE:
                 built = sqlite_view.run(args.backup, args.database)
+                view = _datasette_arguments(args.database, sqlite_view.metadata_file(args.database))
             elif not token:
                 raise ConfigError(
                     f"the environment variable {TOKEN_VARIABLE} is not set or empty; "
                     "set it to your Todoist personal API token"
                 )
+            elif command == BACKUP:
+                stats = run_backup(args.target, client_factory(token, args.max_rate_limit_wait))
             else:
-                client = client_factory(token, args.max_rate_limit_wait)
-                stats = run_backup(args.target, client)
+                built = backup_and_sqlite.run(
+                    args.target,
+                    client_factory(token, args.max_rate_limit_wait),
+                    args.database,
+                    backup_complete=lambda stats: _backup_summary(stats, counter.warnings),
+                ).built
+                # Without --database, Datasette finds the database and metadata.json in the directory (design D7).
+                view = (
+                    _datasette_arguments(args.target)
+                    if args.database is None
+                    else _datasette_arguments(
+                        args.database, backup_and_sqlite.metadata_path(args.target, args.database)
+                    )
+                )
         except TakeoutError as exc:
             _report_failure(str(exc), args.verbose)
             return exc.exit_code
         except KeyboardInterrupt:
-            outcome = "the next run resumes from the last checkpoint" if backup else "the database was left unchanged"
-            _report_failure(f"interrupted; {outcome}", args.verbose)
+            _report_failure(f"interrupted; {INTERRUPTED[command]}", args.verbose)
             return 130
         except Exception as exc:
             hint = "" if args.verbose else "; rerun with --verbose for details"
             _report_failure(f"unexpected error: {type(exc).__name__}: {exc}{hint}", args.verbose)
             return 1
-        if not backup:
-            log.info(
-                "view it with: datasette %s -m %s",
-                _argument(args.database),
-                _argument(sqlite_view.metadata_file(args.database)),
-            )
-            rows = [_plural(count, table.replace("_", " ")[:-1]) for table, count in built.rows.items()]
-            log.info("database complete: %s, %s", ", ".join(rows), _plural(counter.warnings, "warning"))
-            return 0
-        log.info(
-            "backup complete: %d objects written, %d unchanged, %d marked deleted, %s",
-            stats.written,
-            stats.unchanged,
-            stats.deleted,
-            _plural(counter.warnings, "warning"),
-        )
+        if command == BACKUP:
+            _backup_summary(stats, counter.warnings)
+        else:
+            _database_summary(view, built, counter.warnings)
     return 0
+
+
+def _backup_summary(stats: ApplyStats, warnings: int) -> None:
+    log.info(
+        "backup complete: %d objects written, %d unchanged, %d marked deleted, %s",
+        stats.written,
+        stats.unchanged,
+        stats.deleted,
+        _plural(warnings, "warning"),
+    )
+
+
+def _database_summary(view: str, built: sqlite_view.Built, warnings: int) -> None:
+    log.info("view it with: datasette %s", view)
+    rows = [_plural(count, table.replace("_", " ")[:-1]) for table, count in built.rows.items()]
+    log.info("database complete: %s, %s", ", ".join(rows), _plural(warnings, "warning"))
 
 
 def _report_failure(message: str, verbose: bool) -> None:
     if verbose:
         log.debug("traceback of the failure:", exc_info=True)
     log.error("%s", message)  # always the last line on stderr
+
+
+def _datasette_arguments(path: Path, metadata: Path | None = None) -> str:
+    """The arguments that open `path`, a database or a directory, in Datasette, with `metadata` if given."""
+    return _argument(path) if metadata is None else f"{_argument(path)} -m {_argument(metadata)}"
 
 
 def _argument(path: Path) -> str:

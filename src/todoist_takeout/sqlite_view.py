@@ -40,12 +40,15 @@ BACKFILL = "backfill"
 _MONTH_FILE = re.compile(r"\d{4}-\d{2}\.json")
 
 
-def run(backup: Path, database: Path) -> "Built":
-    """Build the database at `database` and its metadata file from the backup in `backup` (design D2)."""
+def run(backup: Path, database: Path, metadata_path: Path | None = None) -> "Built":
+    """Build the database at `database` and its metadata file from the backup in `backup` (design D2).
+
+    The metadata file is `metadata_path`, by default `metadata_file(database)`.
+    """
     backup, database = Path(backup), Path(database)
     state = check_backup(backup)
     check_database(database)
-    metadata_path = metadata_file(database)
+    metadata_path = metadata_file(database) if metadata_path is None else Path(metadata_path)
     check_metadata(metadata_path)
     log.info("reading the backup in %s", backup)
     with _locked(backup):
