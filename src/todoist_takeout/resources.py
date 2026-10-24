@@ -101,11 +101,21 @@ def object_key(kind: Kind, obj) -> tuple[str, ...] | None:
         return None
     if kind.name == ONE_OF:
         present = [(field, key_component(obj.get(field))) for field in kind.fields if obj.get(field) is not None]
-        if len(present) != 1 or present[0][1] is None:
+        if len(present) != 1:
             return None
-        return present[0]
-    key = tuple(key_component(obj.get(field)) for field in kind.fields)
-    return None if None in key else key
+        field, component = present[0]
+        return None if component is None else (field, component)
+    components = [key_component(obj.get(field)) for field in kind.fields]
+    key = tuple(component for component in components if component is not None)
+    return key if len(key) == len(components) else None
+
+
+def key_of(kind: Kind, obj) -> tuple[str, ...]:
+    """Return the key of an object of a value that `fits` the kind, which therefore has one."""
+    key = object_key(kind, obj)
+    if key is None:
+        raise ValueError(f"an object of a {kind.name} value has no key")
+    return key
 
 
 def fits(kind: Kind, value) -> bool:

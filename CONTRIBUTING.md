@@ -30,13 +30,14 @@ pytest --cov --cov-report=html       # browsable report in htmlcov/
 
 CI measures it in every job and shows the report in the job summary. A run with `--cov` fails when the total coverage is below 90 %. Coverage differs a little between operating systems, because some code runs on Windows only or everywhere but Windows; the margin to the current level leaves room for that.
 
-## Linting and formatting
+## Linting, formatting and type checking
 
-[Ruff](https://docs.astral.sh/ruff/) lints and formats the code; its settings are in [pyproject.toml](pyproject.toml), and uv.lock pins its version. CI fails when either check finds something:
+[Ruff](https://docs.astral.sh/ruff/) lints and formats the code, and [ty](https://docs.astral.sh/ty/) checks the type annotations of `src/` for all platforms, so that the code for Windows or macOS only is checked on Linux too. Their settings are in [pyproject.toml](pyproject.toml), and uv.lock pins their versions; ty is still in beta, so an update may report new findings. CI fails when any check finds something, a warning of ty included:
 
 ```sh
 ruff check .            # add --fix to apply the safe fixes
 ruff format .           # or --check to only report
+ty check
 ```
 
 ## Dependencies and CI

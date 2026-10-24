@@ -330,7 +330,7 @@ def _create_temp(path: Path) -> tuple[int, Path]:
 
 
 def _sync_file(fd: int, full_sync: bool) -> None:
-    if full_sync and _F_FULLFSYNC is not None:
+    if full_sync and fcntl is not None and _F_FULLFSYNC is not None:
         try:
             fcntl.fcntl(fd, _F_FULLFSYNC)
             return

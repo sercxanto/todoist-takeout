@@ -11,12 +11,13 @@ Run these and fix what they report; CI runs the same checks and fails on any fin
 ```sh
 uv run ruff format .
 uv run ruff check --fix .
+uv run ty check
 uv run pytest
 ```
 
 While the repository is private, CI runs only when started by hand (see [.github/workflows/tests.yml](.github/workflows/tests.yml)), so these local checks are the only gate, and they run on Linux only. When a change touches code that behaves differently on Windows or macOS, such as paths, file locking or atomic file replacement, say that it needs a manual CI run before it is merged.
 
-Do not silence a Ruff finding with `# noqa` or a new ignore in `pyproject.toml` unless the rule is wrong for that code, and then say why in a comment.
+Do not silence a Ruff finding with `# noqa`, or a ty finding with `# ty: ignore`, or either with a new ignore in `pyproject.toml`, unless the rule is wrong for that code, and then say why in a comment.
 
 ## Planning
 

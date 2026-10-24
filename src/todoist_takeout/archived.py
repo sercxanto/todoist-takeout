@@ -112,7 +112,7 @@ class _Backup:
 
     def _list(self) -> list[tuple[str, dict]]:
         """The listed archived projects with their IDs, in list order, each once."""
-        listed = {}
+        listed: dict[str, dict] = {}
         for page in completed.fetch_pages(self.client, ARCHIVED_PROJECTS, {}, LIST_PAGE_LIMIT, "results"):
             for project in page["results"]:
                 project_id = _object_id(project)

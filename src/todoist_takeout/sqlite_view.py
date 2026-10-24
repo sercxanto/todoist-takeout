@@ -11,7 +11,7 @@ import logging
 import re
 import sqlite3
 import textwrap
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -74,7 +74,7 @@ def check_backup(backup: Path) -> dict:
 
 
 @contextmanager
-def _locked(backup: Path) -> Iterator[None]:
+def _locked(backup: Path) -> Generator[None, None, None]:
     """Hold the backup's lock, or none if the backup is on a read-only file system (design D2)."""
     lock = TargetLock(backup)
     try:

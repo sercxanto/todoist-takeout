@@ -20,7 +20,7 @@ import urllib.request
 import zlib
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from typing import Protocol, TypeVar
+from typing import Protocol, TypeVar, cast
 
 from todoist_takeout import __version__
 from todoist_takeout.errors import (
@@ -440,11 +440,12 @@ class Client:
     def _with_retries(
         self,
         label: str,
-        exchange: Callable[[], tuple[int, Mapping[str, str], T]],
+        exchange: Callable[[], tuple[int, Mapping[str, str], T | bytes]],
         failure: Callable[[int, bytes, str], Exception],
     ) -> T:
         """Run `exchange` until it returns a 2xx, retrying network errors, 5xx and rate limits.
 
+        `exchange` returns the result for a 2xx and the response body for any other status.
         `failure` turns a status, body and message suffix into the exception to raise.
         """
         attempt = 1
@@ -461,17 +462,18 @@ class Client:
                 continue
 
             if 200 <= status < 300:
-                return body
+                return cast(T, body)
+            error = cast(bytes, body)
             if status == 429:
-                self._wait_for_rate_limit(label, headers, _error_body(body))
+                self._wait_for_rate_limit(label, headers, _error_body(error))
                 continue
             if status >= 500:
                 if attempt >= MAX_ATTEMPTS:
-                    raise failure(status, body, f" (gave up after {attempt} attempts)")
+                    raise failure(status, error, f" (gave up after {attempt} attempts)")
                 self._backoff(attempt, f"HTTP {status}")
                 attempt += 1
                 continue
-            raise failure(status, body, "")
+            raise failure(status, error, "")
 
     def _backoff(self, attempt: int, reason: str) -> None:
         delay = 2 ** (attempt - 1) + self._jitter() * MAX_JITTER

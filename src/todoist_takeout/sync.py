@@ -8,7 +8,7 @@ sync returns as live again.
 import importlib.resources
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -246,7 +246,7 @@ def apply_response(target: Path, response: dict, classifier: Classifier) -> Appl
         directory = sync_dir / name
         seen = set()
         for obj in value:
-            object_key = resources.object_key(kind, obj)
+            object_key = resources.key_of(kind, obj)
             stem = storage.encode_key(object_key)
             seen.add(stem)
             _apply_object(directory, stem, object_key, kind, obj, stats)
@@ -361,10 +361,8 @@ def _stored_live_keys(sync_dir: Path) -> tuple[dict[str, set[str]], dict[str, se
     project, and notes of the items left out.
     """
     stored = _stored_live_objects(sync_dir)
-    archived = {_id(v, "id") for v in stored.get(PROJECTS, {}).values() if _flag(v, "is_archived")} - {None}
-    left_out_items = {_id(v, "id") for v in stored.get(ITEMS, {}).values() if _left_out(ITEMS, v, archived, set())} - {
-        None
-    }
+    archived = _ids_of(stored.get(PROJECTS, {}).values(), lambda value: _flag(value, "is_archived"))
+    left_out_items = _ids_of(stored.get(ITEMS, {}).values(), lambda value: _left_out(ITEMS, value, archived, set()))
 
     live, left_out = {}, {}
     for resource, values in stored.items():
@@ -407,6 +405,11 @@ def _left_out(resource: str, value, archived: set[str], left_out_items: set[str]
     if resource == NOTES and _id(value, "item_id") in left_out_items:
         return True
     return _id(value, "project_id") in archived
+
+
+def _ids_of(values: Iterable[dict], keep: Callable[[dict], bool]) -> set[str]:
+    """The IDs of the stored objects that `keep` accepts."""
+    return {found for value in values if keep(value) and (found := _id(value, "id")) is not None}
 
 
 def _flag(value, name: str) -> bool:

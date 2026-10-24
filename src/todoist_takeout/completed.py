@@ -10,6 +10,7 @@ import logging
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TypeGuard
 
 from todoist_takeout import storage, sync
 from todoist_takeout.api import Client, cursor_pages, offset_pages
@@ -97,7 +98,7 @@ def _first_month(target: Path) -> str:
 def _fetch_activity(target: Path, client: Client, state: dict, start: datetime, log_limit) -> None:
     """Fetch the completion events since the previous fetch and merge them into their months' files."""
     progress = storage.completed_state(state)
-    t0 = _checked_time(progress["t0_utc"], "t0_utc")
+    t0 = _started_time(progress["t0_utc"], "t0_utc")
     previous = _checked_time(progress["activity_fetched_utc"], "activity_fetched_utc") or t0
     _warn_about_gap(previous, start, log_limit)
     date_from = (previous - ACTIVITY_OVERLAP).date().isoformat()
@@ -175,7 +176,7 @@ def _fetch_months(target: Path, client: Client, state: dict, moment: datetime, *
     """Fetch every month that is not closed, through the current one, and close those that may close."""
     progress = storage.completed_state(state)
     closed = _checked_month(progress["tasks_closed_through"], "tasks_closed_through")
-    month = next_month(closed) if closed else _checked_month(progress["first_month"], "first_month")
+    month = next_month(closed) if closed else _started_month(progress["first_month"], "first_month")
     current = month_of(moment)
     comment_store = _CommentStore(target / COMPLETED_DIR / COMMENTS_DIR, client, enabled=comments)
     fetched = []
@@ -325,7 +326,7 @@ def _id_text(value) -> str | None:
     return None
 
 
-def _is_int(value) -> bool:
+def _is_int(value) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
@@ -340,9 +341,9 @@ def _backfill(target: Path, client: Client, state: dict) -> None:
         return
     if status != IN_PROGRESS:
         raise ConfigError(f"{storage.STATE_FILE} is not a valid state file: backfill_status {status!r} is unknown")
-    t0 = _checked_time(progress["t0_utc"], "t0_utc")
+    t0 = _started_time(progress["t0_utc"], "t0_utc")
     done = _checked_month(progress["backfill_through"], "backfill_through")
-    month = next_month(done) if done else _checked_month(progress["first_month"], "first_month")
+    month = next_month(done) if done else _started_month(progress["first_month"], "first_month")
     last = month_of(t0)
     stored = []
     # The progress is logged also when the run fails, for example on the rate limit (design D13).
@@ -537,6 +538,22 @@ def _checked_month(value, field: str) -> str | None:
     except ValueError:
         pass
     raise ConfigError(f"{storage.STATE_FILE} is not a valid state file: {field} {value!r} is not a month (YYYY-MM)")
+
+
+def _started_month(value, field: str) -> str:
+    """A month of the state that `_start` set before the first request of this part."""
+    month = _checked_month(value, field)
+    if month is None:
+        raise ConfigError(f"{storage.STATE_FILE} is not a valid state file: {field} is missing")
+    return month
+
+
+def _started_time(value, field: str) -> datetime:
+    """A time of the state that `_start` set before the first request of this part."""
+    moment = _checked_time(value, field)
+    if moment is None:
+        raise ConfigError(f"{storage.STATE_FILE} is not a valid state file: {field} is missing")
+    return moment
 
 
 def _checked_time(value, field: str) -> datetime | None:

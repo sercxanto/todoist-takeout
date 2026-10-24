@@ -25,7 +25,13 @@ Documentation = "https://github.com/sercxanto/todoist-takeout#documentation"
 Issues = "https://github.com/sercxanto/todoist-takeout/issues"
 
 [dependency-groups]
-dev = ["datasette>=0.65.5,<0.66", "pytest>=7", "pytest-cov>=7.1", "ruff>=0.17"]
+dev = [
+    "datasette>=0.65.5,<0.66",
+    "pytest>=7",
+    "pytest-cov>=7.1",
+    "ruff>=0.17",
+    "ty>=0.0.91",
+]
 
 [project.scripts]
 todoist-takeout = "todoist_takeout.cli:main"
@@ -76,3 +82,15 @@ patch = ["subprocess"]
 fail_under = 90
 show_missing = true
 skip_covered = true
+
+[tool.ty.src]
+# The production code; tests and scripts handle raw JSON and fakes, where types say little.
+include = ["src"]
+
+[tool.ty.environment]
+# Also checks the code that runs on Windows or macOS only, such as the lock.
+python-platform = "all"
+
+[tool.ty.terminal]
+# Warnings fail the check too, like every Ruff finding.
+error-on-warning = true
