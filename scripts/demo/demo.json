@@ -1,0 +1,54 @@
+{
+  "user": {"full_name": "Alex Demo", "email": "alex@example.com", "joined_ago": 80},
+  "projects": [
+    {"key": "inbox", "name": "Inbox", "color": "grey", "inbox": true},
+    {"key": "home", "name": "Home", "color": "blue", "favorite": true},
+    {"key": "work", "name": "Work", "color": "red"},
+    {"key": "garden", "name": "Garden", "color": "green"},
+    {"key": "trip", "name": "Trip to Lisbon", "color": "orange", "parent": "home"}
+  ],
+  "sections": [
+    {"key": "kitchen", "project": "home", "name": "Kitchen"},
+    {"key": "admin", "project": "home", "name": "Paperwork"},
+    {"key": "q4", "project": "work", "name": "Q4 planning"},
+    {"key": "beds", "project": "garden", "name": "Vegetable beds"}
+  ],
+  "labels": [
+    {"name": "errand", "color": "lime_green"},
+    {"name": "phone", "color": "sky_blue"},
+    {"name": "15min", "color": "violet", "favorite": true}
+  ],
+  "tasks": [
+    {"key": "tax", "content": "Send the tax documents to the accountant", "project": "home", "section": "admin", "priority": "p1", "due_in": -2, "labels": ["errand"]},
+    {"key": "dentist", "content": "Call the dentist for a check-up", "project": "inbox", "priority": "p2", "due_in": -1, "labels": ["phone", "15min"]},
+    {"key": "plants", "content": "Water the plants", "project": "home", "priority": "p3", "due_in": 0, "recurring": "every 3 days", "labels": ["15min"]},
+    {"key": "review", "content": "Prepare the quarterly review slides", "project": "work", "section": "q4", "priority": "p1", "due_in": 1, "deadline_in": 4, "description": "Numbers from the sales report, then the roadmap."},
+    {"key": "bins", "content": "Take out the bins", "project": "home", "priority": "p4", "due_in": 1, "recurring": "every tuesday"},
+    {"key": "descale", "content": "Descale the coffee machine", "project": "home", "section": "kitchen", "priority": "p4", "due_in": 2, "recurring": "every month", "labels": ["15min"]},
+    {"key": "budget", "content": "Draft the team budget for next year", "project": "work", "section": "q4", "priority": "p2", "due_in": 3},
+    {"key": "flights", "content": "Book the flights", "project": "trip", "priority": "p2", "due_in": 3, "labels": ["errand"]},
+    {"key": "garlic", "content": "Plant the garlic", "project": "garden", "section": "beds", "priority": "p3", "due_in": 5},
+    {"key": "standup", "content": "Write the weekly status update", "project": "work", "priority": "p3", "due_in": 6, "recurring": "every friday"},
+    {"key": "hotel", "content": "Compare hotels near Alfama", "project": "trip", "priority": "p4", "due_in": 9},
+    {"key": "compost", "content": "Turn the compost", "project": "garden", "priority": "p4", "due_in": 12, "recurring": "every 2 weeks"},
+    {"key": "recipes", "content": "Collect recipes for the pumpkin harvest", "project": "inbox", "priority": "p4"}
+  ],
+  "comments": [
+    {"task": "review", "content": "Ask Robin for the updated sales figures first."},
+    {"task": "flights", "content": "Prices look lowest on Tuesdays."}
+  ],
+  "completed": [
+    {"content": "Renew the passport", "project": "trip", "priority": "p1", "done_ago": 3, "labels": ["errand"]},
+    {"content": "Order new seed catalogue", "project": "garden", "priority": "p4", "done_ago": 9},
+    {"content": "Fix the dripping tap", "project": "home", "section": "kitchen", "priority": "p3", "done_ago": 16},
+    {"content": "Send the offsite agenda", "project": "work", "section": "q4", "priority": "p2", "done_ago": 21},
+    {"content": "Cancel the old phone contract", "project": "inbox", "priority": "p2", "done_ago": 40, "labels": ["phone"]}
+  ],
+  "recurring_completions": [
+    {"task": "plants", "done_ago": [3, 6, 9, 13, 16, 19, 22, 26, 29, 32, 35, 38]},
+    {"task": "bins", "done_ago": [6, 13, 20, 27, 34, 41, 48]},
+    {"task": "descale", "done_ago": [28, 59]},
+    {"task": "standup", "done_ago": [1, 8, 15, 22, 29, 36]},
+    {"task": "compost", "done_ago": [2, 16, 30, 44]}
+  ]
+}

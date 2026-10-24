@@ -2,6 +2,8 @@
 
 [CONTRIBUTING.md](CONTRIBUTING.md) describes the development environment, the tests and the project's requirements and design decisions. [README.md](README.md) is for users of the tool; keep development topics out of it.
 
+User documentation lives in two places: [README.md](README.md) is the short entry point and keeps only what makes someone start using the tool, and the pages under [docs/](docs/) hold the details. The README is also the project description on PyPI, so it uses absolute links only, to `https://github.com/sercxanto/todoist-takeout/blob/main/...`, and no links to its own sections; [tests/test_docs.py](tests/test_docs.py) checks this and the links of `docs/`. Development notes, such as [dev/ideas.md](dev/ideas.md), go into `dev/`.
+
 ## Before you commit
 
 Run these and fix what they report; CI runs the same checks and fails on any finding:

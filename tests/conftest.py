@@ -36,6 +36,12 @@ def recorder():
 
 
 @pytest.fixture
+def demo():
+    """The script that builds the demo backup for the README's screenshot."""
+    return load_module("demo_screenshot", ROOT / "scripts" / "demo_screenshot.py")
+
+
+@pytest.fixture
 def contract_support():
     """Helpers of the contract tests that the offline tests check too."""
     return load_module("contract_support", Path(__file__).parent / "contract" / "support.py")

@@ -1,9 +1,10 @@
 # Contributing
 
-How to set up a development environment, run the checks and the tests, and record fixtures, followed by the requirements the tool is built against and the key design decisions. How to install and use the tool is described in the [README](README.md).
+How to set up a development environment, run the checks and the tests, and record fixtures, followed by the requirements the tool is built against and the key design decisions. How to install and use the tool is described in the [README](README.md) and the pages under [docs/](docs/).
 
 - The dev container ([.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)) provides Python 3.12, uv and the OpenSpec CLI, and runs `uv sync` when it is created.
 - Planning uses [OpenSpec](https://github.com/Fission-AI/OpenSpec). Run `openspec list` to see changes in progress.
+- Ideas that are not planned yet are collected in [dev/ideas.md](dev/ideas.md).
 
 ## Setup and tests
 
@@ -99,6 +100,21 @@ python scripts/record_fixtures.py shapes                   # regenerate shapes.j
 ```
 
 Review the recorded files for personal data before you commit them.
+
+## Documentation
+
+The [README](README.md) is the entry point for users and stays short; details go into a page under [docs/](docs/), linked from the README's documentation list. The README is also the project description on PyPI, where relative links and links to its own sections do not work, so it links only to absolute URLs, files of this repository as `https://github.com/sercxanto/todoist-takeout/blob/main/<path>` and images as `.../raw/main/<path>`. The pages under `docs/` link to each other and to the repository with relative links. [tests/test_docs.py](tests/test_docs.py) checks both, and that every linked file and heading exists.
+
+## The screenshot in the README
+
+[docs/images/datasette.png](docs/images/datasette.png) shows the `open_tasks` view of an invented demo account. [scripts/demo_screenshot.py](scripts/demo_screenshot.py) recreates it: it expands [scripts/demo/demo.json](scripts/demo/demo.json) into API responses, runs `backup-and-sqlite` against the fake API of the tests into a temporary directory, serves the result with Datasette and takes the screenshot with [shot-scraper](https://shot-scraper.datasette.io). Due dates are relative to the day of the run. Run it again when the database or its views change in a way the screenshot shows:
+
+```sh
+uvx shot-scraper install                    # once: downloads the browser shot-scraper drives
+uv run python scripts/demo_screenshot.py    # writes docs/images/datasette.png
+```
+
+On Linux, the browser needs system libraries that a minimal system such as the dev container lacks; `sudo uvx --from playwright playwright install-deps chromium-headless-shell` installs them with apt. In the dev container that command fails, because apt rejects the unsigned Yarn repository of the base image; install the libraries directly instead, with `sudo apt-get install libatk1.0-0 libatspi2.0-0 libasound2 libdbus-1-3 libgbm1 libxcomposite1 libxdamage1 libxfixes3 libxkbcommon0 libxrandr2` after an `apt-get update` that leaves out `/etc/apt/sources.list.d/yarn.list`. `--keep DIR` builds the demo in `DIR` and keeps it, for a look with `uvx datasette DIR`. Never take the screenshot from a real account. A test runs the data step of the script, so that the demo account keeps working with the backup code.
 
 ## Requirements
 
