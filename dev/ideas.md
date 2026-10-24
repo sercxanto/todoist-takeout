@@ -11,11 +11,6 @@ Status: `raw` · `clarified` · `change created` · `rejected`
 - Open: format (for example Keep a Changelog), written by hand or generated, relation to the
   OpenSpec changes.
 
-## JSON schema
-
-- Status: raw
-- Open: Does it make sense to add a JSON schema file in addition to the format description?
-
 ## Conduct a independend review session
 
 - Status: raw
