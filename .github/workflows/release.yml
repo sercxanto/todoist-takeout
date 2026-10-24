@@ -1,0 +1,180 @@
+name: release
+
+# Pushing a tag vX.Y.Z releases that version: the tag is checked against the package version and
+# the changelog, the sdist and the wheel are built once and tested on Linux, macOS and Windows, and
+# the same files go to TestPyPI, then, after the maintainer approves the `pypi` deployment, to PyPI,
+# and to a GitHub Release. CONTRIBUTING.md (section "Releasing") describes the steps around it.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# A second push of the same tag waits for the first run instead of racing it.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Actions are pinned to a commit hash, which a tag move cannot change; Dependabot keeps the hashes
+# and the version comments up to date (.github/dependabot.yml). No repository secret is used: PyPI
+# and TestPyPI trust this workflow through Trusted Publishing.
+
+jobs:
+  check:
+    name: check the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history and the branches, to find the tagged commit on main.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME points to $GITHUB_SHA, which is not on main"
+            exit 1
+          fi
+      - name: The tag, the package version and the changelog agree
+        run: python3 scripts/release.py check "$GITHUB_REF_NAME"
+      - id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  tests:
+    name: tests
+    needs: check
+    # Lint, type check and the offline tests on all three systems, on the tagged commit itself.
+    uses: $/.github/workflows/tests.yml
+
+  build:
+    name: build
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          # Nothing restored from a cache can reach the published files.
+          enable-cache: false
+      - name: Build
+        run: uv build
+      - name: Check the description
+        run: uvx twine check --strict dist/*
+      - name: The description links to the tag
+        # The description follows the first empty line of METADATA; the Project-URL headers above it
+        # keep pointing to main.
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          unzip -p dist/*.whl '*.dist-info/METADATA' | sed '1,/^$/d' > "$RUNNER_TEMP/description.md"
+          grep -q "/blob/v$VERSION/" "$RUNNER_TEMP/description.md"
+          grep -q "/raw/v$VERSION/" "$RUNNER_TEMP/description.md"
+          if grep -E "/(blob|raw)/main/" "$RUNNER_TEMP/description.md"; then
+            echo "::error::the description still links to main"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  smoke:
+    name: smoke test (${{ matrix.os }}, Python ${{ matrix.python }})
+    needs: [check, build]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: false
+      - name: The wheel installs and prints its version
+        # bash also on Windows, for the glob.
+        shell: bash
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          printed=$(uvx --from dist/*.whl todoist-takeout --version)
+          echo "$printed"
+          if [ "$printed" != "todoist-takeout $VERSION" ]; then
+            echo "::error::expected todoist-takeout $VERSION"
+            exit 1
+          fi
+
+  testpypi:
+    name: publish to TestPyPI
+    needs: [check, tests, smoke]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/todoist-takeout/${{ needs.check.outputs.version }}/
+    permissions:
+      # Trusted Publishing.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # A re-run of this run after a later job failed finds its files there already.
+          skip-existing: true
+
+  pypi:
+    name: publish to PyPI
+    needs: [check, testpypi]
+    runs-on: ubuntu-latest
+    # The environment has a required reviewer: the run waits here until the maintainer has looked
+    # at the TestPyPI page and approves.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/todoist-takeout/${{ needs.check.outputs.version }}/
+    permissions:
+      # Trusted Publishing, and the attestations of the files.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  github-release:
+    name: GitHub Release
+    needs: [check, pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      # Creates the release and uploads the files.
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          python3 scripts/release.py notes "$VERSION" > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md"

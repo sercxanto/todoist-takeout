@@ -19,6 +19,10 @@ CI ([.github/workflows/tests.yml](.github/workflows/tests.yml)) runs on every pu
 
 Do not silence a Ruff finding with `# noqa`, or a ty finding with `# ty: ignore`, or either with a new ignore in `pyproject.toml`, unless the rule is wrong for that code, and then say why in a comment.
 
+## Changelog
+
+A change that users can notice adds an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md), in the same commit, under one of the Keep a Changelog categories (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`). Write it for users: what they notice, not how it was built. Changes they cannot notice, such as updates of development dependencies, CI or tests, need no entry. [tests/test_release.py](tests/test_release.py) checks the structure of the file.
+
 ## Planning
 
 Changes are planned with OpenSpec under [openspec/](openspec/); [openspec/config.yaml](openspec/config.yaml) holds the constraints every change must keep.

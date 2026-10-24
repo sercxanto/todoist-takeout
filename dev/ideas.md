@@ -7,13 +7,13 @@ Status: `raw` · `clarified` · `change created` · `rejected`
 
 ## Add a changelog
 
-- Status: raw
+- Status: change created: [add-release-workflow](../openspec/changes/add-release-workflow/)
 - Open: format (for example Keep a Changelog), written by hand or generated, relation to the
   OpenSpec changes.
 
 ## Define the release workflow
 
-- Status: raw
+- Status: change created: [add-release-workflow](../openspec/changes/add-release-workflow/)
 - Open: versioning, tagging, build and publication (PyPI?), how it fits with the changelog and
   the license.
 - Badges in the README, for example CI status, PyPI version and supported Python versions. They

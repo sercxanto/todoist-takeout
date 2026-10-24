@@ -42,6 +42,12 @@ def demo():
 
 
 @pytest.fixture
+def release():
+    """The release helper: the changelog parser and the checks before a release."""
+    return load_module("release", ROOT / "scripts" / "release.py")
+
+
+@pytest.fixture
 def contract_support():
     """Helpers of the contract tests that the offline tests check too."""
     return load_module("contract_support", Path(__file__).parent / "contract" / "support.py")

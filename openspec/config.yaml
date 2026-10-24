@@ -31,6 +31,7 @@ context: |
 #       - Break tasks into chunks of max 2 hours
 rules:
   tasks:
+    - If users can notice the change, include a task that adds an entry under `## [Unreleased]` in CHANGELOG.md, written for users; changes they cannot notice (development dependencies, CI, tests) need none.
     - End with a task that runs `uv run ruff format .`, `uv run ruff check .`, `uv run ty check` and `uv run pytest`, and fixes what they report.
 
 # Per-operation guidance (optional)

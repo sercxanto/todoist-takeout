@@ -2,13 +2,15 @@ name: tests
 
 # Branches other than main are tested through their pull request, so that a push to a branch with
 # an open pull request does not run the jobs twice. A run can also be started by hand
-# (Actions -> tests -> Run workflow). The ruleset for main requires the jobs by their names, so
-# renaming a job or changing the matrix means updating that ruleset too.
+# (Actions -> tests -> Run workflow), and the release workflow calls this one to test the tagged
+# commit (release.yml). The ruleset for main requires the jobs by their names, so renaming a job or
+# changing the matrix means updating that ruleset too.
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
