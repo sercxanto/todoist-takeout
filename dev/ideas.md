@@ -11,10 +11,10 @@ Status: `raw` · `clarified` · `change created` · `rejected`
 - Open: format (for example Keep a Changelog), written by hand or generated, relation to the
   OpenSpec changes.
 
-## Conduct a independend review session
+## Conduct an independent review session
 
 - Status: raw
-- Review the codebase and the repo regarding code quality and useability in a fresh session
+- Review the codebase and the repo regarding code quality and usability in a fresh session
 
 ## Define the release workflow
 
@@ -27,3 +27,12 @@ Status: `raw` · `clarified` · `change created` · `rejected`
 - Links in the README point to `main`; pin them to the release tag instead, for example with
   `hatch-fancy-pypi-readme`, so that PyPI shows the documentation of the released version.
 - Check that the README and its screenshot render on PyPI once the repository is public.
+
+## Read the token from a file
+
+- Status: raw
+- Today the token comes only from `TODOIST_API_TOKEN`. Every scheduling example in
+  `docs/scheduling.md` needs a shell wrapper (cron, launchd, PowerShell) to set it from a file,
+  and the `export` line of the README's quick start ends up in the shell history.
+- Open: a variable such as `TODOIST_API_TOKEN_FILE`, an option such as `--token-file`, or both;
+  which one wins when several are set; whether to warn about a token file that others can read.

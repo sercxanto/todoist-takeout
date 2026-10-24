@@ -86,11 +86,11 @@ def test_scrubber_replaces_everything_of_the_account(recorder):
     assert isinstance(user["karma"], float)
     assert scrubbed["user_plan_limits"] == PERSONAL["user_plan_limits"]
 
-    # Enum-like values of enum fields, booleans, null and dates in their format stay.
+    # Enum-like values of enum fields, null and dates in their format stay.
     assert item["color"] == "berry_red" and scrubbed["user_item_orders"][0]["scope"] == "day"
     assert scrubbed["view_options"][0]["view_type"] == "project"
     assert scrubbed["view_options"][0]["sorted_by"] == "due_date"
-    assert user["is_premium"] is True and item["due"]["is_recurring"] is True and item["deadline"] is None
+    assert item["deadline"] is None
     assert item["due"]["date"] == "2000-01-01T00:00:00"
     assert item["added_at"] == "2000-01-01T00:00:00.000000Z"
     # A date used as an ID (the scope of a day order) is pseudonymized like an ID, so keys stay unique.
@@ -118,6 +118,17 @@ def test_scrubber_replaces_everything_of_the_account(recorder):
     ]:
         assert secret not in text, secret
     assert recorder.shape_of(scrubbed) == recorder.shape_of(PERSONAL)
+
+
+def test_scrubber_sets_booleans_to_false_except_response_and_plan_flags(recorder):
+    scrubbed = recorder.Scrubber().scrub(PERSONAL)
+    assert scrubbed["user"]["is_premium"] is False and scrubbed["items"][0]["due"]["is_recurring"] is False
+    assert scrubbed["full_sync"] is True
+    assert scrubbed["user_plan_limits"]["current"]["comments"] is True
+
+    # The contract findings keep them.
+    kept = recorder.Scrubber(keep_booleans=True).scrub(PERSONAL)
+    assert kept["user"]["is_premium"] is True and kept["items"][0]["due"]["is_recurring"] is True
 
 
 def test_ids_get_consistent_pseudonyms_with_the_same_classes(recorder):

@@ -5,7 +5,7 @@
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -19,18 +19,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 9196828743290067797289625162809582407,
-      "initiator_id": "9891055",
-      "object_id": "5mj9aO9HbV5sKAC1",
+      "id": 4397370487535449496791384223656103514,
+      "initiator_id": "7346359",
+      "object_id": "5ox6dC4AkW4vQHK0",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -44,18 +44,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 7843619275716275136162981458237293454,
-      "initiator_id": "9891055",
-      "object_id": "8hx5za9zM5cRvVKq",
+      "id": 4071185805446021077763404289233893885,
+      "initiator_id": "7346359",
+      "object_id": "9sw6do2wB1ySnREy",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "6BtwQ5Uyc1Gucj8J"
+      "parent_project_id": "9WkmP4Wub9Wgpj7R"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -65,24 +65,24 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 3989809637901641951578717893204541584,
-      "initiator_id": "9891055",
-      "object_id": "872DxIE3ZKbn2c9S",
+      "id": 3528346362492026816279776835290314146,
+      "initiator_id": "7346359",
+      "object_id": "516QzQQ4IMrq0w4E",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "6DaiC8BubT6AnI8z"
+      "parent_project_id": "3SmjG9YqfT9NmR4s"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -96,18 +96,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 4442546384368663885155459196672013861,
-      "initiator_id": "9891055",
-      "object_id": "3fa6hOr5Nx2O5TZ9",
+      "id": 3935955293820067257659147932058411149,
+      "initiator_id": "7346359",
+      "object_id": "9yn6hIa0Wi7D4KZ7",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -121,18 +121,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 7448730155212561507421320814383367571,
-      "initiator_id": "9891055",
-      "object_id": "3qu39jNM81veNJv0",
+      "id": 9127837452923517905521900540736665689,
+      "initiator_id": "7346359",
+      "object_id": "1tx51iYT66lbCJn2",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -146,18 +146,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 9681779877838468463646172197211415648,
-      "initiator_id": "9891055",
-      "object_id": "4onfbt9ga0K1mYdV",
+      "id": 4072025578494691022726657861815400083,
+      "initiator_id": "7346359",
+      "object_id": "2mlahn6zz4E4cVsM",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -171,18 +171,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 3773984249275154936009602137834829050,
-      "initiator_id": "9891055",
-      "object_id": "7rwdntPkmIEvJ8Ud",
+      "id": 5677450017458972007750849606997424982,
+      "initiator_id": "7346359",
+      "object_id": "8ydrlfYdwHFbT0Kq",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -196,18 +196,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 6614273386000220397142344674776159513,
-      "initiator_id": "9891055",
-      "object_id": "7towasvZaKr8PonI",
+      "id": 6336011275163994959672702025719648044,
+      "initiator_id": "7346359",
+      "object_id": "2vmjcmsCyNw7IcbL",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -221,18 +221,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 5813271459450451888832536520475377540,
-      "initiator_id": "9891055",
-      "object_id": "9gloyzWRUuoMZCEq",
+      "id": 5813310828148509561690373888259366457,
+      "initiator_id": "7346359",
+      "object_id": "4fhhbqJHCjmIHODi",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -246,18 +246,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 3434250675464418849147897642389730342,
-      "initiator_id": "9891055",
-      "object_id": "3pbqbse3EON6uuDW",
+      "id": 4580024272254250549210505105421500207,
+      "initiator_id": "7346359",
+      "object_id": "4wiphcj3ABY3mkMO",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -271,18 +271,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 6454759084022940670571371748647362176,
-      "initiator_id": "9891055",
-      "object_id": "8qcrsZU5Yi3ceQBj",
+      "id": 3236720705976658370643615934898996708,
+      "initiator_id": "7346359",
+      "object_id": "4zidyWQ7Hy2bjYKi",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -293,49 +293,21 @@
         "has_time": false,
         "note_count": 0,
         "priority": 0,
-        "was_overdue": true
-      },
-      "extra_data_id": null,
-      "id": 3550184453849404899985170197539365644,
-      "initiator_id": "9891055",
-      "object_id": "3pant80ZtTXo9bcB",
-      "object_type": "item",
-      "parent_item_id": null,
-      "parent_project_id": "7JjrS1OyQMzHVZyl"
-    },
-    {
-      "event_date": "2000-01-01T00:00:00.000000Z",
-      "event_type": "completed",
-      "extra_data": {
-        "added_by_uid": 61740796,
-        "child_order": 0,
-        "client": "<scrubbed>",
-        "completed_date_source": "<scrubbed>",
-        "completed_due_date": "2000-01-01T00:00:00.000000Z",
-        "completed_due_date_local": "2000-01-01T00:00:00",
-        "content": "<scrubbed>",
-        "date_added": "2000-01-01T00:00:00.000000Z",
-        "due_date": "2000-01-01T00:00:00.000000Z",
-        "has_time": false,
-        "is_recurring": true,
-        "note_count": 0,
-        "priority": 0,
-        "section_id": "34m6CEx9fCp2ZbV7",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 1891542243964602372889231175503436955,
-      "initiator_id": "9891055",
-      "object_id": "103KoodKAk3zj4G4",
+      "id": 8171460581475627662363921235280765409,
+      "initiator_id": "7346359",
+      "object_id": "1ifat21KmLNs7rrJ",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "3YpaR5XrDKfCZWgn"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 21701994,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -345,25 +317,25 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "89b0pv7v94fyjXF9",
+        "section_id": "55v3KZe4gQe0CdM1",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 1337914266017244672455710652326917960,
-      "initiator_id": "9891055",
-      "object_id": "28nVCxjPkWCF8DBS",
+      "id": 2793891557709296220576558051505160609,
+      "initiator_id": "7346359",
+      "object_id": "808XaepEUg4yk6Q0",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8YaxC3NcTy2kKy22"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -373,24 +345,25 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "89b0pv7v94fyjXF9",
+        "section_id": "58h8ez4a09aupMZ4",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 8124210539297485128094109279981350654,
-      "initiator_id": "9891055",
-      "object_id": "12vXhjfBPub9HZPY",
+      "id": 7213892542758238493684544834045100114,
+      "initiator_id": "7346359",
+      "object_id": "84oKSklCfUDG6YDC",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8YaxC3NcTy2kKy22"
+      "parent_project_id": "9SuhM1DiJr2dSm58"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -400,19 +373,19 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "89b0pv7v94fyjXF9",
+        "section_id": "58h8ez4a09aupMZ4",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 6959094702222505235225634790730435030,
-      "initiator_id": "9891055",
-      "object_id": "341Q9INAzrEqjtI6",
+      "id": 7761201964339032162129248254643097734,
+      "initiator_id": "7346359",
+      "object_id": "83dRxilSDyn0HAUO",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8YaxC3NcTy2kKy22"
+      "parent_project_id": "9SuhM1DiJr2dSm58"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
@@ -427,50 +400,24 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "89b0pv7v94fyjXF9",
+        "section_id": "58h8ez4a09aupMZ4",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 2760298779871645656710777465836413326,
-      "initiator_id": "9891055",
-      "object_id": "609PJ1IbVQn53WE6",
+      "id": 7697205976978766062667562525344042995,
+      "initiator_id": "7346359",
+      "object_id": "426D3CTIlvIzksL6",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8YaxC3NcTy2kKy22"
+      "parent_project_id": "9SuhM1DiJr2dSm58"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
-        "child_order": 0,
-        "client": "<scrubbed>",
-        "completed_date_source": "<scrubbed>",
-        "completed_due_date": "2000-01-01T00:00:00.000000Z",
-        "completed_due_date_local": "2000-01-01T00:00:00",
-        "content": "<scrubbed>",
-        "date_added": "2000-01-01T00:00:00.000000Z",
-        "has_time": false,
-        "note_count": 0,
-        "priority": 0,
-        "was_overdue": false
-      },
-      "extra_data_id": null,
-      "id": 6990005328946589365837294358764200622,
-      "initiator_id": "9891055",
-      "object_id": "1sxa9y8oOLE7GK3Y",
-      "object_type": "item",
-      "parent_item_id": null,
-      "parent_project_id": "6BtwQ5Uyc1Gucj8J"
-    },
-    {
-      "event_date": "2000-01-01T00:00:00.000000Z",
-      "event_type": "completed",
-      "extra_data": {
-        "added_by_uid": 9891055,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -480,25 +427,25 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "34m6CEx9fCp2ZbV7",
+        "section_id": "58h8ez4a09aupMZ4",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 2290443513861395706658194693920735593,
-      "initiator_id": "9891055",
-      "object_id": "3ZQg34bdOjAcmZZu",
+      "id": 5306459458284132957845709373922915356,
+      "initiator_id": "7346359",
+      "object_id": "539YX4YtJUh07JJ6",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "9SuhM1DiJr2dSm58"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -512,18 +459,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 2991064687645596457619300499981425876,
-      "initiator_id": "61740796",
-      "object_id": "8rsMW1tdxei5Lz14",
+      "id": 1953564261349197820402873519783353893,
+      "initiator_id": "7346359",
+      "object_id": "1oka2t7tGYA5MG5T",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "9WkmP4Wub9Wgpj7R"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 61740796,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -533,25 +480,50 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "34m6CEx9fCp2ZbV7",
-        "was_overdue": true
+        "section_id": "55v3KZe4gQe0CdM1",
+        "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 3137951316176068755866696190200743480,
-      "initiator_id": "61740796",
-      "object_id": "103KoodKAk3zj4G4",
+      "id": 3422784784623027476323784716944986366,
+      "initiator_id": "7346359",
+      "object_id": "1ZYr30dgRgFruEHa",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 61740796,
+        "added_by_uid": 7346359,
+        "child_order": 0,
+        "client": "<scrubbed>",
+        "completed_date_source": "<scrubbed>",
+        "completed_due_date": "2000-01-01T00:00:00.000000Z",
+        "completed_due_date_local": "2000-01-01T00:00:00",
+        "content": "<scrubbed>",
+        "date_added": "2000-01-01T00:00:00.000000Z",
+        "has_time": false,
+        "note_count": 0,
+        "priority": 0,
+        "was_overdue": false
+      },
+      "extra_data_id": null,
+      "id": 4451727622205545637428589059596437704,
+      "initiator_id": "21701994",
+      "object_id": "1cdAR0whmtb5Eb57",
+      "object_type": "item",
+      "parent_item_id": null,
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
+    },
+    {
+      "event_date": "2000-01-01T00:00:00.000000Z",
+      "event_type": "completed",
+      "extra_data": {
+        "added_by_uid": 21701994,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -561,25 +533,25 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "34m6CEx9fCp2ZbV7",
-        "was_overdue": true
+        "section_id": "55v3KZe4gQe0CdM1",
+        "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 6409286020129668411274539356597882073,
-      "initiator_id": "61740796",
-      "object_id": "318Hj3e2e45WNI20",
+      "id": 3387520091664723519497677951663945585,
+      "initiator_id": "21701994",
+      "object_id": "808XaepEUg4yk6Q0",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 21701994,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -589,50 +561,25 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "89b0pv7v94fyjXF9",
+        "section_id": "55v3KZe4gQe0CdM1",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 9665618988410865869967622282134316812,
-      "initiator_id": "9891055",
-      "object_id": "4OoPkLmGLr8bmlyE",
+      "id": 4313530012810347669971860830157787449,
+      "initiator_id": "21701994",
+      "object_id": "374Bl0j7r29WVP12",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8YaxC3NcTy2kKy22"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
-        "child_order": 0,
-        "client": "<scrubbed>",
-        "completed_date_source": "<scrubbed>",
-        "completed_due_date": "2000-01-01T00:00:00.000000Z",
-        "completed_due_date_local": "2000-01-01T00:00:00",
-        "content": "<scrubbed>",
-        "date_added": "2000-01-01T00:00:00.000000Z",
-        "has_time": false,
-        "note_count": 0,
-        "priority": 0,
-        "was_overdue": false
-      },
-      "extra_data_id": null,
-      "id": 7787826532292979717593367957414584722,
-      "initiator_id": "9891055",
-      "object_id": "6hqHj5Xfi4xj05IS",
-      "object_type": "item",
-      "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
-    },
-    {
-      "event_date": "2000-01-01T00:00:00.000000Z",
-      "event_type": "completed",
-      "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -642,24 +589,25 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
+        "section_id": "58h8ez4a09aupMZ4",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 6913138955014393146535265910426000941,
-      "initiator_id": "9891055",
-      "object_id": "872DxIE3ZKbn2c9S",
+      "id": 2377278426060786684671167880197779374,
+      "initiator_id": "7346359",
+      "object_id": "3GdDkQoDDe1geauM",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "6DaiC8BubT6AnI8z"
+      "parent_project_id": "9SuhM1DiJr2dSm58"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -673,18 +621,45 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 4061666695979410203785600098655058729,
-      "initiator_id": "9891055",
-      "object_id": "2xxZ9uj20ER3l8Dk",
+      "id": 4231997981092795117186850716835858685,
+      "initiator_id": "7346359",
+      "object_id": "6hjCk8Ref2uy10KJ",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
+        "child_order": 0,
+        "client": "<scrubbed>",
+        "completed_date_source": "<scrubbed>",
+        "completed_due_date": "2000-01-01T00:00:00.000000Z",
+        "completed_due_date_local": "2000-01-01T00:00:00",
+        "content": "<scrubbed>",
+        "date_added": "2000-01-01T00:00:00.000000Z",
+        "due_date": "2000-01-01T00:00:00.000000Z",
+        "has_time": false,
+        "is_recurring": false,
+        "note_count": 0,
+        "priority": 0,
+        "was_overdue": false
+      },
+      "extra_data_id": null,
+      "id": 8647930344177023999576694650148336110,
+      "initiator_id": "7346359",
+      "object_id": "516QzQQ4IMrq0w4E",
+      "object_type": "item",
+      "parent_item_id": null,
+      "parent_project_id": "3SmjG9YqfT9NmR4s"
+    },
+    {
+      "event_date": "2000-01-01T00:00:00.000000Z",
+      "event_type": "completed",
+      "extra_data": {
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -698,18 +673,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 8562933694545109772794150041100256243,
-      "initiator_id": "9891055",
-      "object_id": "8pq1r1p6elbnQ1F4",
+      "id": 4221368707962295166911769476608972840,
+      "initiator_id": "7346359",
+      "object_id": "6qbI7ni48LP4f9Ag",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -723,18 +698,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 3458217237185378124270182513673378367,
-      "initiator_id": "9891055",
-      "object_id": "1tbO1hf4y1On0liW",
+      "id": 1768694225405511441475473427561352313,
+      "initiator_id": "7346359",
+      "object_id": "5by1j9e9bhokS7Z2",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -748,18 +723,43 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 9831222636818701190524274251287922437,
-      "initiator_id": "9891055",
-      "object_id": "7tdrg4zUuaUjJoZ0",
+      "id": 1962024976694184917164357228206009909,
+      "initiator_id": "7346359",
+      "object_id": "8zmX8vx7v8Gx2gyO",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8Icoz6e769oUeZr0"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
+        "child_order": 0,
+        "client": "<scrubbed>",
+        "completed_date_source": "<scrubbed>",
+        "completed_due_date": "2000-01-01T00:00:00.000000Z",
+        "completed_due_date_local": "2000-01-01T00:00:00",
+        "content": "<scrubbed>",
+        "date_added": "2000-01-01T00:00:00.000000Z",
+        "has_time": false,
+        "note_count": 0,
+        "priority": 0,
+        "was_overdue": false
+      },
+      "extra_data_id": null,
+      "id": 7483236377188079991593785789449668144,
+      "initiator_id": "7346359",
+      "object_id": "8ssov1eDfdZoMiZ8",
+      "object_type": "item",
+      "parent_item_id": null,
+      "parent_project_id": "8Syjt6x572rJeGv1"
+    },
+    {
+      "event_date": "2000-01-01T00:00:00.000000Z",
+      "event_type": "completed",
+      "extra_data": {
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "content": "<scrubbed>",
@@ -768,18 +768,18 @@
         "priority": 0
       },
       "extra_data_id": null,
-      "id": 4246614990940559234930026228442414715,
-      "initiator_id": "9891055",
-      "object_id": "7wkDNR65aWy5KGT9",
+      "id": 4612906257969508264912548431033800369,
+      "initiator_id": "7346359",
+      "object_id": "6wiWZL11rPg7LTJ9",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8Icoz6e769oUeZr0"
+      "parent_project_id": "8Syjt6x572rJeGv1"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -793,18 +793,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 2787617848830198783369700051354631913,
-      "initiator_id": "9891055",
-      "object_id": "8xy5p8FOEVEH7XJw",
+      "id": 3108122925452553499436101344357682276,
+      "initiator_id": "7346359",
+      "object_id": "1bi2v4YEUUEM6GQk",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "7JjrS1OyQMzHVZyl"
+      "parent_project_id": "3YpaR5XrDKfCZWgn"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -818,18 +818,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 1238016980996564527903521600899274952,
-      "initiator_id": "9891055",
-      "object_id": "6gc6g7KA5Tl09Hmt",
+      "id": 9310611214897994706412739458673941707,
+      "initiator_id": "7346359",
+      "object_id": "2cr4h9NQ4Tw07Eos",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -843,18 +843,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 1006615383260166107885037280683328168,
-      "initiator_id": "9891055",
-      "object_id": "2ka8uzVnign3Hguv",
+      "id": 9166976932859800899177801906129161026,
+      "initiator_id": "7346359",
+      "object_id": "3vw9loWdcwy8Buvk",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -868,12 +868,12 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 8189525157088835325804262064065598642,
-      "initiator_id": "9891055",
-      "object_id": "9pe0C4S8ia7b0VP1",
+      "id": 9157568074821381257482655096296530087,
+      "initiator_id": "7346359",
+      "object_id": "4ra7Y7H5de1f4VG8",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8YaxC3NcTy2kKy22"
+      "parent_project_id": "9SuhM1DiJr2dSm58"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
@@ -888,24 +888,24 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 2087088039800490998522081091155823730,
-      "initiator_id": "9891055",
-      "object_id": "189VM59H4QBsWiVf",
+      "id": 3520361510988669147585175850891091683,
+      "initiator_id": "7346359",
+      "object_id": "374TP90T6LMbLsAo",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "6KyzK8UbFm1038Xm"
+      "parent_project_id": "6GynO2FsBd3781Vr"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -915,24 +915,24 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 1058939781026982464118358758798461969,
-      "initiator_id": "9891055",
-      "object_id": "128E2eL2JrOO85cG",
+      "id": 9134824115699319605567743083661510774,
+      "initiator_id": "7346359",
+      "object_id": "623X6oI0QzBI77dQ",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "6KyzK8UbFm1038Xm"
+      "parent_project_id": "6GynO2FsBd3781Vr"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 61740796,
+        "added_by_uid": 21701994,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -942,25 +942,25 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
-        "section_id": "34m6CEx9fCp2ZbV7",
-        "was_overdue": true
+        "section_id": "55v3KZe4gQe0CdM1",
+        "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 5117533130849532713752487127383341099,
-      "initiator_id": "9891055",
-      "object_id": "103KoodKAk3zj4G4",
+      "id": 6271771806324230232622083096737964136,
+      "initiator_id": "7346359",
+      "object_id": "808XaepEUg4yk6Q0",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -974,12 +974,12 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 9243314808330678815316016383002982283,
-      "initiator_id": "9891055",
-      "object_id": "1ej29CC4HK8qj1UL",
+      "id": 7759773921006822332444223472346964667,
+      "initiator_id": "7346359",
+      "object_id": "6hz80LO3YO2yv8FV",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
@@ -994,28 +994,28 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "labels": [
           "<scrubbed>"
         ],
         "note_count": 0,
         "priority": 0,
-        "section_id": "89b0pv7v94fyjXF9",
+        "section_id": "58h8ez4a09aupMZ4",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 9014359089653774068708279052193140183,
-      "initiator_id": "9891055",
-      "object_id": "508G5WYd2ua28mCT",
+      "id": 4325452269376519873138573099793760842,
+      "initiator_id": "7346359",
+      "object_id": "729F5GIt2dm31uPR",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8YaxC3NcTy2kKy22"
+      "parent_project_id": "9SuhM1DiJr2dSm58"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -1029,18 +1029,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 4083713456793960494609308687863092220,
-      "initiator_id": "9891055",
-      "object_id": "4nqEHoOK7imiSda4",
+      "id": 2901555340995737294556866134800973554,
+      "initiator_id": "7346359",
+      "object_id": "6ufEFkYY7aiwBaf0",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -1054,18 +1054,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 4157343761843495933587705724666291981,
-      "initiator_id": "9891055",
-      "object_id": "2ctf0eWca4uM5oMN",
+      "id": 2321999167926079242260317892145573422,
+      "initiator_id": "7346359",
+      "object_id": "2dtp4nJlo2yL0kXL",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -1079,12 +1079,12 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 3257131846240202380401258901395975570,
-      "initiator_id": "9891055",
-      "object_id": "6ylMqr2RLMPuy15c",
+      "id": 5317581433556827661733237120408501960,
+      "initiator_id": "7346359",
+      "object_id": "9tjKka2PLLCma86r",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
@@ -1099,24 +1099,24 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 8691091424026043293835449578047715283,
-      "initiator_id": "9891055",
-      "object_id": "846Y5lByceL9E3oO",
+      "id": 9994693884174204450506321184424489068,
+      "initiator_id": "7346359",
+      "object_id": "514Z6mVfntW7K9cQ",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "6KyzK8UbFm1038Xm"
+      "parent_project_id": "6GynO2FsBd3781Vr"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "content": "<scrubbed>",
@@ -1125,12 +1125,12 @@
         "priority": 0
       },
       "extra_data_id": null,
-      "id": 2650914583584127210755889510260668879,
-      "initiator_id": "9891055",
-      "object_id": "9udX77HxglWMm2l4",
+      "id": 7660393899156668673333113207219338655,
+      "initiator_id": "7346359",
+      "object_id": "5yzW84DtraDJg0b3",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8Icoz6e769oUeZr0"
+      "parent_project_id": "8Syjt6x572rJeGv1"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
@@ -1145,24 +1145,24 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 9397282132013060857634206083108830563,
-      "initiator_id": "9891055",
-      "object_id": "417LRVUUp5m49E2o",
+      "id": 2942208225490366496070716147503446119,
+      "initiator_id": "7346359",
+      "object_id": "796KMOWAx5p73N4c",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "6KyzK8UbFm1038Xm"
+      "parent_project_id": "6GynO2FsBd3781Vr"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -1176,18 +1176,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 4554686046711433749486736833153157752,
-      "initiator_id": "9891055",
-      "object_id": "2hHeEq0YM1pd52d5",
+      "id": 3651581155725594070772228475536840067,
+      "initiator_id": "7346359",
+      "object_id": "8uReKj2XL6jx57p7",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "8Icoz6e769oUeZr0"
+      "parent_project_id": "8Syjt6x572rJeGv1"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -1201,46 +1201,18 @@
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 5955263399362427622755647207023939220,
-      "initiator_id": "9891055",
-      "object_id": "8pE0oOOI9sMUgv9H",
+      "id": 4689634057892009047395715157185332700,
+      "initiator_id": "7346359",
+      "object_id": "6mX3yFWY1qYSle8O",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 61740796,
-        "child_order": 0,
-        "client": "<scrubbed>",
-        "completed_date_source": "<scrubbed>",
-        "completed_due_date": "2000-01-01T00:00:00.000000Z",
-        "completed_due_date_local": "2000-01-01T00:00:00",
-        "content": "<scrubbed>",
-        "date_added": "2000-01-01T00:00:00.000000Z",
-        "due_date": "2000-01-01T00:00:00.000000Z",
-        "has_time": false,
-        "is_recurring": true,
-        "note_count": 0,
-        "priority": 0,
-        "section_id": "34m6CEx9fCp2ZbV7",
-        "was_overdue": false
-      },
-      "extra_data_id": null,
-      "id": 7424611459767893591192738772131356663,
-      "initiator_id": "9891055",
-      "object_id": "103KoodKAk3zj4G4",
-      "object_type": "item",
-      "parent_item_id": null,
-      "parent_project_id": "1WxeR6ZxERu0hO1l"
-    },
-    {
-      "event_date": "2000-01-01T00:00:00.000000Z",
-      "event_type": "completed",
-      "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 21701994,
         "child_order": 0,
         "client": "<scrubbed>",
         "completed_date_source": "<scrubbed>",
@@ -1250,24 +1222,52 @@
         "date_added": "2000-01-01T00:00:00.000000Z",
         "due_date": "2000-01-01T00:00:00.000000Z",
         "has_time": false,
-        "is_recurring": true,
+        "is_recurring": false,
         "note_count": 0,
         "priority": 0,
+        "section_id": "55v3KZe4gQe0CdM1",
         "was_overdue": false
       },
       "extra_data_id": null,
-      "id": 6355674104439204286994427088072214339,
-      "initiator_id": "9891055",
-      "object_id": "872DxIE3ZKbn2c9S",
+      "id": 3125037819609316023854053567503736854,
+      "initiator_id": "7346359",
+      "object_id": "808XaepEUg4yk6Q0",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "6DaiC8BubT6AnI8z"
+      "parent_project_id": "7XhmE3IcVUm6jW5t"
     },
     {
       "event_date": "2000-01-01T00:00:00.000000Z",
       "event_type": "completed",
       "extra_data": {
-        "added_by_uid": 9891055,
+        "added_by_uid": 7346359,
+        "child_order": 0,
+        "client": "<scrubbed>",
+        "completed_date_source": "<scrubbed>",
+        "completed_due_date": "2000-01-01T00:00:00.000000Z",
+        "completed_due_date_local": "2000-01-01T00:00:00",
+        "content": "<scrubbed>",
+        "date_added": "2000-01-01T00:00:00.000000Z",
+        "due_date": "2000-01-01T00:00:00.000000Z",
+        "has_time": false,
+        "is_recurring": false,
+        "note_count": 0,
+        "priority": 0,
+        "was_overdue": false
+      },
+      "extra_data_id": null,
+      "id": 1896973345990298682514174158219591872,
+      "initiator_id": "7346359",
+      "object_id": "516QzQQ4IMrq0w4E",
+      "object_type": "item",
+      "parent_item_id": null,
+      "parent_project_id": "3SmjG9YqfT9NmR4s"
+    },
+    {
+      "event_date": "2000-01-01T00:00:00.000000Z",
+      "event_type": "completed",
+      "extra_data": {
+        "added_by_uid": 7346359,
         "child_order": 0,
         "client": "<scrubbed>",
         "content": "<scrubbed>",
@@ -1276,12 +1276,12 @@
         "priority": 0
       },
       "extra_data_id": null,
-      "id": 8526272833575623780011098439663057445,
-      "initiator_id": "9891055",
-      "object_id": "6yNAQK085sqJx1uD",
+      "id": 6690614018132661261271417212722160914,
+      "initiator_id": "7346359",
+      "object_id": "9qMIQE980ocZr7oO",
       "object_type": "item",
       "parent_item_id": null,
-      "parent_project_id": "2ZmqV7KgA4LNFG4r"
+      "parent_project_id": "9IgsN4FyS0HLGI9d"
     }
   ]
 }

@@ -5,18 +5,18 @@
   "collaborators": [],
   "completed_info": [],
   "day_orders": {
-    "3qo34C68jV9YzW9u": 0,
-    "7ag31G4XOs0K2hFz": 0,
-    "2yz07S0dXAl5hda0": 0,
-    "9au12r7r85PwR68x": 0,
-    "9cs09w0uoTNYRUng": 0,
-    "7fk48y7lrkaGFEvj": 0
+    "4za46V44jI9BqV7c": 0,
+    "3zn54G5LYd8M9eYx": 0,
+    "7ds05Z1pVFc5gtp5": 0,
+    "6md15s9m27ItI86w": 0,
+    "9aj96e4saQZVRKvy": 0,
+    "3bi03v3edwdNXAmg": 0
   },
   "filters": [
     {
       "color": "charcoal",
       "description": "",
-      "id": "5090686036",
+      "id": "9919024271",
       "is_deleted": false,
       "is_favorite": false,
       "is_frozen": false,
@@ -28,7 +28,7 @@
     {
       "color": "charcoal",
       "description": "",
-      "id": "4306974674",
+      "id": "6317284186",
       "is_deleted": false,
       "is_favorite": false,
       "is_frozen": false,
@@ -48,30 +48,30 @@
   "live_notifications": [
     {
       "created_at": "2000-01-01T00:00:00.000000Z",
-      "id": "9837375900",
+      "id": "8967247897",
       "is_deleted": false,
-      "is_unread": true,
+      "is_unread": false,
       "karma_level": 0,
       "notification_key": "<scrubbed>",
       "notification_type": "karma_level",
       "promo_img": "https://example.invalid/"
     }
   ],
-  "live_notifications_last_read_id": "9837375900",
+  "live_notifications_last_read_id": "8967247897",
   "locations": [],
   "notes": [],
   "project_notes": [],
   "project_view_options_defaults": [
     {
       "calendar_settings": null,
-      "creator_uid": 87508419,
+      "creator_uid": 72614129,
       "filtered_by": null,
       "grouped_by": null,
-      "project_id": "8np5jCDRdurWX4Nh",
+      "project_id": "8pp1nATLbnbON0Gx",
       "show_completed_tasks": false,
       "sort_order": "<scrubbed>",
       "sorted_by": null,
-      "updater_uid": 87508419,
+      "updater_uid": 72614129,
       "view_mode": "<scrubbed>"
     }
   ],
@@ -82,17 +82,17 @@
         "visibility": "<scrubbed>"
       },
       "can_assign_tasks": false,
-      "can_comment": true,
+      "can_comment": false,
       "child_order": 0,
       "color": "charcoal",
       "created_at": "2000-01-01T00:00:00.000000Z",
-      "creator_uid": "87508419",
+      "creator_uid": "72614129",
       "default_order": 0,
       "default_order_key": null,
       "description": "",
       "icon": null,
-      "id": "8np5jCDRdurWX4Nh",
-      "inbox_project": true,
+      "id": "8pp1nATLbnbON0Gx",
+      "inbox_project": false,
       "is_archived": false,
       "is_collapsed": false,
       "is_deleted": false,
@@ -843,22 +843,22 @@
         "locale": "<scrubbed>",
         "templates": [
           {
-            "id": "yvutjol",
+            "id": "nxnvzrl",
             "name": "<scrubbed>",
             "template_type": "project"
           },
           {
-            "id": "obt-xjzfth-ikwmii",
+            "id": "pdn-dzrosb-tndeqq",
             "name": "<scrubbed>",
             "template_type": "project"
           },
           {
-            "id": "aydgbdch-pzrufuta",
+            "id": "ewfzabyr-nhticvnl",
             "name": "<scrubbed>",
             "template_type": "project"
           },
           {
-            "id": "lyer-ytxfrzo",
+            "id": "aofo-bbpuqgt",
             "name": "<scrubbed>",
             "template_type": "setup"
           }
@@ -866,7 +866,7 @@
       },
       "is_deleted": false,
       "type": "templates",
-      "user_id": "87508419"
+      "user_id": "72614129"
     }
   ],
   "sync_status": {},
@@ -923,8 +923,8 @@
       "beta": 0,
       "dateist_inline_disabled": false,
       "dateist_lang": null,
-      "global.teams": true,
-      "has_push_reminders": true,
+      "global.teams": false,
+      "has_push_reminders": false,
       "karma_disabled": false,
       "karma_vacation": false,
       "kisa_consent_timestamp": null,
@@ -935,12 +935,12 @@
     "getting_started_guide_projects": null,
     "has_consented_to_ai_training": null,
     "has_magic_number": false,
-    "has_password": true,
+    "has_password": false,
     "has_started_a_trial": false,
-    "id": "87508419",
+    "id": "72614129",
     "image_id": null,
-    "inbox_project_id": "8np5jCDRdurWX4Nh",
-    "is_celebrations_enabled": true,
+    "inbox_project_id": "8pp1nATLbnbON0Gx",
+    "is_celebrations_enabled": false,
     "is_deleted": false,
     "is_onboarded": false,
     "is_premium": false,
@@ -952,11 +952,11 @@
     "mfa_enabled": false,
     "next_week": 0,
     "onboarded_dated_tasks_created": false,
-    "onboarded_desktop_accessed": true,
+    "onboarded_desktop_accessed": false,
     "onboarded_mobile_accessed": false,
-    "onboarded_tasks_completed": true,
-    "onboarding_completed": true,
-    "onboarding_initiated": true,
+    "onboarded_tasks_completed": false,
+    "onboarding_completed": false,
+    "onboarding_initiated": false,
     "onboarding_level": "<scrubbed>",
     "onboarding_persona": "<scrubbed>",
     "onboarding_role": null,
@@ -980,7 +980,7 @@
     "status": null,
     "team_inbox_id": null,
     "theme_appearance": "<scrubbed>",
-    "theme_id": "5",
+    "theme_id": "2",
     "time_format": 0,
     "token": "<scrubbed>",
     "tz_info": {
@@ -1000,45 +1000,45 @@
   "user_item_orders": [
     {
       "is_deleted": false,
-      "item_id": "3qo34C68jV9YzW9u",
+      "item_id": "4za46V44jI9BqV7c",
       "order_key": "<scrubbed>",
       "scope": "day",
-      "scope_id": 5
+      "scope_id": 2
     },
     {
       "is_deleted": false,
-      "item_id": "9au12r7r85PwR68x",
+      "item_id": "6md15s9m27ItI86w",
       "order_key": "<scrubbed>",
       "scope": "day",
-      "scope_id": 5
+      "scope_id": 2
     },
     {
       "is_deleted": false,
-      "item_id": "9cs09w0uoTNYRUng",
+      "item_id": "9aj96e4saQZVRKvy",
       "order_key": "<scrubbed>",
       "scope": "day",
-      "scope_id": 5
+      "scope_id": 2
     },
     {
       "is_deleted": false,
-      "item_id": "2yz07S0dXAl5hda0",
+      "item_id": "7ds05Z1pVFc5gtp5",
       "order_key": "<scrubbed>",
       "scope": "day",
-      "scope_id": 5
+      "scope_id": 2
     },
     {
       "is_deleted": false,
-      "item_id": "7ag31G4XOs0K2hFz",
+      "item_id": "3zn54G5LYd8M9eYx",
       "order_key": "<scrubbed>",
       "scope": "day",
-      "scope_id": 5
+      "scope_id": 2
     },
     {
       "is_deleted": false,
-      "item_id": "7fk48y7lrkaGFEvj",
+      "item_id": "3bi03v3edwdNXAmg",
       "order_key": "<scrubbed>",
       "scope": "day",
-      "scope_id": 5
+      "scope_id": 2
     }
   ],
   "user_plan_limits": {
@@ -1132,9 +1132,9 @@
     }
   },
   "user_settings": {
-    "ai_email_assist": true,
-    "completed_sound_desktop": true,
-    "completed_sound_mobile": true,
+    "ai_email_assist": false,
+    "completed_sound_desktop": false,
+    "completed_sound_mobile": false,
     "debug_logging_enabled_until": null,
     "habit_push_notifications": {
       "features": [
@@ -1157,19 +1157,11 @@
     },
     "legacy_pricing": 0,
     "navigation": {
-      "counts_shown": true,
+      "counts_shown": false,
       "features": [
         {
           "name": "<scrubbed>",
-          "shown": true
-        },
-        {
-          "name": "<scrubbed>",
-          "shown": true
-        },
-        {
-          "name": "<scrubbed>",
-          "shown": true
+          "shown": false
         },
         {
           "name": "<scrubbed>",
@@ -1177,11 +1169,7 @@
         },
         {
           "name": "<scrubbed>",
-          "shown": true
-        },
-        {
-          "name": "<scrubbed>",
-          "shown": true
+          "shown": false
         },
         {
           "name": "<scrubbed>",
@@ -1189,11 +1177,23 @@
         },
         {
           "name": "<scrubbed>",
-          "shown": true
+          "shown": false
         },
         {
           "name": "<scrubbed>",
-          "shown": true
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
+        },
+        {
+          "name": "<scrubbed>",
+          "shown": false
         }
       ]
     },
@@ -1202,15 +1202,15 @@
       "features": [
         {
           "name": "<scrubbed>",
-          "shown": true
+          "shown": false
         },
         {
           "name": "<scrubbed>",
-          "shown": true
+          "shown": false
         },
         {
           "name": "<scrubbed>",
-          "shown": true
+          "shown": false
         },
         {
           "name": "<scrubbed>",
@@ -1237,12 +1237,12 @@
           "shown": false
         }
       ],
-      "labels_shown": true
+      "labels_shown": false
     },
-    "reminder_desktop": true,
-    "reminder_email": true,
-    "reminder_push": true,
-    "reset_recurring_subtasks": true
+    "reminder_desktop": false,
+    "reminder_email": false,
+    "reminder_push": false,
+    "reset_recurring_subtasks": false
   },
   "view_options": [],
   "workspace_filters": [],

@@ -2,16 +2,16 @@
   "collaborator_states": [
     {
       "is_deleted": false,
-      "project_id": "3OxtW7IzeIhy782q",
+      "project_id": "4YjfS6VxkBpl376z",
       "state": "<scrubbed>",
-      "user_id": "9891055"
+      "user_id": "7346359"
     }
   ],
   "collaborators": [
     {
       "email": "user@example.invalid",
       "full_name": "<scrubbed>",
-      "id": "9891055",
+      "id": "7346359",
       "image_id": null,
       "status": null,
       "timezone": "<scrubbed>"
@@ -25,17 +25,17 @@
       "visibility": "<scrubbed>"
     },
     "can_assign_tasks": false,
-    "can_comment": true,
+    "can_comment": false,
     "child_order": 0,
     "color": "charcoal",
     "created_at": "2000-01-01T00:00:00.000000Z",
-    "creator_uid": "9891055",
+    "creator_uid": "7346359",
     "default_order": 0,
     "default_order_key": null,
     "description": "",
     "icon": null,
-    "id": "3OxtW7IzeIhy782q",
-    "is_archived": true,
+    "id": "4YjfS6VxkBpl376z",
+    "is_archived": false,
     "is_collapsed": false,
     "is_deleted": false,
     "is_favorite": false,
@@ -55,7 +55,7 @@
   "tasks": [
     {
       "added_at": "2000-01-01T00:00:00.000000Z",
-      "added_by_uid": "9891055",
+      "added_by_uid": "7346359",
       "assigned_by_uid": null,
       "checked": false,
       "child_order": 0,
@@ -68,7 +68,7 @@
       "description": "",
       "due": null,
       "duration": null,
-      "id": "375P87Tg38MlH7KW",
+      "id": "871G75Oe46JwO7DS",
       "is_collapsed": false,
       "is_deleted": false,
       "labels": [],
@@ -77,15 +77,15 @@
       "parent_id": null,
       "postponed_count": 0,
       "priority": 0,
-      "project_id": "3OxtW7IzeIhy782q",
+      "project_id": "4YjfS6VxkBpl376z",
       "responsible_uid": null,
       "section_id": null,
       "updated_at": "2000-01-01T00:00:00.000000Z",
-      "user_id": "9891055"
+      "user_id": "7346359"
     },
     {
       "added_at": "2000-01-01T00:00:00.000000Z",
-      "added_by_uid": "9891055",
+      "added_by_uid": "7346359",
       "assigned_by_uid": null,
       "checked": false,
       "child_order": 0,
@@ -98,7 +98,7 @@
       "description": "",
       "due": null,
       "duration": null,
-      "id": "310X7lF3MTDNMo9k",
+      "id": "418H0sS0WITWXk9g",
       "is_collapsed": false,
       "is_deleted": false,
       "labels": [],
@@ -107,11 +107,11 @@
       "parent_id": null,
       "postponed_count": 0,
       "priority": 0,
-      "project_id": "3OxtW7IzeIhy782q",
+      "project_id": "4YjfS6VxkBpl376z",
       "responsible_uid": null,
       "section_id": null,
       "updated_at": "2000-01-01T00:00:00.000000Z",
-      "user_id": "9891055"
+      "user_id": "7346359"
     }
   ]
 }

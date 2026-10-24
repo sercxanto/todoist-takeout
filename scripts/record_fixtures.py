@@ -9,8 +9,8 @@ Recording is read-only: it makes a full sync and one incremental sync, sends no 
 records one page of each completed-tasks endpoint (see record_completed), and one page of the
 archived projects with the `/full` of one of them (see record_archived). All responses are
 scrubbed together before they are written to `tests/fixtures/recorded/<account>/`, so that nothing
-of the account is committed: strings become placeholders, IDs random pseudonyms and numbers zero
-(see Scrubber). Field names, booleans and enum-like values stay.
+of the account is committed: strings become placeholders, IDs random pseudonyms, numbers zero and
+booleans false (see Scrubber). Field names and enum-like values stay.
 
 shapes.json also describes the `file_attachment` of uploaded files (see attachment_shape_of), from
 the recordings that hold one, or else from the hand-written `tests/fixtures/attachments/uploads.json`.
@@ -106,8 +106,10 @@ ENUM_FIELDS = frozenset(
         "template_type",
     }
 )
-# Numbers in this resource are plan values, not account data; design D12 reads them.
+# Numbers and booleans in this resource are plan values, not account data; design D12 reads them.
 PLAN_LIMITS = "user_plan_limits"
+# Booleans that describe the response rather than the account; `shape_of` reads `full_sync`.
+KEPT_BOOLEANS = frozenset({"full_sync"})
 # IDs of six or more characters must not occur anywhere in the output.
 MIN_CHECKED_ID_LENGTH = 6
 
@@ -161,11 +163,14 @@ class Scrubber:
     `*_id`, `*_ids`, `*_uid` and `*_uids` fields, and object keys that look like IDs) become random
     pseudonyms with the same length and character classes. The same ID gets the same pseudonym for
     the lifetime of the scrubber, so use one scrubber for all responses of a recording. Numbers
-    become 0 of the same type, except in `user_plan_limits`. Booleans, null and field names stay.
+    become 0 of the same type and booleans false, except in `user_plan_limits` and the booleans of
+    KEPT_BOOLEANS. With `keep_booleans`, as for the contract findings, which are not committed and
+    need flags such as `is_deleted`, booleans stay. Null and field names stay.
     """
 
-    def __init__(self, rng: random.Random | None = None):
+    def __init__(self, rng: random.Random | None = None, *, keep_booleans: bool = False):
         self._rng = rng or random.SystemRandom()
+        self._keep_booleans = keep_booleans
         self._pseudonyms: dict[str, str] = {}
         self._used: set[str] = set()
 
@@ -183,7 +188,9 @@ class Scrubber:
             return {self._key(key, field): self.scrub(item, key, plan=plan) for key, item in value.items()}
         if isinstance(value, list):
             return [self.scrub(item, field, plan=plan) for item in value]
-        if isinstance(value, bool) or value is None:
+        if isinstance(value, bool):
+            return value if plan or self._keep_booleans or field in KEPT_BOOLEANS else False
+        if value is None:
             return value
         if isinstance(value, str):
             if is_id_field(field) and _ID_LIKE.match(value):

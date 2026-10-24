@@ -67,7 +67,8 @@ def test_deletion_restore_and_archive(write_client, contract_support, recorder, 
     def backup():
         run_backup(target, client)
 
-    scrubber = recorder.Scrubber()  # one for all findings, so that their IDs match each other
+    # One for all findings, so that their IDs match each other; deletion payloads need their flags.
+    scrubber = recorder.Scrubber(keep_booleans=True)
 
     def payload(response, resource, object_id):
         return scrubber.scrub(find(response, resource, object_id))

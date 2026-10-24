@@ -37,9 +37,9 @@ path = "src/todoist_takeout/__init__.py"
 packages = ["src/todoist_takeout"]
 
 [tool.hatch.build.targets.sdist]
-# The whole test suite with its fixtures and the fixture recorder it loads, so tests run from an
-# unpacked sdist.
-include = ["src/", "tests/", "scripts/", "README.md", "LICENSE"]
+# The whole test suite with its fixtures, the fixture recorder it loads and the documentation whose
+# links it checks, so tests run from an unpacked sdist.
+include = ["src/", "tests/", "scripts/", "docs/", "README.md", "CONTRIBUTING.md", "LICENSE"]
 exclude = ["tests/contract/findings/"]
 
 [tool.ruff]
