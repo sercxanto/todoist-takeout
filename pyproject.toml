@@ -1,15 +1,16 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+# hatch-fancy-pypi-readme writes the PyPI description at build time (see below); it is installed into
+# the isolated build environment only, never with the package.
+requires = ["hatchling>=1.27", "hatch-fancy-pypi-readme>=25.1"]
 build-backend = "hatchling.build"
 
 [project]
 name = "todoist-takeout"
 description = "Keeps a complete, long-term readable local backup of a Todoist account."
-readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dynamic = ["version"]
+dynamic = ["version", "readme"]
 dependencies = []
 classifiers = [
     "Environment :: Console",
@@ -17,16 +18,23 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Archiving :: Backup",
 ]
 
 [project.urls]
 Homepage = "https://github.com/sercxanto/todoist-takeout"
 Documentation = "https://github.com/sercxanto/todoist-takeout#documentation"
 Issues = "https://github.com/sercxanto/todoist-takeout/issues"
+Changelog = "https://github.com/sercxanto/todoist-takeout/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
     "datasette>=0.65.5,<0.66",
+    "hatch-fancy-pypi-readme>=25.1",
     "pytest>=7",
     "pytest-cov>=7.1",
     "ruff>=0.17",
@@ -39,13 +47,26 @@ todoist-takeout = "todoist_takeout.cli:main"
 [tool.hatch.version]
 path = "src/todoist_takeout/__init__.py"
 
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+# The README links to files of the repository on main; the description of each version on PyPI links
+# to that version's tag instead, so it keeps showing the documentation of that version.
+# tests/test_release.py checks the result.
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = 'https://github\.com/sercxanto/todoist-takeout/(blob|raw)/main/'
+replacement = 'https://github.com/sercxanto/todoist-takeout/\1/v$HFPR_VERSION/'
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/todoist_takeout"]
 
 [tool.hatch.build.targets.sdist]
 # The whole test suite with its fixtures, the fixture recorder it loads and the documentation whose
-# links it checks, so tests run from an unpacked sdist.
-include = ["src/", "tests/", "scripts/", "docs/", "README.md", "CONTRIBUTING.md", "LICENSE"]
+# links it checks, and the changelog with the history of the release, so tests run from an unpacked sdist.
+include = ["src/", "tests/", "scripts/", "docs/", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE"]
 exclude = ["tests/contract/findings/"]
 
 [tool.ruff]

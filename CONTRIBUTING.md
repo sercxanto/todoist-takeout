@@ -1,10 +1,22 @@
 # Contributing
 
-How to set up a development environment, run the checks and the tests, and record fixtures, followed by the requirements the tool is built against and the key design decisions. How to install and use the tool is described in the [README](README.md) and the pages under [docs/](docs/).
+How to install the unreleased code, set up a development environment, run the checks and the tests, record fixtures and cut a release, followed by the requirements the tool is built against and the key design decisions. How to install and use the tool is described in the [README](README.md) and the pages under [docs/](docs/).
 
 - The dev container ([.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)) provides Python 3.12, uv and the OpenSpec CLI, and runs `uv sync` when it is created.
 - Planning uses [OpenSpec](https://github.com/Fission-AI/OpenSpec). Run `openspec list` to see changes in progress.
 - Ideas that are not planned yet are collected in [dev/ideas.md](dev/ideas.md).
+
+## Installing the unreleased code
+
+The README installs the latest release from PyPI. To use what is on `main`, or on a branch, install it from the repository, or from a checkout:
+
+```sh
+uv tool install git+https://github.com/sercxanto/todoist-takeout             # main
+uv tool install git+https://github.com/sercxanto/todoist-takeout@<branch>
+uv tool install .                   # the checkout in the current directory
+```
+
+`pipx install` takes the same arguments. `todoist-takeout --version` then shows the version of the last release, since the version changes only in a release commit (see [Releasing](#releasing)).
 
 ## Setup and tests
 
@@ -104,7 +116,7 @@ Review the recorded files for personal data before you commit them.
 
 ## Documentation
 
-The [README](README.md) is the entry point for users and stays short; details go into a page under [docs/](docs/), linked from the README's documentation list. The README is also the project description on PyPI, where relative links and links to its own sections do not work, so it links only to absolute URLs, files of this repository as `https://github.com/sercxanto/todoist-takeout/blob/main/<path>` and images as `.../raw/main/<path>`. The pages under `docs/` link to each other and to the repository with relative links. [tests/test_docs.py](tests/test_docs.py) checks both, and that every linked file and heading exists.
+The [README](README.md) is the entry point for users and stays short; details go into a page under [docs/](docs/), linked from the README's documentation list. The README is also the project description on PyPI, where relative links and links to its own sections do not work, so it links only to absolute URLs, files of this repository as `https://github.com/sercxanto/todoist-takeout/blob/main/<path>` and images as `.../raw/main/<path>`. When a release is built, [hatch-fancy-pypi-readme](https://github.com/hynek/hatch-fancy-pypi-readme) moves these links from `main` to the release's tag in the PyPI description (configured in pyproject.toml), so the description of each version keeps showing the documentation of that version; [tests/test_release.py](tests/test_release.py) checks the result. The pages under `docs/` link to each other and to the repository with relative links. [tests/test_docs.py](tests/test_docs.py) checks both, and that every linked file and heading exists.
 
 ## The screenshot in the README
 
@@ -116,6 +128,45 @@ uv run python scripts/demo_screenshot.py    # writes docs/images/datasette.png
 ```
 
 On Linux, the browser needs system libraries that a minimal system such as the dev container lacks; `sudo uvx --from playwright playwright install-deps chromium-headless-shell` installs them with apt. In the dev container that command fails, because apt rejects the unsigned Yarn repository of the base image; install the libraries directly instead, with `sudo apt-get install libatk1.0-0 libatspi2.0-0 libasound2 libdbus-1-3 libgbm1 libxcomposite1 libxdamage1 libxfixes3 libxkbcommon0 libxrandr2` after an `apt-get update` that leaves out `/etc/apt/sources.list.d/yarn.list`. `--keep DIR` builds the demo in `DIR` and keeps it, for a look with `uvx datasette DIR`. Never take the screenshot from a real account. A test runs the data step of the script, so that the demo account keeps working with the backup code.
+
+## Releasing
+
+Versions follow [Semantic Versioning](https://semver.org). The version is `__version__` in [`src/todoist_takeout/__init__.py`](src/todoist_takeout/__init__.py), and it changes only in a release commit; between releases, `main` carries the version of the last release. While the version is 0.x, a change that breaks the command line or what users rely on in the backup raises the minor version, and everything else the patch version. The format version in a backup's `state.json` is independent of it.
+
+[CHANGELOG.md](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/): `## [Unreleased]` first, then `## [X.Y.Z] - YYYY-MM-DD` for each release, newest first, with entries under `### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed` and `### Security`. Link references end the file: `[Unreleased]` points to `https://github.com/sercxanto/todoist-takeout/compare/vX.Y.Z...HEAD` with the newest release (before the first release, to `https://github.com/sercxanto/todoist-takeout/commits/main`), and each version to `https://github.com/sercxanto/todoist-takeout/releases/tag/vX.Y.Z`. Every change that users can notice adds an entry under `Unreleased`, written for users: what they notice, not how it was built. [scripts/release.py](scripts/release.py) parses the file, and [tests/test_release.py](tests/test_release.py) checks its structure.
+
+Pushing a tag `vX.Y.Z` starts [.github/workflows/release.yml](.github/workflows/release.yml). It checks that the tagged commit is on `main` and that the tag, `__version__` and the changelog agree, runs the jobs of the tests workflow on the tagged commit, builds the sdist and the wheel once, and runs the wheel's `--version` on Linux, macOS and Windows. Then it publishes the same files to TestPyPI, waits for the maintainer to approve the deployment to PyPI, publishes them to PyPI, and creates a GitHub Release with the changelog section as its notes and both files attached. PyPI and TestPyPI trust the workflow through [Trusted Publishing](https://docs.pypi.org/trusted-publishers/), so no token is stored anywhere, and PyPI shows an attestation of where the files were built. This relies on settings outside the repository: a trusted publisher on PyPI and one on TestPyPI for the workflow `release.yml`, with the environment `pypi` and `testpypi`, and the GitHub environments of those names, both limited to tags `v*`, where `pypi` has the maintainer as required reviewer.
+
+To cut release X.Y.Z:
+
+1. In CHANGELOG.md, move the entries under `Unreleased` into a new section `## [X.Y.Z] - <today>` below it, point the link reference `[Unreleased]` to `compare/vX.Y.Z...HEAD`, and add `[X.Y.Z]` pointing to `releases/tag/vX.Y.Z`. Set `__version__` to `"X.Y.Z"`.
+2. Dry run:
+
+   ```sh
+   python scripts/release.py check vX.Y.Z    # the tag, the version and the changelog agree
+   uv build --clear
+   uvx twine check --strict dist/*
+   uv run hatch-fancy-pypi-readme            # optional: the PyPI description, with the version shown as 42.0
+   ```
+
+3. Commit as "Release X.Y.Z", push to `main` and wait until CI is green.
+4. Tag and push the tag:
+
+   ```sh
+   git tag -a vX.Y.Z -m "X.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+5. In the run of the release workflow (*Actions → release*), once "publish to TestPyPI" has finished, look at the version's page on TestPyPI, the description and its links in particular. Then approve the deployment to `pypi` (*Review deployments*). Nothing on PyPI can be uploaded again, so this is the last point to stop.
+6. Check the version's page on PyPI and the GitHub Release.
+
+A version number is never reused, and a tag that was published is never moved. A bad release is yanked on PyPI and followed by a patch release. What to do after a failed run depends on how far it got:
+
+- Failed before "publish to TestPyPI", in the check, the tests, the build or the smoke test: fix the cause in a new commit, delete the tag and create it again on that commit (only repository admins can); the version stays the same.
+- Failed or rejected from "publish to TestPyPI" on, a rejected approval included: the version is used up, because TestPyPI, like PyPI, accepts each file name only once, and a re-tag would leave the old files there, so the review would no longer show what PyPI gets. Release the fix as the next patch version, with the changelog section renamed to it; the skipped version never appears on PyPI, a gap that Semantic Versioning allows.
+- Failed after "publish to PyPI", in the GitHub Release: re-run the failed job; it uses the same files.
+
+If GitHub Actions cannot publish at all, publish from a workstation: create an API token on PyPI that is limited to the project, build from a clean checkout of the tag with `uv build --clear`, upload with `uv publish --token <token>`, and delete the token right after. Such a release has no attestation. No token is kept between releases.
 
 ## Requirements
 

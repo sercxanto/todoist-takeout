@@ -1,5 +1,9 @@
 # todoist-takeout
 
+[![tests](https://github.com/sercxanto/todoist-takeout/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/sercxanto/todoist-takeout/actions/workflows/tests.yml)
+[![PyPI version](https://img.shields.io/pypi/v/todoist-takeout)](https://pypi.org/project/todoist-takeout/)
+[![Python versions](https://img.shields.io/pypi/pyversions/todoist-takeout)](https://pypi.org/project/todoist-takeout/)
+
 A command-line tool that keeps a complete, long-term readable local backup of a [Todoist](https://www.todoist.com) account, and lets you browse it in your web browser.
 
 ## Why
@@ -22,13 +26,13 @@ Todoist is a cloud service, so your data is only reachable through it. If the se
 
 ## Quick start
 
-todoist-takeout needs Python 3.11 or newer. It is not on PyPI yet, so install it straight from this repository with [uv](https://docs.astral.sh/uv/):
+todoist-takeout needs Python 3.11 or newer, which [uv](https://docs.astral.sh/uv/) installs if needed. Install todoist-takeout with uv:
 
 ```sh
-uv tool install git+https://github.com/sercxanto/todoist-takeout
+uv tool install todoist-takeout
 ```
 
-`pipx install git+https://github.com/sercxanto/todoist-takeout` works as well. From a checkout of the repository, `uv tool install .` installs that checkout.
+With [pipx](https://pipx.pypa.io), use `pipx install todoist-takeout` instead, and `pipx run datasette` where the commands below use `uvx datasette`.
 
 Copy your API token from Todoist (*Settings → Integrations → Developer*) into the environment, back up your account, and open the result in Datasette:
 
@@ -54,13 +58,9 @@ The tool never asks for input, so a scheduler can run it every night: [Schedulin
 - [Platform notes](https://github.com/sercxanto/todoist-takeout/blob/main/docs/platform-notes.md): macOS certificates, network drives, Windows long paths.
 - [Format description](https://github.com/sercxanto/todoist-takeout/blob/main/src/todoist_takeout/storage_format.md): the layout and files of a backup, for reading it without this tool.
 
-## Status
-
-Not released yet. All parts of the backup listed above work, as do the database and Datasette views.
-
 ## Contributing
 
-Setting up a development environment, running the checks and the tests, the requirements and the key design decisions are described in [CONTRIBUTING.md](https://github.com/sercxanto/todoist-takeout/blob/main/CONTRIBUTING.md).
+Installing the unreleased code from the repository, setting up a development environment, running the checks and the tests, the requirements and the key design decisions are described in [CONTRIBUTING.md](https://github.com/sercxanto/todoist-takeout/blob/main/CONTRIBUTING.md).
 
 ## License
 

@@ -19,9 +19,11 @@ DOCS = sorted((ROOT / "docs").glob("*.md"))
 # The prefixes of links to a file of this repository, on the main branch.
 REPOSITORY_FILES = (f"{SOURCE_URL}/blob/main/", f"{SOURCE_URL}/raw/main/")
 
-# Inline links and images: [text](target) and ![alt](target). Code is left out first, since a
-# shell snippet or a table cell can hold brackets.
+# Inline links and images: [text](target) and ![alt](target), and the outer target of a linked
+# image such as a badge, [![alt](image)](target), whose image the first pattern finds. Code is left
+# out first, since a shell snippet or a table cell can hold brackets.
 LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]*)\)")
+LINKED_IMAGE = re.compile(r"\[!\[[^\]]*\]\([^)\s]*\)\]\(([^)\s]*)\)")
 CODE = re.compile(r"```.*?```|`[^`\n]*`", re.DOTALL)
 OTHER_LINK_FORMS = re.compile(r"<a\s|<img\s|^\[[^\]]+\]:\s", re.IGNORECASE | re.MULTILINE)
 
@@ -31,7 +33,8 @@ def prose(path: Path) -> str:
 
 
 def links(path: Path) -> list[str]:
-    return LINK.findall(prose(path))
+    text = prose(path)
+    return LINK.findall(text) + LINKED_IMAGE.findall(text)
 
 
 def anchors(path: Path) -> set[str]:
