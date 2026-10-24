@@ -6,6 +6,8 @@ All notable changes to todoist-takeout are documented in this file. The format i
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-24
+
 ### Added
 
 - `todoist-takeout backup` keeps a complete local backup of a Todoist account: projects, sections, labels, tasks and comments, every completed task since the account was created, every completion of a recurring task, archived projects, and the files uploaded to comments.
@@ -15,4 +17,5 @@ All notable changes to todoist-takeout are documented in this file. The format i
 - Features that the Todoist plan does not include produce a warning and never make a run fail.
 - Runs on Windows, macOS and Linux with Python 3.11 or newer, without further dependencies.
 
-[Unreleased]: https://github.com/sercxanto/todoist-takeout/commits/main
+[Unreleased]: https://github.com/sercxanto/todoist-takeout/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sercxanto/todoist-takeout/releases/tag/v0.1.0

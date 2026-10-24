@@ -37,7 +37,7 @@ These steps are done by the user in the web interfaces; ask them to do each and 
 ## 6. Checks
 
 - [x] 6.1 Run `uv run ruff format .`, `uv run ruff check .`, `uv run ty check` and `uv run pytest`, and fix what they report. Verify that all four pass
-- [ ] 6.2 After the user agrees, push the change to `main` and wait for CI. Verify that all seven checks are green, so `tests/test_release.py` passes on Windows and macOS too
+- [x] 6.2 After the user agrees, push the change to `main` and wait for CI. Verify that all seven checks are green, so `tests/test_release.py` passes on Windows and macOS too
 
 ## Workflow follow-up
 
