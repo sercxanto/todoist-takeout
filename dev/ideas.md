@@ -11,11 +11,6 @@ Status: `raw` · `clarified` · `change created` · `rejected`
 - Open: format (for example Keep a Changelog), written by hand or generated, relation to the
   OpenSpec changes.
 
-## Conduct an independent review session
-
-- Status: raw
-- Review the codebase and the repo regarding code quality and usability in a fresh session
-
 ## Define the release workflow
 
 - Status: raw
