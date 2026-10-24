@@ -68,8 +68,13 @@ def stderr_lines(capsys):
     return capsys.readouterr().err.splitlines()
 
 
-def snapshot(root: Path) -> dict[str, bytes]:
-    return {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+def snapshot(root: Path) -> dict[str, bytes | None]:
+    # Lock files are listed but not read: on Windows a held lock also blocks reading, and they hold no data.
+    return {
+        p.relative_to(root).as_posix(): None if p.name == LOCK_FILE else p.read_bytes()
+        for p in root.rglob("*")
+        if p.is_file()
+    }
 
 
 def dump(database: Path) -> dict[str, list]:
