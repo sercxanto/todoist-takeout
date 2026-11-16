@@ -40,7 +40,7 @@ pytest --cov
 pytest --cov --cov-report=html       # browsable report in htmlcov/
 ```
 
-CI measures it in every job and shows the report in the job summary. A run with `--cov` fails when the total coverage is below 90 %. Coverage differs a little between operating systems, because some code runs on Windows only or everywhere but Windows; the margin to the current level leaves room for that.
+CI measures it in every job, shows the report in the job summary and uploads it to [Codecov](https://app.codecov.io/gh/sercxanto/todoist-takeout), which merges the reports of all jobs into the coverage of the README badge ([codecov.yml](codecov.yml)). A run with `--cov` fails when the total coverage is below 90 %. Coverage differs a little between operating systems, because some code runs on Windows only or everywhere but Windows; the margin to the current level leaves room for that.
 
 ## Linting, formatting and type checking
 

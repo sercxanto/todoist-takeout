@@ -1,0 +1,18 @@
+# Codecov (https://about.codecov.io) shows the coverage that CI uploads (.github/workflows/tests.yml).
+codecov:
+  notify:
+    # Report only once all six pytest jobs have uploaded, so that the coverage is that of all three systems.
+    after_n_builds: 6
+
+coverage:
+  status:
+    # The required checks are the CI jobs; `pytest --cov` already fails below 90 %.
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  after_n_builds: 6

@@ -1,6 +1,7 @@
 # todoist-takeout
 
 [![tests](https://github.com/sercxanto/todoist-takeout/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/sercxanto/todoist-takeout/actions/workflows/tests.yml)
+[![coverage](https://codecov.io/gh/sercxanto/todoist-takeout/graph/badge.svg)](https://codecov.io/gh/sercxanto/todoist-takeout)
 [![PyPI version](https://img.shields.io/pypi/v/todoist-takeout)](https://pypi.org/project/todoist-takeout/)
 [![Python versions](https://img.shields.io/pypi/pyversions/todoist-takeout)](https://pypi.org/project/todoist-takeout/)
 
