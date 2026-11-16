@@ -57,6 +57,19 @@ jobs:
         run: uv sync --locked
       - name: Test
         # Offline only: the contract tests are deselected by default and need tokens that CI does not have.
-        # The coverage report goes to the log and to the job summary; bash also on Windows, for the variable.
+        # The coverage report goes to the log, to the job summary and, as coverage.xml, to Codecov; bash also
+        # on Windows, for the variable.
         shell: bash
-        run: uv run --locked pytest -rs --cov --cov-report=term --cov-report="markdown-append:$GITHUB_STEP_SUMMARY"
+        run: uv run --locked pytest -rs --cov --cov-report=term --cov-report="markdown-append:$GITHUB_STEP_SUMMARY" --cov-report=xml
+      - name: Upload coverage
+        # Codecov merges the reports of all jobs into the coverage that the README badge shows. Not when
+        # release.yml calls this workflow: the tagged commit is on main and was uploaded by its push, and
+        # the release passes no secrets. Pull requests from forks get no secrets; the action uploads them
+        # without a token. A failed upload does not fail the job.
+        if: github.workflow == 'tests'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          disable_search: true
+          disable_telem: true

@@ -8,6 +8,7 @@ venv/
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
 .ruff_cache/
 
 # Contract-test results (tests/contract/conftest.py)
